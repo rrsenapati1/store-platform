@@ -20,6 +20,10 @@ Read the smallest useful set.
   - `API_CONTRACT_MATRIX.md`
 - Reset program status or future work:
   - `TASK_LEDGER.md`
+- V2 launch target and program direction:
+  - `PROJECT_CONTEXT.md`
+  - `STORE_CANONICAL_BLUEPRINT.md`
+  - `TASK_LEDGER.md`
 - Recent implementation history:
   - `WORKLOG.md`
 - Handoff between contributors:
@@ -65,6 +69,7 @@ Root `docs/` contains canonical docs only:
   - internal support/admin playbooks and escalation guides
 - `superpowers/specs/`
   - approved architecture and milestone design specs
+  - includes the V2 launch-program design that supersedes the smaller public-release endgame
 
 ## Governance Rules
 

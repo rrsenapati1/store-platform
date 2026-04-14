@@ -2,6 +2,16 @@
 
 ## 2026-04-15
 
+- Completed CP-028 as the V2 program transition:
+  - rewrote the task ledger so the repo now targets a broader V2 launch program instead of the smaller desktop-first public-release endgame
+  - kept `CP-*` history intact while adding a new `V2-*` task family for runtime surfaces, device input, advanced hardware, store operations depth, customer/commercial features, staff/branch controls, reporting, vertical extensions, hardening, and final V2 launch readiness
+  - realigned the canonical docs so `PROJECT_CONTEXT.md` and `STORE_CANONICAL_BLUEPRINT.md` now describe V2 as the active physical-retail suite target
+  - explicitly deferred omnichannel work like e-commerce, marketplace sync, online ordering, customer app flows, and delivery orchestration into post-V2 future work instead of mixing them into the launch-critical path
+- Verified:
+  - `rg -n "V2-001|V2-010|Future Work After V2|omnichannel" docs/TASK_LEDGER.md`
+  - `rg -n "V2 launch|mobile store app|inventory tablet|customer display|omnichannel" docs/PROJECT_CONTEXT.md docs/STORE_CANONICAL_BLUEPRINT.md`
+  - `rg -n "V2 launch|V2 program|future work" docs/DOCS_INDEX.md docs/WORKLOG.md`
+
 - Started CP-028 on launch readiness and cutover:
   - added a release-candidate certification script and regression tests so staging/prod cutover checks are executable instead of living only in narrative runbooks
   - added a release-candidate evidence generator so operators can run local/deployed launch checks and write a concrete Markdown evidence record instead of hand-copying verification outputs into the template
