@@ -8,6 +8,13 @@ export interface StoreRuntimePrinterRecord {
   is_online: boolean | null;
 }
 
+export interface StoreRuntimeBarcodeLabel {
+  sku_code: string;
+  product_name: string;
+  barcode: string;
+  price_label: string;
+}
+
 export interface StoreRuntimeHardwareProfile {
   receipt_printer_name: string | null;
   label_printer_name: string | null;
@@ -34,9 +41,18 @@ export interface StoreRuntimeHardwareStatus {
   diagnostics: StoreRuntimeHardwareDiagnostics;
 }
 
+export interface StoreRuntimeHardwarePrintJobInput {
+  job_id: string;
+  job_type: string;
+  document_number: string | null;
+  receipt_lines: string[] | null;
+  labels: StoreRuntimeBarcodeLabel[] | null;
+}
+
 export interface StoreRuntimeHardwareAdapter {
   getStatus(): Promise<StoreRuntimeHardwareStatus>;
   saveProfile(profile: StoreRuntimeHardwareProfileInput): Promise<StoreRuntimeHardwareStatus>;
+  dispatchPrintJob(job: StoreRuntimeHardwarePrintJobInput): Promise<StoreRuntimeHardwareStatus>;
 }
 
 export type StoreRuntimeHardwareInvoke = (command: string, payload?: Record<string, unknown>) => Promise<unknown>;

@@ -67,6 +67,7 @@ import { isStoreRuntimeDeveloperBootstrapEnabled } from './storeRuntimeAuthMode'
 import { ensureStoreRuntimeHubIdentity } from './runtimeHubIdentity';
 import { loadStoreRuntimeShellStatus, useStoreRuntimeShellStatus } from './useStoreRuntimeShellStatus';
 import { ControlPlaneRequestError, storeControlPlaneClient } from './client';
+import { useStoreRuntimeHardwareIntegration } from './useStoreRuntimeHardwareIntegration';
 import { useStoreRuntimeOfflineContinuity } from './useStoreRuntimeOfflineContinuity';
 type CacheStatus = 'EMPTY' | 'HYDRATED' | 'SYNCED';
 
@@ -145,6 +146,30 @@ export function useStoreRuntimeWorkspace() {
 
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? actor?.branch_memberships[0]?.tenant_id ?? '';
   const branchId = actor?.branch_memberships[0]?.branch_id ?? branches[0]?.branch_id ?? '';
+  const runtimeHardware = useStoreRuntimeHardwareIntegration({
+    runtimeShellKind: runtimeShellStatus?.runtime_kind ?? null,
+    accessToken,
+    tenantId,
+    branchId,
+    selectedRuntimeDeviceId,
+    isSessionLive,
+    isLocalUnlocked,
+    onPrintJobsChange(nextPrintJobs) {
+      startTransition(() => {
+        setPrintJobs(nextPrintJobs);
+      });
+    },
+    onLatestPrintJobChange(nextLatestPrintJob) {
+      startTransition(() => {
+        setLatestPrintJob(nextLatestPrintJob);
+      });
+    },
+    onErrorMessage(message) {
+      startTransition(() => {
+        setErrorMessage(message);
+      });
+    },
+  });
   const offlineContinuity = useStoreRuntimeOfflineContinuity({
     accessToken,
     tenantId,
@@ -1260,10 +1285,21 @@ export function useStoreRuntimeWorkspace() {
     replayOfflineSales: offlineContinuity.replayOfflineSales,
     replayPendingRuntimeActions: replayPendingRuntimeActions,
     refreshPrintQueue,
+    assignRuntimeLabelPrinter: runtimeHardware.assignLabelPrinter,
+    assignRuntimeReceiptPrinter: runtimeHardware.assignReceiptPrinter,
     runtimeAppVersion: runtimeShellStatus?.app_version ?? null,
     runtimeArchitecture: runtimeShellStatus?.architecture ?? null,
     runtimeCacheDatabasePath: runtimeShellStatus?.cache_db_path ?? null,
     runtimeDevices,
+    runtimeHardwareBridgeState: runtimeHardware.hardwareStatus?.bridge_state ?? null,
+    runtimeHardwareError: runtimeHardware.hardwareError,
+    runtimeHardwareLastPrintMessage: runtimeHardware.hardwareStatus?.diagnostics.last_print_message ?? null,
+    runtimeHardwareLastPrintStatus: runtimeHardware.hardwareStatus?.diagnostics.last_print_status ?? null,
+    runtimeHardwareLastPrintedAt: runtimeHardware.hardwareStatus?.diagnostics.last_printed_at ?? null,
+    runtimeHardwareLastScanAt: runtimeHardware.hardwareStatus?.diagnostics.last_scan_at ?? null,
+    runtimeHardwarePrinters: runtimeHardware.hardwareStatus?.printers ?? [],
+    runtimeLabelPrinterName: runtimeHardware.hardwareStatus?.profile.label_printer_name ?? null,
+    runtimeReceiptPrinterName: runtimeHardware.hardwareStatus?.profile.receipt_printer_name ?? null,
     runtimeHeartbeat,
     runtimeHome: runtimeShellStatus?.runtime_home ?? null,
     runtimeHostname: runtimeShellStatus?.hostname ?? null,

@@ -2,6 +2,7 @@ import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 import type {
   StoreRuntimeHardwareAdapter,
   StoreRuntimeHardwareInvoke,
+  StoreRuntimeHardwarePrintJobInput,
   StoreRuntimeHardwareProfileInput,
   StoreRuntimeHardwareStatus,
 } from './storeRuntimeHardwareContract';
@@ -33,6 +34,11 @@ export function createNativeStoreRuntimeHardware(options: NativeStoreRuntimeHard
       return toHardwareStatus(await invoke('cmd_save_store_runtime_hardware_profile', {
         receipt_printer_name: profile.receipt_printer_name,
         label_printer_name: profile.label_printer_name,
+      }));
+    },
+    async dispatchPrintJob(job: StoreRuntimeHardwarePrintJobInput) {
+      return toHardwareStatus(await invoke('cmd_dispatch_store_runtime_print_job', {
+        job,
       }));
     },
   };

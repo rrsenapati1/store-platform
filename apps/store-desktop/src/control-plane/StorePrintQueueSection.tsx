@@ -15,6 +15,7 @@ function describePrintJobPayload(job: StoreRuntimeWorkspaceState['printJobs'][nu
 export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const hasDevice = Boolean(workspace.selectedRuntimeDeviceId);
   const latestJob = workspace.latestPrintJob;
+  const isPackagedRuntime = workspace.runtimeShellKind === 'packaged_desktop';
 
   return (
     <SectionCard eyebrow="Runtime print desk" title="Print queue and device polling">
@@ -52,10 +53,54 @@ export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeW
         <ActionButton onClick={() => void workspace.refreshPrintQueue()} disabled={workspace.isBusy || !workspace.isSessionLive || !hasDevice}>
           Refresh print queue
         </ActionButton>
-        <ActionButton onClick={() => void workspace.completeFirstPrintJob()} disabled={workspace.isBusy || !workspace.isSessionLive || workspace.printJobs.length === 0 || !hasDevice}>
-          Mark first job completed
-        </ActionButton>
+        {!isPackagedRuntime ? (
+          <ActionButton onClick={() => void workspace.completeFirstPrintJob()} disabled={workspace.isBusy || !workspace.isSessionLive || workspace.printJobs.length === 0 || !hasDevice}>
+            Mark first job completed
+          </ActionButton>
+        ) : null}
       </div>
+
+      {isPackagedRuntime ? (
+        <div style={{ marginTop: '18px' }}>
+          <DetailList
+            items={[
+              { label: 'Hardware bridge', value: workspace.runtimeHardwareBridgeState ?? 'Unavailable' },
+              { label: 'Receipt printer', value: workspace.runtimeReceiptPrinterName ?? 'Not assigned' },
+              { label: 'Label printer', value: workspace.runtimeLabelPrinterName ?? 'Not assigned' },
+              { label: 'Last local print', value: workspace.runtimeHardwareLastPrintMessage ?? 'No local print activity yet' },
+            ]}
+          />
+        </div>
+      ) : null}
+
+      {isPackagedRuntime ? (
+        <div style={{ marginTop: '18px' }}>
+          <h3 style={{ marginBottom: '10px' }}>Discovered local printers</h3>
+          <ul style={{ margin: 0, color: '#4e5871', lineHeight: 1.7 }}>
+            {workspace.runtimeHardwarePrinters.length ? (
+              workspace.runtimeHardwarePrinters.map((printer) => (
+                <li key={printer.name} style={{ marginBottom: '12px' }}>
+                  <strong>{printer.label}</strong>
+                  <span> :: {printer.is_default ? 'default' : 'secondary'} :: {printer.is_online === false ? 'offline' : 'ready'}</span>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '8px' }}>
+                    <ActionButton onClick={() => void workspace.assignRuntimeReceiptPrinter(printer.name)} disabled={workspace.isBusy}>
+                      Use for receipts
+                    </ActionButton>
+                    <ActionButton onClick={() => void workspace.assignRuntimeLabelPrinter(printer.name)} disabled={workspace.isBusy}>
+                      Use for labels
+                    </ActionButton>
+                  </div>
+                </li>
+              ))
+            ) : (
+              <li>No local printers discovered yet.</li>
+            )}
+          </ul>
+          {workspace.runtimeHardwareError ? (
+            <p style={{ color: '#9d2b19', marginBottom: 0 }}>{workspace.runtimeHardwareError}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {workspace.runtimeHeartbeat ? (
         <div style={{ marginTop: '18px' }}>

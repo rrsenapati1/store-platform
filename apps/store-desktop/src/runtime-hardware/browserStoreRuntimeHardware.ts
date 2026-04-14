@@ -30,5 +30,8 @@ export function createBrowserStoreRuntimeHardware(): StoreRuntimeHardwareAdapter
     async saveProfile() {
       return buildBrowserFallbackStatus();
     },
+    async dispatchPrintJob() {
+      return buildBrowserFallbackStatus();
+    },
   };
 }
