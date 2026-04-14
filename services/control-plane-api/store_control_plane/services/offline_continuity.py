@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..repositories import AuditRepository, BillingRepository, CatalogRepository, InventoryRepository, SyncRuntimeRepository, TenantRepository
 from ..utils import utc_now
 from .billing_policy import SaleDraft, build_sale_draft, sale_invoice_number
+from .commercial_access import CommercialAccessService
 from .sync_runtime_auth import SyncDeviceContext
 
 
@@ -47,6 +48,7 @@ class OfflineContinuityService:
         self._billing_repo = BillingRepository(session)
         self._sync_repo = SyncRuntimeRepository(session)
         self._audit_repo = AuditRepository(session)
+        self._commercial_access = CommercialAccessService(session)
 
     async def replay_offline_sale(
         self,
@@ -54,6 +56,7 @@ class OfflineContinuityService:
         device: SyncDeviceContext,
         payload: dict[str, object],
     ) -> dict[str, object]:
+        await self._commercial_access.assert_offline_continuity_allowed(tenant_id=device.tenant_id)
         branch = await self._tenant_repo.get_branch(tenant_id=device.tenant_id, branch_id=device.branch_id)
         if branch is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")

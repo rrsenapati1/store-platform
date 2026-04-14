@@ -3,6 +3,7 @@ from .batches import BatchExpiryWriteOff, BatchLot
 from .billing import CreditNote, CreditNoteTaxLine, ExchangeOrder, InvoiceTaxLine, Payment, Sale, SaleLine, SaleReturn, SaleReturnLine, SalesInvoice
 from .catalog import BranchCatalogItem, CatalogProduct
 from .compliance import BranchIrpProfile, GstExportJob, IrnAttachment
+from .commerce import BillingPlan, SubscriptionWebhookEvent, TenantBillingOverride, TenantEntitlement, TenantSubscription
 from .customers import CustomerExchangeSnapshot, CustomerSaleReturnSnapshot, CustomerSaleSnapshot
 from .identity import AppSession, PlatformAdminAccount, User
 from .operations import OperationsJob
@@ -22,6 +23,7 @@ __all__ = [
     "AuditEvent",
     "BatchExpiryWriteOff",
     "BatchLot",
+    "BillingPlan",
     "BranchIrpProfile",
     "Branch",
     "BranchCatalogItem",
@@ -60,6 +62,7 @@ __all__ = [
     "SalesInvoice",
     "StockAdjustment",
     "StockCountSession",
+    "SubscriptionWebhookEvent",
     "SyncConflict",
     "SyncEnvelope",
     "SyncMutationLog",
@@ -74,6 +77,9 @@ __all__ = [
     "SupplierReturn",
     "SupplierReturnLine",
     "Tenant",
+    "TenantBillingOverride",
+    "TenantEntitlement",
+    "TenantSubscription",
     "TenantMembership",
     "User",
     "VendorDispute",

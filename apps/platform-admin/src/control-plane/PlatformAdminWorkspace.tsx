@@ -61,7 +61,7 @@ export function PlatformAdminWorkspace() {
             <li key={tenant.tenant_id}>
               <button
                 type="button"
-                onClick={() => workspace.setActiveTenantId(tenant.tenant_id)}
+                onClick={() => void workspace.selectTenant(tenant.tenant_id)}
                 style={{ border: 0, background: 'transparent', color: '#25314f', cursor: 'pointer', fontWeight: tenant.tenant_id === workspace.activeTenantId ? 700 : 500 }}
               >
                 {tenant.name}
@@ -94,6 +94,88 @@ export function PlatformAdminWorkspace() {
             />
           </div>
         ) : null}
+      </SectionCard>
+
+      <SectionCard eyebrow="Commercial catalog" title="Billing plan catalog">
+        <FormField id="plan-code" label="Plan code" value={workspace.planCode} onChange={workspace.setPlanCode} />
+        <FormField id="plan-name" label="Plan name" value={workspace.planName} onChange={workspace.setPlanName} />
+        <FormField
+          id="plan-amount-minor"
+          label="Plan monthly amount (minor units)"
+          value={workspace.planAmountMinor}
+          onChange={workspace.setPlanAmountMinor}
+        />
+        <FormField id="plan-branch-limit" label="Plan branch limit" value={workspace.planBranchLimit} onChange={workspace.setPlanBranchLimit} />
+        <FormField id="plan-device-limit" label="Plan device limit" value={workspace.planDeviceLimit} onChange={workspace.setPlanDeviceLimit} />
+        <ActionButton
+          onClick={() => void workspace.createBillingPlan()}
+          disabled={
+            workspace.isBusy ||
+            !workspace.actor ||
+            !workspace.planCode ||
+            !workspace.planName ||
+            !workspace.planAmountMinor ||
+            !workspace.planBranchLimit ||
+            !workspace.planDeviceLimit
+          }
+        >
+          Create billing plan
+        </ActionButton>
+        <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
+          {workspace.billingPlans.map((plan) => (
+            <li key={plan.id}>
+              {plan.display_name}{' '}
+              {plan.is_default ? <StatusBadge label="DEFAULT" tone="success" /> : <StatusBadge label={plan.status} tone="neutral" />}
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+
+      <SectionCard eyebrow="Tenant commercial posture" title="Commercial lifecycle">
+        {workspace.activeTenantLifecycle ? (
+          <>
+            <DetailList
+              items={[
+                { label: 'Plan', value: workspace.activeTenantLifecycle.entitlement.active_plan_code },
+                {
+                  label: 'Subscription',
+                  value: (
+                    <StatusBadge
+                      label={workspace.activeTenantLifecycle.subscription.lifecycle_status}
+                      tone={workspace.activeTenantLifecycle.subscription.lifecycle_status === 'ACTIVE' ? 'success' : 'warning'}
+                    />
+                  ),
+                },
+                {
+                  label: 'Entitlement',
+                  value: (
+                    <StatusBadge
+                      label={workspace.activeTenantLifecycle.entitlement.lifecycle_status}
+                      tone={workspace.activeTenantLifecycle.entitlement.lifecycle_status === 'ACTIVE' ? 'success' : 'warning'}
+                    />
+                  ),
+                },
+                { label: 'Device limit', value: String(workspace.activeTenantLifecycle.entitlement.device_limit) },
+              ]}
+            />
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
+              <ActionButton
+                onClick={() => void workspace.suspendActiveTenantAccess()}
+                disabled={workspace.isBusy || workspace.activeTenantLifecycle.entitlement.lifecycle_status === 'SUSPENDED'}
+              >
+                Suspend tenant access
+              </ActionButton>
+              <ActionButton
+                onClick={() => void workspace.reactivateActiveTenantAccess()}
+                disabled={workspace.isBusy || workspace.activeTenantLifecycle.entitlement.lifecycle_status !== 'SUSPENDED'}
+              >
+                Reactivate tenant access
+              </ActionButton>
+            </div>
+          </>
+        ) : (
+          <p style={{ margin: 0, color: '#4e5871' }}>Select a tenant to inspect commercial lifecycle.</p>
+        )}
       </SectionCard>
     </AppShell>
   );

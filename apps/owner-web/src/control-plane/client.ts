@@ -35,6 +35,7 @@ import type {
   ControlPlanePurchaseOrderRecord,
   ControlPlaneReceivingBoard,
   ControlPlaneSaleRecord,
+  ControlPlaneSubscriptionBootstrap,
   ControlPlaneSupplierPayablesReport,
   ControlPlaneSupplierPayment,
   ControlPlaneSupplierReturn,
@@ -60,6 +61,7 @@ import type {
   ControlPlaneSupplierSettlementReport,
   ControlPlaneSupplierStatementReport,
   ControlPlaneTenant,
+  ControlPlaneTenantLifecycleSummary,
   ControlPlaneTransfer,
   ControlPlaneVendorDisputeBoard,
   ControlPlaneTransferBoard,
@@ -94,6 +96,19 @@ export const ownerControlPlaneClient = {
   },
   getTenantSummary(accessToken: string, tenantId: string) {
     return request<ControlPlaneTenant>(`/v1/tenants/${tenantId}`, undefined, accessToken);
+  },
+  getTenantBillingLifecycle(accessToken: string, tenantId: string) {
+    return request<ControlPlaneTenantLifecycleSummary>(`/v1/tenants/${tenantId}/billing/lifecycle`, undefined, accessToken);
+  },
+  bootstrapTenantSubscription(accessToken: string, tenantId: string, payload: { provider_name: string }) {
+    return request<ControlPlaneSubscriptionBootstrap>(
+      `/v1/tenants/${tenantId}/billing/subscription-bootstrap`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
   },
   listBranches(accessToken: string, tenantId: string) {
     return request<{ records: ControlPlaneBranchRecord[] }>(`/v1/tenants/${tenantId}/branches`, undefined, accessToken);

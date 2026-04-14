@@ -4,6 +4,7 @@ from .barcode import router as barcode_router
 from .billing import router as billing_router
 from .catalog import router as catalog_router
 from .compliance import router as compliance_router
+from .commerce import router as commerce_router
 from .customers import router as customers_router
 from .exchanges import router as exchange_router
 from .inventory import router as inventory_router
@@ -25,6 +26,7 @@ __all__ = [
     "billing_router",
     "catalog_router",
     "compliance_router",
+    "commerce_router",
     "customers_router",
     "exchange_router",
     "inventory_router",

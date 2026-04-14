@@ -44,11 +44,13 @@ import { resolveControlPlaneRequestUrl } from './controlPlaneOrigin';
 
 export class ControlPlaneRequestError extends Error {
   readonly status: number;
+  readonly detail: string | null;
 
-  constructor(status: number) {
-    super(`Control-plane request failed with status ${status}`);
+  constructor(status: number, detail?: string | null) {
+    super(detail || `Control-plane request failed with status ${status}`);
     this.name = 'ControlPlaneRequestError';
     this.status = status;
+    this.detail = detail ?? null;
   }
 }
 
@@ -63,7 +65,16 @@ async function request<T>(path: string, init?: RequestInit, accessToken?: string
   });
 
   if (!response.ok) {
-    throw new ControlPlaneRequestError(response.status);
+    let detail: string | null = null;
+    try {
+      const payload = await response.json() as { detail?: unknown };
+      if (typeof payload.detail === 'string') {
+        detail = payload.detail;
+      }
+    } catch {
+      detail = null;
+    }
+    throw new ControlPlaneRequestError(response.status, detail);
   }
 
   return (await response.json()) as T;
@@ -80,7 +91,16 @@ async function requestWithHeaders<T>(path: string, headers: Record<string, strin
   });
 
   if (!response.ok) {
-    throw new ControlPlaneRequestError(response.status);
+    let detail: string | null = null;
+    try {
+      const payload = await response.json() as { detail?: unknown };
+      if (typeof payload.detail === 'string') {
+        detail = payload.detail;
+      }
+    } catch {
+      detail = null;
+    }
+    throw new ControlPlaneRequestError(response.status, detail);
   }
 
   return (await response.json()) as T;

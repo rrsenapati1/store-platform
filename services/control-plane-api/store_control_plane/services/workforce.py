@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import AuditRepository, IdentityRepository, MembershipRepository, TenantRepository, WorkforceRepository
 from ..utils import utc_now
+from .commercial_access import CommercialAccessService
 from .sync_runtime_auth import hash_sync_access_secret
 
 STORE_DESKTOP_ACTIVATION_TTL_MINUTES = 15
@@ -96,6 +97,7 @@ class WorkforceService:
         self._workforce_repo = WorkforceRepository(session)
         self._audit_repo = AuditRepository(session)
         self._identity_repo = IdentityRepository(session)
+        self._commercial_access = CommercialAccessService(session)
 
     async def _resolve_runtime_user_for_profile(self, *, device, profile):
         synthetic_subject = f"store-desktop-activation:{profile.id}"
@@ -587,6 +589,7 @@ class WorkforceService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Approved packaged store desktop device required",
             )
+        await self._commercial_access.assert_runtime_activation_allowed(tenant_id=device.tenant_id)
         if not device.assigned_staff_profile_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -643,6 +646,7 @@ class WorkforceService:
         )
         if device is None or device.status != "ACTIVE" or device.session_surface != "store_desktop":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Desktop activation is invalid")
+        access = await self._commercial_access.assert_runtime_activation_allowed(tenant_id=device.tenant_id)
 
         activation = await self._workforce_repo.get_store_desktop_activation(
             device_id=device.id,
@@ -662,7 +666,11 @@ class WorkforceService:
 
         redeemed_at = utc_now()
         local_auth_token = build_store_desktop_local_auth_token()
-        offline_valid_until = redeemed_at + timedelta(hours=STORE_DESKTOP_OFFLINE_UNLOCK_TTL_HOURS)
+        offline_hours = self._commercial_access.resolve_offline_runtime_hours(
+            access=access,
+            fallback_hours=STORE_DESKTOP_OFFLINE_UNLOCK_TTL_HOURS,
+        )
+        offline_valid_until = redeemed_at + timedelta(hours=offline_hours)
         await self._workforce_repo.redeem_store_desktop_activation(
             activation=activation,
             local_auth_token_hash=hash_store_desktop_local_auth_token(local_auth_token),
@@ -706,6 +714,7 @@ class WorkforceService:
         )
         if device is None or device.status != "ACTIVE" or device.session_surface != "store_desktop":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Store desktop unlock is invalid")
+        access = await self._commercial_access.assert_runtime_session_allowed(tenant_id=device.tenant_id)
 
         activation = await self._workforce_repo.get_active_store_desktop_activation_by_local_auth_token(
             device_id=device.id,
@@ -725,7 +734,11 @@ class WorkforceService:
         await self._assert_store_desktop_branch_membership(runtime_user_id=runtime_user.id, device=device)
 
         unlocked_at = utc_now()
-        offline_valid_until = unlocked_at + timedelta(hours=STORE_DESKTOP_OFFLINE_UNLOCK_TTL_HOURS)
+        offline_hours = self._commercial_access.resolve_offline_runtime_hours(
+            access=access,
+            fallback_hours=STORE_DESKTOP_OFFLINE_UNLOCK_TTL_HOURS,
+        )
+        offline_valid_until = unlocked_at + timedelta(hours=offline_hours)
         await self._workforce_repo.touch_store_desktop_activation_unlock(
             activation=activation,
             unlocked_at=unlocked_at,

@@ -2,6 +2,31 @@
 
 ## 2026-04-14
 
+- Completed CP-023 on SaaS commerce and tenant lifecycle:
+  - added canonical billing plan, tenant subscription, entitlement, billing override, and webhook-event persistence for the control plane instead of leaving SaaS lifecycle outside the product authority boundary
+  - added Cashfree and Razorpay recurring-subscription adapters, tenant trial issuance, canonical entitlement rebuilding, and webhook normalization so provider state flows into one commercial contract per tenant
+  - added platform-admin plan and tenant lifecycle management plus owner billing lifecycle and subscription bootstrap surfaces instead of handling subscription state as opaque backoffice metadata
+  - enforced commercial lifecycle across packaged runtime auth, store-desktop activation and unlock, and offline sale replay so suspended or expired-grace tenants are blocked consistently while owner billing recovery stays accessible
+  - surfaced clear packaged-runtime commercial denial messaging and stopped treating 402 billing denials as transient local-offline fallbacks
+- Added regression coverage for:
+  - billing-plan and lifecycle persistence
+  - Cashfree and Razorpay provider adapter normalization
+  - platform-admin billing plan and tenant lifecycle routes
+  - owner billing lifecycle UI and recovery bootstrap
+  - runtime actor-context suspension enforcement
+  - packaged desktop grace and suspension activation or unlock enforcement
+  - offline sale replay suspension enforcement
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `npm run test --workspace @store/platform-admin`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.activation.test.tsx`
+  - `npm run typecheck --workspace @store/platform-admin`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/platform-admin`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run build --workspace @store/store-desktop`
 - Completed CP-022 on Store Desktop packaging and distribution:
   - added build-time release profiles for `dev`, `staging`, and `prod` so packaged Store Desktop no longer depends on ad hoc localhost defaults after installation
   - enabled Windows-first NSIS bundle output plus signed updater artifacts in the Tauri shell configuration

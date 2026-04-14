@@ -666,7 +666,11 @@ export function useStoreRuntimeWorkspace() {
         setActivationCode('');
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to activate desktop access');
+      if (error instanceof ControlPlaneRequestError && error.status === 402) {
+        setErrorMessage(error.detail ?? 'Commercial access is suspended for this tenant. Ask the owner to update billing.');
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to activate desktop access');
+      }
     } finally {
       setIsBusy(false);
     }
@@ -795,6 +799,12 @@ export function useStoreRuntimeWorkspace() {
         await bootstrapRuntimeSession(session);
         return;
       } catch (error) {
+        if (error instanceof ControlPlaneRequestError && error.status === 402) {
+          await clearStoreRuntimeSession();
+          resetRuntimeWorkspaceState();
+          setErrorMessage(error.detail ?? 'Commercial access is suspended for this tenant. Ask the owner to update billing.');
+          return;
+        }
         if (error instanceof ControlPlaneRequestError && (error.status === 401 || error.status === 403 || error.status === 409)) {
           await clearStoreRuntimeSession();
           await clearStoreRuntimeLocalAuth();
@@ -838,6 +848,10 @@ export function useStoreRuntimeWorkspace() {
         await clearStoreRuntimeSession();
         resetRuntimeWorkspaceState();
         setErrorMessage('Runtime session expired. Sign in again.');
+      } else if (error instanceof ControlPlaneRequestError && error.status === 402) {
+        await clearStoreRuntimeSession();
+        resetRuntimeWorkspaceState();
+        setErrorMessage(error.detail ?? 'Commercial access is suspended for this tenant. Ask the owner to update billing.');
       } else {
         setErrorMessage(error instanceof Error ? error.message : 'Unable to refresh runtime session');
       }

@@ -3,19 +3,23 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import Settings
 from ..repositories import AuditRepository, MembershipRepository, TenantRepository, WorkforceRepository
+from .commerce import CommerceService
 
 
 class OnboardingService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, settings: Settings):
         self._session = session
         self._tenant_repo = TenantRepository(session)
         self._membership_repo = MembershipRepository(session)
         self._workforce_repo = WorkforceRepository(session)
         self._audit_repo = AuditRepository(session)
+        self._commerce_service = CommerceService(session, settings)
 
     async def create_tenant(self, *, actor_user_id: str, name: str, slug: str):
         tenant = await self._tenant_repo.create_tenant(name=name, slug=slug)
+        await self._commerce_service.issue_trial_subscription(tenant_id=tenant.id)
         await self._audit_repo.record(
             tenant_id=tenant.id,
             branch_id=None,

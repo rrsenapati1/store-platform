@@ -5,6 +5,7 @@ from .batches_policy import build_batch_expiry_report, ensure_expiry_write_off_a
 from .barcode import BarcodeService
 from .barcode_policy import allocate_barcode, build_barcode_label_preview, normalize_barcode
 from .billing import BillingService
+from .commerce import CommerceService
 from .offline_continuity import OfflineContinuityService
 from .catalog import CatalogService
 from .compliance import ComplianceService
@@ -25,6 +26,7 @@ from .spoke_runtime import SpokeRuntimeService
 from .sync_runtime import SyncRuntimeService
 from .sync_runtime_auth import SyncDeviceContext, SyncRuntimeAuthService, hash_sync_access_secret
 from .supplier_reporting import SupplierReportingService
+from .subscription_providers import build_subscription_provider
 from .workforce import WorkforceService
 
 __all__ = [
@@ -34,6 +36,7 @@ __all__ = [
     "BarcodeService",
     "BillingService",
     "CatalogService",
+    "CommerceService",
     "ComplianceService",
     "ComplianceSecretsService",
     "CustomerReportingService",
@@ -51,6 +54,7 @@ __all__ = [
     "SyncRuntimeAuthService",
     "SupplierReportingService",
     "WorkforceService",
+    "build_subscription_provider",
     "build_authority_boundary",
     "build_batch_expiry_report",
     "build_hsn_sac_summary",

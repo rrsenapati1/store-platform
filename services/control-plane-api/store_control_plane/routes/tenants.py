@@ -3,7 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..dependencies import get_current_actor, get_session
+from ..config import Settings
+from ..dependencies import get_current_actor, get_session, get_settings
 from ..schemas import AuditListResponse, AuditRecord, BranchCreateRequest, BranchListResponse, BranchMembershipCreateRequest, BranchRecord, BranchResponse, MembershipResponse, TenantMembershipCreateRequest, TenantSummaryResponse
 from ..services import ActorContext, OnboardingService, assert_branch_any_capability, assert_tenant_capability
 
@@ -15,9 +16,10 @@ async def get_tenant_summary(
     tenant_id: str,
     actor: ActorContext = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ) -> TenantSummaryResponse:
     assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id="", capabilities=("tenant.manage", "sales.bill"))
-    service = OnboardingService(session)
+    service = OnboardingService(session, settings)
     tenant = await service.get_tenant_summary(tenant_id)
     return TenantSummaryResponse.model_validate(tenant, from_attributes=True)
 
@@ -28,9 +30,10 @@ async def create_branch(
     payload: BranchCreateRequest,
     actor: ActorContext = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ) -> BranchResponse:
     assert_tenant_capability(actor, tenant_id=tenant_id, capability="branch.manage")
-    service = OnboardingService(session)
+    service = OnboardingService(session, settings)
     branch = await service.create_branch(
         tenant_id=tenant_id,
         actor_user_id=actor.user_id,
@@ -47,9 +50,10 @@ async def list_branches(
     tenant_id: str,
     actor: ActorContext = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ) -> BranchListResponse:
     assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id="", capabilities=("branch.manage", "sales.bill"))
-    service = OnboardingService(session)
+    service = OnboardingService(session, settings)
     branches = await service.list_branches(tenant_id)
     return BranchListResponse(
         records=[
@@ -72,9 +76,10 @@ async def create_tenant_membership(
     payload: TenantMembershipCreateRequest,
     actor: ActorContext = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ) -> MembershipResponse:
     assert_tenant_capability(actor, tenant_id=tenant_id, capability="staff.manage")
-    service = OnboardingService(session)
+    service = OnboardingService(session, settings)
     membership = await service.assign_tenant_membership(
         tenant_id=tenant_id,
         actor_user_id=actor.user_id,
@@ -99,9 +104,10 @@ async def create_branch_membership(
     payload: BranchMembershipCreateRequest,
     actor: ActorContext = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ) -> MembershipResponse:
     assert_tenant_capability(actor, tenant_id=tenant_id, capability="staff.manage")
-    service = OnboardingService(session)
+    service = OnboardingService(session, settings)
     membership = await service.assign_branch_membership(
         tenant_id=tenant_id,
         branch_id=branch_id,
@@ -126,9 +132,10 @@ async def list_audit_events(
     tenant_id: str,
     actor: ActorContext = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ) -> AuditListResponse:
     assert_tenant_capability(actor, tenant_id=tenant_id, capability="audit.view")
-    service = OnboardingService(session)
+    service = OnboardingService(session, settings)
     events = await service.list_audit_events(tenant_id)
     return AuditListResponse(
         records=[

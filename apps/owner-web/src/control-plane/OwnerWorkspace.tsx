@@ -2,6 +2,7 @@ import { ActionButton, AppShell, DetailList, FormField, MetricGrid, SectionCard,
 import { OwnerBatchExpirySection } from './OwnerBatchExpirySection';
 import { OwnerBarcodeSection } from './OwnerBarcodeSection';
 import { OwnerBarcodePrintRuntimeSection } from './OwnerBarcodePrintRuntimeSection';
+import { OwnerBillingLifecycleSection } from './OwnerBillingLifecycleSection';
 import { OwnerComplianceSection } from './OwnerComplianceSection';
 import { OwnerCustomerInsightsSection } from './OwnerCustomerInsightsSection';
 import { OwnerDeviceClaimSection } from './OwnerDeviceClaimSection';
@@ -73,6 +74,8 @@ export function OwnerWorkspace() {
           <p style={{ margin: 0, color: '#4e5871' }}>Start a session to load tenant onboarding.</p>
         )}
       </SectionCard>
+
+      <OwnerBillingLifecycleSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} />
 
       <SectionCard eyebrow="First branch setup" title="Branch creation">
         <FormField id="branch-name" label="Branch name" value={workspace.branchName} onChange={workspace.setBranchName} />

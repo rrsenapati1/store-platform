@@ -508,6 +508,25 @@ describe('store desktop packaged activation flow', () => {
     expect(screen.queryByText('Counter Cashier')).not.toBeInTheDocument();
   });
 
+  test('does not fall back to cached local unlock when commercial access is suspended', async () => {
+    tauriState.cache = createCachedRuntimeSnapshot();
+    tauriState.localAuth = await createLocalAuthRecord();
+    tauriState.session = null;
+    globalThis.fetch = vi.fn(async () => jsonResponse({ detail: 'Commercial access is suspended for this tenant. Ask the owner to update billing.' }, 402)) as unknown as typeof fetch;
+
+    render(<App />);
+
+    expect(await screen.findByText('Unlock with PIN')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('PIN'), {
+      target: { value: '2580' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock runtime' }));
+
+    expect(await screen.findByText('Commercial access is suspended for this tenant. Ask the owner to update billing.')).toBeInTheDocument();
+    expect(screen.queryByText('Counter Cashier')).not.toBeInTheDocument();
+  });
+
   test('bootstraps and persists hub machine identity for a packaged branch hub device', async () => {
     const responses = [
       jsonResponse({

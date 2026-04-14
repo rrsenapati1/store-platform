@@ -4,6 +4,7 @@ from .barcode import BarcodeRepository
 from .billing import BillingRepository
 from .catalog import CatalogRepository
 from .compliance import ComplianceRepository
+from .commerce import CommerceRepository
 from .customers import CustomerReportingRepository
 from .identity import IdentityRepository
 from .inventory import InventoryRepository
@@ -24,6 +25,7 @@ __all__ = [
     "BillingRepository",
     "CatalogRepository",
     "ComplianceRepository",
+    "CommerceRepository",
     "CustomerReportingRepository",
     "IdentityRepository",
     "InventoryRepository",

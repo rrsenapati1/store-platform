@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     compliance_irp_get_gstin_details_url: str | None = None
     compliance_irp_public_key_pem: str | None = None
     compliance_irp_timeout_seconds: float = 10.0
+    subscription_provider_mode: str = "stub"
+    subscription_checkout_base_url: str = "https://payments.store.local"
+    cashfree_webhook_secret: str | None = None
+    razorpay_webhook_secret: str | None = None
 
     model_config = SettingsConfigDict(
         env_prefix="STORE_CONTROL_PLANE_",
@@ -73,6 +77,15 @@ class Settings(BaseSettings):
                 return normalized
         return value
 
+    @field_validator("subscription_provider_mode", mode="before")
+    @classmethod
+    def _normalize_subscription_provider_mode(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"stub"}:
+                return normalized
+        return value
+
 
 def build_settings(
     *,
@@ -85,6 +98,8 @@ def build_settings(
     platform_admin_emails: list[str] | None = None,
     compliance_secret_key: str | None = None,
     compliance_irp_mode: str | None = None,
+    subscription_provider_mode: str | None = None,
+    subscription_checkout_base_url: str | None = None,
 ) -> Settings:
     overrides: dict[str, object] = {}
     if database_url is not None:
@@ -105,4 +120,8 @@ def build_settings(
         overrides["compliance_secret_key"] = compliance_secret_key
     if compliance_irp_mode is not None:
         overrides["compliance_irp_mode"] = compliance_irp_mode
+    if subscription_provider_mode is not None:
+        overrides["subscription_provider_mode"] = subscription_provider_mode
+    if subscription_checkout_base_url is not None:
+        overrides["subscription_checkout_base_url"] = subscription_checkout_base_url
     return Settings(**overrides)

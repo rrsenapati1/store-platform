@@ -131,6 +131,85 @@ export interface ControlPlaneTenant {
   onboarding_status: string;
 }
 
+export interface ControlPlaneBillingPlan {
+  id: string;
+  code: string;
+  display_name: string;
+  billing_cadence: string;
+  currency_code: string;
+  amount_minor: number;
+  trial_days: number;
+  branch_limit: number;
+  device_limit: number;
+  offline_runtime_hours: number;
+  grace_window_days: number;
+  feature_flags: Record<string, unknown>;
+  provider_plan_refs: Record<string, string>;
+  is_default: boolean;
+  status: string;
+}
+
+export interface ControlPlaneTenantSubscriptionSummary {
+  id: string;
+  tenant_id: string;
+  billing_plan_id: string;
+  provider_name?: string | null;
+  provider_customer_id?: string | null;
+  provider_subscription_id?: string | null;
+  lifecycle_status: string;
+  mandate_status?: string | null;
+  trial_started_at?: string | null;
+  trial_ends_at?: string | null;
+  current_period_started_at?: string | null;
+  current_period_ends_at?: string | null;
+  grace_until?: string | null;
+  canceled_at?: string | null;
+}
+
+export interface ControlPlaneTenantEntitlement {
+  id: string;
+  tenant_id: string;
+  billing_plan_id?: string | null;
+  active_plan_code: string;
+  lifecycle_status: string;
+  branch_limit: number;
+  device_limit: number;
+  offline_runtime_hours: number;
+  grace_until?: string | null;
+  suspend_at?: string | null;
+  feature_flags: Record<string, unknown>;
+  policy_source: string;
+  policy_metadata: Record<string, unknown>;
+}
+
+export interface ControlPlaneTenantBillingOverride {
+  id: string;
+  tenant_id: string;
+  grants_lifecycle_status: string;
+  branch_limit_override?: number | null;
+  device_limit_override?: number | null;
+  offline_runtime_hours_override?: number | null;
+  feature_flags_override: Record<string, unknown>;
+  reason: string;
+  expires_at: string;
+  status: string;
+}
+
+export interface ControlPlaneTenantLifecycleSummary {
+  tenant_id: string;
+  subscription: ControlPlaneTenantSubscriptionSummary;
+  entitlement: ControlPlaneTenantEntitlement;
+  active_override?: ControlPlaneTenantBillingOverride | null;
+}
+
+export interface ControlPlaneSubscriptionBootstrap {
+  provider_name: string;
+  provider_customer_id: string;
+  provider_subscription_id: string;
+  checkout_url: string;
+  mandate_status: string;
+}
+
 export interface ControlPlaneBranch {
   id: string;
   tenant_id: string;

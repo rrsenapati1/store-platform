@@ -220,3 +220,40 @@ def test_branch_hub_replay_records_conflict_when_cloud_stock_has_diverged() -> N
     assert conflict.json()["result"] == "conflict_review_required"
     assert conflict.json()["duplicate"] is False
     assert conflict.json()["conflict_id"]
+
+
+def test_branch_hub_replay_rejects_suspended_commercial_access() -> None:
+    database_url = sqlite_test_database_url("offline-sale-replay-suspended")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _bootstrap_replay_context(client)
+    admin_session = _exchange(client, subject="platform-admin-1", email="admin@store.local", name="Platform Admin")
+    admin_headers = {"authorization": f"Bearer {admin_session['access_token']}"}
+
+    suspend = client.post(
+        f"/v1/platform/tenants/{context['tenant_id']}/billing/suspend",
+        headers=admin_headers,
+        json={"reason": "Billing hold"},
+    )
+    assert suspend.status_code == 200
+
+    device_headers = {
+        "x-store-device-id": context["hub_device_id"],
+        "x-store-device-secret": context["hub_device_secret"],
+    }
+
+    replay = client.post(
+        "/v1/sync/offline-sales/replay",
+        headers=device_headers,
+        json=_offline_sale_payload(context, quantity=4),
+    )
+
+    assert replay.status_code == 402
+    assert replay.json()["detail"] == "Commercial access is suspended for this tenant. Ask the owner to update billing."

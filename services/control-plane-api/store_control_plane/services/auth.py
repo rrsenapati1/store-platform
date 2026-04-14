@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import Settings
 from ..repositories import AuditRepository, IdentityRepository, MembershipRepository, TenantRepository, WorkforceRepository
 from ..utils import utc_now
+from .commercial_access import CommercialAccessService
 from .idp import IdentityClaims
 from .rbac import capabilities_for_role
 
@@ -43,6 +44,7 @@ class AuthService:
         self._membership_repo = MembershipRepository(session)
         self._workforce_repo = WorkforceRepository(session)
         self._audit_repo = AuditRepository(session)
+        self._commercial_access = CommercialAccessService(session)
 
     async def exchange_oidc_token(self, token: str):
         claims = self._identity_provider.validate_token(token)
@@ -71,6 +73,8 @@ class AuthService:
         user = await self._identity_repo.get_user_by_id(session_record.user_id)
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+        if user.provider == "store_desktop_activation":
+            await self._assert_runtime_commercial_access(user_id=user.id)
         await self._identity_repo.touch_session(session_record)
         tenant_memberships = [
             ActorMembership(
@@ -111,12 +115,24 @@ class AuthService:
         user = await self._identity_repo.get_user_by_id(session_record.user_id)
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+        if user.provider == "store_desktop_activation":
+            await self._assert_runtime_commercial_access(user_id=user.id)
         refreshed_session = await self._identity_repo.rotate_session(
             session_record=session_record,
             ttl_minutes=self._settings.session_ttl_minutes,
         )
         await self._session.commit()
         return refreshed_session
+
+    async def _assert_runtime_commercial_access(self, *, user_id: str) -> None:
+        tenant_memberships = await self._membership_repo.list_active_tenant_memberships(user_id)
+        branch_memberships = await self._membership_repo.list_active_branch_memberships(user_id)
+        scoped_tenant_ids = {
+            membership.tenant_id
+            for membership in [*tenant_memberships, *branch_memberships]
+        }
+        for tenant_id in scoped_tenant_ids:
+            await self._commercial_access.assert_runtime_session_allowed(tenant_id=tenant_id)
 
     async def _accept_pending_owner_invites(self, user_id: str, claims: IdentityClaims) -> None:
         pending_invites = await self._tenant_repo.list_pending_owner_invites(claims.email)
