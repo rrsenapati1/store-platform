@@ -17,6 +17,7 @@ STORE_DESKTOP_OFFLINE_UNLOCK_TTL_HOURS = 24
 DEFAULT_RUNTIME_PROFILE_BY_SURFACE = {
     "store_desktop": "desktop_spoke",
     "store_mobile": "mobile_store_spoke",
+    "inventory_tablet": "inventory_tablet_spoke",
     "customer_display": "customer_display",
 }
 

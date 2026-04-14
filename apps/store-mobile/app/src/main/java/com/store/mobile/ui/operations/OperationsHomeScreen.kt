@@ -36,13 +36,7 @@ fun OperationsHomeScreen(
                 enabled = section != activeSection,
             ) {
                 Text(
-                    text = when (section) {
-                        MobileOperationsSection.SCAN -> "Scan"
-                        MobileOperationsSection.RECEIVING -> "Receiving"
-                        MobileOperationsSection.STOCK_COUNT -> "Count"
-                        MobileOperationsSection.EXPIRY -> "Expiry"
-                        MobileOperationsSection.RUNTIME -> "Status"
-                    },
+                    text = mobileOperationsSectionLabel(section),
                     style = MaterialTheme.typography.labelLarge,
                 )
             }

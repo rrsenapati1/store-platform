@@ -27,4 +27,24 @@ class PairingViewModelTest {
         assertTrue(viewModel.state.canRedeemActivation)
         assertNull(viewModel.state.pairedDevice)
     }
+
+    @Test
+    fun redeemsInventoryTabletActivationIntoPairedTabletDevice() {
+        val viewModel = PairingViewModel(
+            pairingRepository = InMemoryStoreMobilePairingRepository(),
+            sessionRepository = InMemoryStoreMobileSessionRepository(),
+            hubClient = FakeStoreMobileHubClient(),
+        )
+
+        viewModel.updateManualActivation(
+            hubBaseUrl = "http://127.0.0.1:9400",
+            activationCode = "TABL-1234-EFGH",
+        )
+        viewModel.updateRequestedSessionSurface("inventory_tablet")
+        viewModel.redeemManualActivation(installationId = "android-tablet-installation")
+
+        assertEquals("inventory_tablet", viewModel.state.requestedSessionSurface)
+        assertEquals("inventory_tablet_spoke", viewModel.state.pairedDevice?.runtimeProfile)
+        assertEquals("inventory_tablet", viewModel.state.pairedDevice?.sessionSurface)
+    }
 }

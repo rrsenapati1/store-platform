@@ -2,6 +2,15 @@
 
 ## 2026-04-15
 
+- Expanded V2-001 within the shared Android runtime:
+  - added `inventory_tablet` activation support on the control plane so approved tablet devices redeem into `inventory_tablet_spoke` instead of falling back to desktop posture
+  - kept one Android app and split runtime shells by paired profile so `mobile_store_spoke` stays cashier-assist-first while `inventory_tablet_spoke` gets a tablet-first inventory shell
+  - extended the pairing flow to choose handheld vs inventory-tablet mode in the current fake hub contract while preserving the same bounded branch-hub activation/session model
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_store_mobile_activation_flow.py -q`
+  - `cd apps/store-mobile && .\\gradlew.bat testDebugUnitTest --tests com.store.mobile.ui.StoreMobileShellModeTest --tests com.store.mobile.ui.pairing.PairingViewModelTest`
+  - `npm run ci:store-mobile`
+
 - Started V2-001 on runtime surfaces:
   - scaffolded the first Android-native `store-mobile` app as a `mobile_store_spoke` instead of bolting handheld work into the desktop runtime
   - added generic runtime activation support on the control plane so non-desktop runtime surfaces can redeem approved device activations without reusing the desktop-only contract

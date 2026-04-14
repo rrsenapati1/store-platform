@@ -8,6 +8,7 @@ import com.store.mobile.runtime.StoreMobileSessionRepository
 data class PairingUiState(
     val hubBaseUrl: String = "",
     val activationCode: String = "",
+    val requestedSessionSurface: String = "store_mobile",
     val canRedeemActivation: Boolean = false,
     val pairedDevice: StoreMobilePairedDevice? = null,
     val errorMessage: String? = null,
@@ -32,6 +33,13 @@ class PairingViewModel(
         )
     }
 
+    fun updateRequestedSessionSurface(requestedSessionSurface: String) {
+        state = state.copy(
+            requestedSessionSurface = requestedSessionSurface,
+            errorMessage = null,
+        )
+    }
+
     fun redeemManualActivation(installationId: String) {
         if (!state.canRedeemActivation) {
             state = state.copy(errorMessage = "Hub URL and activation code are required.")
@@ -44,6 +52,7 @@ class PairingViewModel(
             hubBaseUrl = state.hubBaseUrl,
             installationId = installationId,
             activationCode = state.activationCode,
+            requestedSessionSurface = state.requestedSessionSurface,
         )
         pairingRepository.savePairedDevice(
             deviceId = session.deviceId,

@@ -22,18 +22,14 @@ import com.store.mobile.runtime.InMemoryStoreMobilePairingRepository
 import com.store.mobile.runtime.InMemoryStoreMobileSessionRepository
 import com.store.mobile.runtime.StoreMobilePairingRepository
 import com.store.mobile.runtime.StoreMobileSessionRepository
-import com.store.mobile.ui.operations.ExpiryScreen
+import com.store.mobile.scan.InMemoryScanLookupRepository
+import com.store.mobile.ui.handheld.HandheldStoreShell
 import com.store.mobile.ui.operations.MobileOperationsSection
-import com.store.mobile.ui.operations.OperationsHomeScreen
-import com.store.mobile.ui.operations.ReceivingScreen
-import com.store.mobile.ui.operations.StockCountScreen
 import com.store.mobile.ui.pairing.PairingScreen
 import com.store.mobile.ui.pairing.PairingViewModel
-import com.store.mobile.scan.InMemoryScanLookupRepository
-import com.store.mobile.ui.runtime.RuntimeStatusScreen
 import com.store.mobile.ui.runtime.buildRuntimeStatusState
-import com.store.mobile.ui.scan.ScanLookupScreen
 import com.store.mobile.ui.scan.ScanLookupViewModel
+import com.store.mobile.ui.tablet.InventoryTabletShell
 
 @Composable
 fun StoreMobileApp() {
@@ -55,7 +51,8 @@ fun StoreMobileApp() {
     var pairingState by remember { mutableStateOf(pairingViewModel.state) }
     var scanDraftBarcode by remember { mutableStateOf("") }
     var scanLookupState by remember { mutableStateOf(scanLookupViewModel.state) }
-    var activeSection by remember { mutableStateOf(MobileOperationsSection.SCAN) }
+    var handheldSection by remember { mutableStateOf(MobileOperationsSection.SCAN) }
+    var tabletSection by remember { mutableStateOf(MobileOperationsSection.RECEIVING) }
 
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -83,6 +80,10 @@ fun StoreMobileApp() {
                             )
                             pairingState = pairingViewModel.state
                         },
+                        onRequestedSessionSurfaceChange = { requestedSessionSurface ->
+                            pairingViewModel.updateRequestedSessionSurface(requestedSessionSurface)
+                            pairingState = pairingViewModel.state
+                        },
                         onRedeemActivation = {
                             pairingViewModel.redeemManualActivation(
                                 installationId = "android-installation-demo",
@@ -91,6 +92,10 @@ fun StoreMobileApp() {
                         },
                     )
                 } else {
+                    val shellMode = resolveStoreMobileShellMode(pairingState.pairedDevice?.runtimeProfile)
+                    val receivingBoard = receivingRepository.loadReceivingBoard(branchId = "branch-demo-1")
+                    val stockCountContext = stockCountRepository.loadStockCountContext(branchId = "branch-demo-1")
+                    val expiryReport = expiryRepository.loadExpiryReport(branchId = "branch-demo-1")
                     val runtimeStatusState = buildRuntimeStatusState(
                         connected = true,
                         pendingSyncCount = 0,
@@ -98,38 +103,39 @@ fun StoreMobileApp() {
                         hubBaseUrl = pairingState.pairedDevice?.hubBaseUrl,
                         sessionExpiresAt = sessionRepository.loadSession()?.expiresAt,
                     )
-                    OperationsHomeScreen(
-                        activeSection = activeSection,
-                        onSelectSection = { section -> activeSection = section },
-                    )
-                    when (activeSection) {
-                        MobileOperationsSection.SCAN -> {
-                            ScanLookupScreen(
-                                draftBarcode = scanDraftBarcode,
-                                state = scanLookupState,
-                                onDraftBarcodeChange = { barcode -> scanDraftBarcode = barcode },
-                                onLookupBarcode = {
-                                    scanLookupViewModel.lookupScannedBarcode(scanDraftBarcode)
-                                    scanLookupState = scanLookupViewModel.state
-                                },
-                            )
-                        }
 
-                        MobileOperationsSection.RECEIVING -> {
-                            ReceivingScreen(board = receivingRepository.loadReceivingBoard(branchId = "branch-demo-1"))
-                        }
-
-                        MobileOperationsSection.STOCK_COUNT -> {
-                            StockCountScreen(context = stockCountRepository.loadStockCountContext(branchId = "branch-demo-1"))
-                        }
-
-                        MobileOperationsSection.EXPIRY -> {
-                            ExpiryScreen(report = expiryRepository.loadExpiryReport(branchId = "branch-demo-1"))
-                        }
-
-                        MobileOperationsSection.RUNTIME -> {
-                            RuntimeStatusScreen(state = runtimeStatusState)
-                        }
+                    if (shellMode == StoreMobileShellMode.TABLET) {
+                        InventoryTabletShell(
+                            activeSection = tabletSection,
+                            onSelectSection = { section -> tabletSection = section },
+                            draftBarcode = scanDraftBarcode,
+                            scanLookupState = scanLookupState,
+                            onDraftBarcodeChange = { barcode -> scanDraftBarcode = barcode },
+                            onLookupBarcode = {
+                                scanLookupViewModel.lookupScannedBarcode(scanDraftBarcode)
+                                scanLookupState = scanLookupViewModel.state
+                            },
+                            receivingBoard = receivingBoard,
+                            stockCountContext = stockCountContext,
+                            expiryReport = expiryReport,
+                            runtimeStatusState = runtimeStatusState,
+                        )
+                    } else {
+                        HandheldStoreShell(
+                            activeSection = handheldSection,
+                            onSelectSection = { section -> handheldSection = section },
+                            draftBarcode = scanDraftBarcode,
+                            scanLookupState = scanLookupState,
+                            onDraftBarcodeChange = { barcode -> scanDraftBarcode = barcode },
+                            onLookupBarcode = {
+                                scanLookupViewModel.lookupScannedBarcode(scanDraftBarcode)
+                                scanLookupState = scanLookupViewModel.state
+                            },
+                            receivingBoard = receivingBoard,
+                            stockCountContext = stockCountContext,
+                            expiryReport = expiryReport,
+                            runtimeStatusState = runtimeStatusState,
+                        )
                     }
                 }
             }

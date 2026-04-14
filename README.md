@@ -6,7 +6,7 @@ This repository currently contains the Wave 1 foundation:
 - shared retail domain packages for RBAC, barcode, printing, and sync
 - FastAPI backend core for tenant, catalog, inventory, GST billing, and IRP-ready export/import
 - initial React shells for platform admin, owner web, and store desktop
-- the first Android `store-mobile` runtime slice for handheld spoke pairing, scan/lookup, store operations, and branch-runtime posture
+- the first Android `store-mobile` runtime slices for handheld and inventory-tablet spoke pairing, scan/lookup, store operations, and branch-runtime posture
 
 ## Release Docs
 
