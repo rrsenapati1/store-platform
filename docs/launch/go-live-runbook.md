@@ -19,10 +19,11 @@ Before go-live:
 2. Run local verification for the release candidate.
 3. Deploy to staging and verify staging.
 4. Run the release-candidate certification command against staging.
-5. Review beta evidence and known issues.
-6. Deploy to production.
-7. Run deployed verification and release-candidate certification against production.
-8. Complete launch-readiness checklist sign-off.
+5. Generate or refresh the release-candidate evidence record.
+6. Review beta evidence and known issues.
+7. Deploy to production.
+8. Run deployed verification, release-candidate certification, and evidence generation against production.
+9. Complete launch-readiness checklist sign-off.
 
 ## Commands
 
@@ -49,6 +50,18 @@ python services/control-plane-api/scripts/certify_release_candidate.py `
   --expected-environment prod `
   --expected-release-version <version>
 ```
+
+### Release-candidate evidence generation
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version <version> `
+  --release-owner ops@store.korsenex.com
+```
+
+By default, the evidence file is written under `docs/launch/evidence/`.
 
 ## Supporting Runbooks
 

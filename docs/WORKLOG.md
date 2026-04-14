@@ -4,6 +4,7 @@
 
 - Started CP-028 on launch readiness and cutover:
   - added a release-candidate certification script and regression tests so staging/prod cutover checks are executable instead of living only in narrative runbooks
+  - added a release-candidate evidence generator so operators can run local/deployed launch checks and write a concrete Markdown evidence record instead of hand-copying verification outputs into the template
   - added a dedicated `docs/launch/` pack covering launch-readiness checklist, beta pilot exit criteria, legacy-read acceptance register, release-candidate evidence capture, and go-live operator flow
   - updated the docs index so launch/cutover materials are first-class entrypoints beside public docs, support playbooks, and operational runbooks
   - kept launch status honest by treating this as the repo-side launch gate framework only; real beta evidence, final sign-offs, and operational approval still require operator execution outside the repo
@@ -11,9 +12,12 @@
   - release-candidate certification approval when deployed verification reports a cutover-ready environment
   - certification blocking when legacy write mode is still `shadow`
   - certification blocking when any legacy remaining domains are still present
+  - release-candidate evidence generation for both approved and blocked launch-gate output
 - Verified:
   - `python -m pytest services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `python -m pytest services/control-plane-api/tests/test_release_candidate_evidence_generation.py -q`
   - `python services/control-plane-api/scripts/certify_release_candidate.py --help`
+  - `python services/control-plane-api/scripts/generate_release_candidate_evidence.py --help`
   - docs-integrity check confirming all `docs/launch/*` files exist and are linked from `docs/DOCS_INDEX.md`
 
 - Completed CP-027 on public docs and support readiness:

@@ -4,6 +4,16 @@ Updated: 2026-04-15
 
 Use this template to capture the evidence for a specific release candidate.
 
+If you want the repo to pre-fill the verification sections, run:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version <version> `
+  --release-owner ops@store.korsenex.com
+```
+
 ## Candidate Metadata
 
 - Version:
