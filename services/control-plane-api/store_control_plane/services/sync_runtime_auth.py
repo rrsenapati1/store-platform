@@ -22,6 +22,7 @@ class SyncDeviceContext:
     device_code: str
     device_name: str
     session_surface: str
+    runtime_profile: str
 
 
 class SyncRuntimeAuthService:
@@ -45,4 +46,5 @@ class SyncRuntimeAuthService:
             device_code=device.device_code,
             device_name=device.device_name,
             session_surface=device.session_surface,
+            runtime_profile=device.runtime_profile,
         )

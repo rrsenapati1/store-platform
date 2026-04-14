@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import DeviceClaim, DeviceRegistration, StaffProfile, StoreDesktopActivation
+from ..models import DeviceClaim, DeviceRegistration, SpokeRuntimeActivation, StaffProfile, StoreDesktopActivation
 from ..utils import new_id
 
 
@@ -86,6 +86,7 @@ class WorkforceRepository:
         device_name: str,
         device_code: str,
         session_surface: str,
+        runtime_profile: str = "desktop_spoke",
         is_branch_hub: bool = False,
         sync_secret_hash: str | None = None,
         sync_secret_issued_at=None,
@@ -99,6 +100,7 @@ class WorkforceRepository:
             device_name=device_name,
             device_code=device_code,
             session_surface=session_surface,
+            runtime_profile=runtime_profile,
             is_branch_hub=is_branch_hub,
             sync_secret_hash=sync_secret_hash,
             sync_secret_issued_at=sync_secret_issued_at,
@@ -334,6 +336,48 @@ class WorkforceRepository:
         self._session.add(activation)
         await self._session.flush()
         return activation
+
+    async def create_spoke_runtime_activation(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        hub_device_id: str,
+        activation_code_hash: str,
+        pairing_mode: str,
+        runtime_profile: str,
+        expires_at,
+    ) -> SpokeRuntimeActivation:
+        activation = SpokeRuntimeActivation(
+            id=new_id(),
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            hub_device_id=hub_device_id,
+            activation_code_hash=activation_code_hash,
+            pairing_mode=pairing_mode,
+            runtime_profile=runtime_profile,
+            status="ISSUED",
+            expires_at=expires_at,
+        )
+        self._session.add(activation)
+        await self._session.flush()
+        return activation
+
+    async def supersede_spoke_runtime_activations(
+        self,
+        *,
+        hub_device_id: str,
+        runtime_profile: str | None = None,
+    ) -> None:
+        statement = select(SpokeRuntimeActivation).where(
+            SpokeRuntimeActivation.hub_device_id == hub_device_id,
+            SpokeRuntimeActivation.status == "ISSUED",
+        )
+        if runtime_profile is not None:
+            statement = statement.where(SpokeRuntimeActivation.runtime_profile == runtime_profile)
+        for activation in (await self._session.scalars(statement)).all():
+            activation.status = "SUPERSEDED"
+        await self._session.flush()
 
     async def get_store_desktop_activation(
         self,

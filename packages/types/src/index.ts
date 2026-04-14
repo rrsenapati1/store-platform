@@ -190,6 +190,7 @@ export interface ControlPlaneDeviceRegistration {
   device_name: string;
   device_code: string;
   session_surface: string;
+  runtime_profile: string;
   is_branch_hub?: boolean;
   status: string;
   assigned_staff_profile_id?: string | null;
@@ -248,6 +249,14 @@ export interface ControlPlaneStoreDesktopActivation {
   staff_profile_id: string;
   activation_code: string;
   status: string;
+  expires_at: string;
+}
+
+export interface ControlPlaneSpokeRuntimeActivation {
+  activation_code: string;
+  pairing_mode: 'approval_code' | 'qr';
+  runtime_profile: string;
+  hub_device_id: string;
   expires_at: string;
 }
 

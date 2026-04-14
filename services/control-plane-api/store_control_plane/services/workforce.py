@@ -13,12 +13,30 @@ from .sync_runtime_auth import hash_sync_access_secret
 
 STORE_DESKTOP_ACTIVATION_TTL_MINUTES = 15
 STORE_DESKTOP_OFFLINE_UNLOCK_TTL_HOURS = 24
+DEFAULT_RUNTIME_PROFILE_BY_SURFACE = {
+    "store_desktop": "desktop_spoke",
+    "store_mobile": "mobile_store_spoke",
+    "customer_display": "customer_display",
+}
 
 
 def build_device_claim_code(installation_id: str) -> str:
     normalized = "".join(character for character in installation_id.upper() if character.isalnum())
     suffix = normalized[-8:] if normalized else "UNBOUND00"
     return f"STORE-{suffix}"
+
+
+def resolve_device_runtime_profile(
+    *,
+    session_surface: str,
+    is_branch_hub: bool,
+    runtime_profile: str | None = None,
+) -> str:
+    if runtime_profile:
+        return runtime_profile
+    if is_branch_hub:
+        return "branch_hub"
+    return DEFAULT_RUNTIME_PROFILE_BY_SURFACE.get(session_surface, "desktop_spoke")
 
 
 def serialize_device_claim(claim, device) -> dict[str, object]:
@@ -200,6 +218,7 @@ class WorkforceService:
         device_name: str,
         device_code: str,
         session_surface: str,
+        runtime_profile: str | None = None,
         is_branch_hub: bool = False,
     ) -> dict[str, object]:
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
@@ -231,6 +250,11 @@ class WorkforceService:
             )
             if existing_installation is not None:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Installation already bound")
+        resolved_runtime_profile = resolve_device_runtime_profile(
+            session_surface=session_surface,
+            is_branch_hub=is_branch_hub,
+            runtime_profile=runtime_profile,
+        )
         sync_access_secret = secrets.token_urlsafe(24) if is_branch_hub else None
         device = await self._workforce_repo.create_device_registration(
             tenant_id=tenant_id,
@@ -240,6 +264,7 @@ class WorkforceService:
             device_name=device_name,
             device_code=device_code,
             session_surface=session_surface,
+            runtime_profile=resolved_runtime_profile,
             is_branch_hub=is_branch_hub,
             sync_secret_hash=hash_sync_access_secret(sync_access_secret) if sync_access_secret else None,
             sync_secret_issued_at=utc_now() if sync_access_secret else None,
@@ -254,6 +279,7 @@ class WorkforceService:
             payload={
                 "device_code": device.device_code,
                 "session_surface": device.session_surface,
+                "runtime_profile": device.runtime_profile,
                 "is_branch_hub": device.is_branch_hub,
                 "installation_id": device.installation_id,
             },
@@ -266,6 +292,7 @@ class WorkforceService:
             "device_name": device.device_name,
             "device_code": device.device_code,
             "session_surface": device.session_surface,
+            "runtime_profile": device.runtime_profile,
             "is_branch_hub": device.is_branch_hub,
             "status": device.status,
             "assigned_staff_profile_id": device.assigned_staff_profile_id,
@@ -290,6 +317,7 @@ class WorkforceService:
                 "device_name": device.device_name,
                 "device_code": device.device_code,
                 "session_surface": device.session_surface,
+                "runtime_profile": device.runtime_profile,
                 "is_branch_hub": device.is_branch_hub,
                 "status": device.status,
                 "assigned_staff_profile_id": device.assigned_staff_profile_id,
@@ -416,6 +444,7 @@ class WorkforceService:
         device_name: str,
         device_code: str,
         session_surface: str,
+        runtime_profile: str | None = None,
         is_branch_hub: bool = False,
     ) -> dict[str, object]:
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
@@ -463,6 +492,11 @@ class WorkforceService:
             )
             if existing_code is not None:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Device code already registered")
+            resolved_runtime_profile = resolve_device_runtime_profile(
+                session_surface=session_surface,
+                is_branch_hub=is_branch_hub,
+                runtime_profile=runtime_profile,
+            )
             sync_access_secret = secrets.token_urlsafe(24) if is_branch_hub else None
             device = await self._workforce_repo.create_device_registration(
                 tenant_id=tenant_id,
@@ -472,6 +506,7 @@ class WorkforceService:
                 device_name=device_name,
                 device_code=device_code,
                 session_surface=session_surface,
+                runtime_profile=resolved_runtime_profile,
                 is_branch_hub=is_branch_hub,
                 sync_secret_hash=hash_sync_access_secret(sync_access_secret) if sync_access_secret else None,
                 sync_secret_issued_at=utc_now() if sync_access_secret else None,
@@ -486,6 +521,7 @@ class WorkforceService:
                 payload={
                     "device_code": device.device_code,
                     "session_surface": device.session_surface,
+                    "runtime_profile": device.runtime_profile,
                     "is_branch_hub": device.is_branch_hub,
                     "installation_id": device.installation_id,
                     "approved_from_claim": claim.id,
@@ -518,6 +554,7 @@ class WorkforceService:
                 "device_name": device.device_name,
                 "device_code": device.device_code,
                 "session_surface": device.session_surface,
+                "runtime_profile": device.runtime_profile,
                 "is_branch_hub": device.is_branch_hub,
                 "status": device.status,
                 "assigned_staff_profile_id": device.assigned_staff_profile_id,

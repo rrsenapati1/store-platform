@@ -32,6 +32,7 @@ class DeviceRegistration(Base, TimestampMixin):
     device_name: Mapped[str] = mapped_column(String(255))
     device_code: Mapped[str] = mapped_column(String(64), index=True)
     session_surface: Mapped[str] = mapped_column(String(64))
+    runtime_profile: Mapped[str] = mapped_column(String(64), default="desktop_spoke")
     is_branch_hub: Mapped[bool] = mapped_column(Boolean, default=False)
     sync_secret_hash: Mapped[str | None] = mapped_column(String(128), default=None)
     sync_secret_issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
@@ -76,3 +77,19 @@ class StoreDesktopActivation(Base, TimestampMixin):
     offline_valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
     redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
     last_unlocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+
+
+class SpokeRuntimeActivation(Base, TimestampMixin):
+    __tablename__ = "spoke_runtime_activations"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    hub_device_id: Mapped[str] = mapped_column(ForeignKey("device_registrations.id", ondelete="CASCADE"), index=True)
+    activation_code_hash: Mapped[str] = mapped_column(String(128), index=True)
+    pairing_mode: Mapped[str] = mapped_column(String(32), default="approval_code")
+    runtime_profile: Mapped[str] = mapped_column(String(64), default="desktop_spoke")
+    status: Mapped[str] = mapped_column(String(32), default="ISSUED")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), index=True)
+    redeemed_spoke_installation_id: Mapped[str | None] = mapped_column(String(96), default=None, index=True)
+    redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)

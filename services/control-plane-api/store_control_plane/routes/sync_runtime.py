@@ -17,13 +17,15 @@ from ..schemas import (
     SyncPullResponse,
     SyncPushRequest,
     SyncPushResponse,
+    SyncSpokeActivationRequest,
+    SyncSpokeActivationResponse,
     SyncSpokeListResponse,
     SyncSpokeObserveRequest,
     SyncSpokeObserveResponse,
     SyncSpokeRecord,
     SyncStatusResponse,
 )
-from ..services import ActorContext, SyncDeviceContext, SyncRuntimeService, assert_branch_any_capability
+from ..services import ActorContext, SpokeRuntimeService, SyncDeviceContext, SyncRuntimeService, assert_branch_any_capability
 
 router = APIRouter(tags=["sync_runtime"])
 
@@ -71,6 +73,21 @@ async def observe_sync_spokes(
         spokes=[spoke.model_dump() for spoke in payload.spokes],
     )
     return SyncSpokeObserveResponse(**response)
+
+
+@router.post("/v1/sync/spokes/activate", response_model=SyncSpokeActivationResponse)
+async def issue_sync_spoke_activation(
+    payload: SyncSpokeActivationRequest,
+    device: SyncDeviceContext = Depends(get_current_sync_device),
+    session: AsyncSession = Depends(get_session),
+) -> SyncSpokeActivationResponse:
+    service = SpokeRuntimeService(session)
+    response = await service.issue_activation(
+        device=device,
+        runtime_profile=payload.runtime_profile,
+        pairing_mode=payload.pairing_mode,
+    )
+    return SyncSpokeActivationResponse(**response)
 
 
 @router.post("/v1/sync/push", response_model=SyncPushResponse)

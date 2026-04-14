@@ -68,6 +68,7 @@ describe('owner barcode print runtime section', () => {
             device_name: 'Counter Desktop 1',
             device_code: 'counter-1',
             session_surface: 'store_desktop',
+            runtime_profile: 'desktop_spoke',
             status: 'ACTIVE',
             assigned_staff_profile_id: null,
             assigned_staff_full_name: null,

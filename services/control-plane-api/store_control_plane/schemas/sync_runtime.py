@@ -81,6 +81,19 @@ class SyncSpokeObserveResponse(BaseModel):
     last_local_spoke_sync_at: datetime | None = None
 
 
+class SyncSpokeActivationRequest(BaseModel):
+    runtime_profile: str
+    pairing_mode: str = "approval_code"
+
+
+class SyncSpokeActivationResponse(BaseModel):
+    activation_code: str
+    pairing_mode: str
+    runtime_profile: str
+    hub_device_id: str
+    expires_at: str
+
+
 class SyncSpokeRecord(BaseModel):
     spoke_device_id: str
     hub_device_id: str

@@ -42,6 +42,7 @@ class DeviceRegistrationCreateRequest(BaseModel):
     device_name: str
     device_code: str
     session_surface: str
+    runtime_profile: str | None = None
     assigned_staff_profile_id: str | None = None
     is_branch_hub: bool = False
 
@@ -53,6 +54,7 @@ class DeviceRegistrationResponse(BaseModel):
     device_name: str
     device_code: str
     session_surface: str
+    runtime_profile: str
     is_branch_hub: bool = False
     status: str
     assigned_staff_profile_id: str | None = None
@@ -67,6 +69,7 @@ class DeviceRegistrationRecord(BaseModel):
     device_name: str
     device_code: str
     session_surface: str
+    runtime_profile: str
     is_branch_hub: bool = False
     status: str
     assigned_staff_profile_id: str | None = None
@@ -135,6 +138,7 @@ class DeviceClaimApproveRequest(BaseModel):
     device_name: str
     device_code: str
     session_surface: str
+    runtime_profile: str | None = None
     assigned_staff_profile_id: str | None = None
     is_branch_hub: bool = False
 

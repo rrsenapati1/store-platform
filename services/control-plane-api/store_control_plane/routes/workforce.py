@@ -61,6 +61,7 @@ async def register_branch_device(
         device_name=payload.device_name,
         device_code=payload.device_code,
         session_surface=payload.session_surface,
+        runtime_profile=payload.runtime_profile,
         is_branch_hub=payload.is_branch_hub,
     )
     return DeviceRegistrationResponse(**device)
@@ -112,6 +113,7 @@ async def approve_branch_device_claim(
         device_name=payload.device_name,
         device_code=payload.device_code,
         session_surface=payload.session_surface,
+        runtime_profile=payload.runtime_profile,
         is_branch_hub=payload.is_branch_hub,
     )
     return DeviceClaimApprovalResponse(

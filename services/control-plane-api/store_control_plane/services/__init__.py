@@ -17,6 +17,7 @@ from .purchasing import PurchasingService
 from .procurement_finance_policy import build_supplier_payables_report
 from .rbac import capabilities_for_role, seed_role_definitions
 from .runtime import RuntimeService
+from .spoke_runtime import SpokeRuntimeService
 from .sync_runtime import SyncRuntimeService
 from .sync_runtime_auth import SyncDeviceContext, SyncRuntimeAuthService, hash_sync_access_secret
 from .supplier_reporting import SupplierReportingService
@@ -36,6 +37,7 @@ __all__ = [
     "ProcurementFinanceService",
     "PurchasingService",
     "RuntimeService",
+    "SpokeRuntimeService",
     "SyncRuntimeService",
     "SyncDeviceContext",
     "SyncRuntimeAuthService",
