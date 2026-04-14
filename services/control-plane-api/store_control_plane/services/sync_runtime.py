@@ -115,6 +115,67 @@ class SyncRuntimeService:
         await self._session.commit()
         return response
 
+    async def observe_spokes(
+        self,
+        *,
+        device: SyncDeviceContext,
+        spokes: list[dict[str, object]],
+    ) -> dict[str, object]:
+        await self._assert_branch_exists(tenant_id=device.tenant_id, branch_id=device.branch_id)
+        observed_at = utc_now()
+        envelope = await self._sync_repo.create_sync_envelope(
+            tenant_id=device.tenant_id,
+            branch_id=device.branch_id,
+            device_id=device.device_id,
+            idempotency_key=f"spokes-{observed_at.isoformat()}",
+            direction="INGRESS",
+            entity_type="sync_spoke_observe",
+            payload_json={"spokes": [_json_ready(spoke) for spoke in spokes]},
+        )
+        records = await self._sync_repo.replace_hub_spoke_observations(
+            tenant_id=device.tenant_id,
+            branch_id=device.branch_id,
+            hub_device_id=device.device_id,
+            observations=spokes,
+            observed_at=observed_at,
+        )
+        connected_spoke_count = sum(1 for record in records if record.connection_state == "CONNECTED")
+        latest_local_spoke_sync_at = max(
+            (record.last_local_sync_at for record in records if record.last_local_sync_at is not None),
+            default=None,
+        )
+        await self._sync_repo.upsert_hub_sync_status(
+            tenant_id=device.tenant_id,
+            branch_id=device.branch_id,
+            hub_device_id=device.device_id,
+            source_device_id=device.device_code,
+            updates={
+                "connected_spoke_count": connected_spoke_count,
+                "last_local_spoke_sync_at": latest_local_spoke_sync_at,
+            },
+        )
+        response = {
+            "observed_spoke_count": len(records),
+            "connected_spoke_count": connected_spoke_count,
+            "last_local_spoke_sync_at": latest_local_spoke_sync_at,
+        }
+        await self._sync_repo.finalize_sync_envelope(
+            envelope=envelope,
+            status="SYNCED",
+            response_payload=_json_ready(response),
+        )
+        await self._audit_repo.record(
+            tenant_id=device.tenant_id,
+            branch_id=device.branch_id,
+            actor_user_id=None,
+            action="sync_runtime.spoke_observe",
+            entity_type="device_registration",
+            entity_id=device.device_id,
+            payload=_json_ready(response),
+        )
+        await self._session.commit()
+        return response
+
     async def push(
         self,
         *,
@@ -404,6 +465,24 @@ class SyncRuntimeService:
                 "attempt_count": record.attempt_count,
                 "last_error": record.last_error,
                 "created_at": record.created_at,
+            }
+            for record in records
+        ]
+
+    async def list_sync_spokes(self, *, tenant_id: str, branch_id: str) -> list[dict[str, object]]:
+        await self._assert_branch_exists(tenant_id=tenant_id, branch_id=branch_id)
+        records = await self._sync_repo.list_hub_spoke_observations(tenant_id=tenant_id, branch_id=branch_id)
+        return [
+            {
+                "spoke_device_id": record.spoke_device_id,
+                "hub_device_id": record.hub_device_id,
+                "runtime_kind": record.runtime_kind,
+                "hostname": record.hostname,
+                "operating_system": record.operating_system,
+                "app_version": record.app_version,
+                "connection_state": record.connection_state,
+                "last_seen_at": record.last_seen_at,
+                "last_local_sync_at": record.last_local_sync_at,
             }
             for record in records
         ]

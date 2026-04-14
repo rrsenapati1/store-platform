@@ -13,11 +13,13 @@ import type {
   ControlPlaneInventorySnapshotRecord,
   ControlPlanePrintJob,
   ControlPlaneRuntimeDeviceClaimResolution,
+  ControlPlaneRuntimeHubBootstrap,
   ControlPlaneRuntimeHeartbeat,
   ControlPlaneSale,
   ControlPlaneSaleRecord,
   ControlPlaneSaleReturn,
   ControlPlaneSession,
+  ControlPlaneStoreDesktopActivationSession,
   ControlPlaneSupplierAgingReport,
   ControlPlaneSupplierDueScheduleReport,
   ControlPlaneSupplierEscalationReport,
@@ -30,6 +32,7 @@ import type {
   ControlPlaneSupplierStatementReport,
   ControlPlaneSyncConflictRecord,
   ControlPlaneSyncEnvelopeRecord,
+  ControlPlaneSyncSpokeRecord,
   ControlPlaneSyncStatus,
   ControlPlaneTenant,
   ControlPlaneVendorDisputeBoard,
@@ -69,6 +72,42 @@ export const storeControlPlaneClient = {
       method: 'POST',
       body: JSON.stringify({ token }),
     });
+  },
+  activateStoreDesktopSession(installationId: string, activationCode: string) {
+    return request<ControlPlaneStoreDesktopActivationSession>('/v1/auth/store-desktop/activate', {
+      method: 'POST',
+      body: JSON.stringify({
+        installation_id: installationId,
+        activation_code: activationCode,
+      }),
+    });
+  },
+  unlockStoreDesktopSession(installationId: string, localAuthToken: string) {
+    return request<ControlPlaneStoreDesktopActivationSession>('/v1/auth/store-desktop/unlock', {
+      method: 'POST',
+      body: JSON.stringify({
+        installation_id: installationId,
+        local_auth_token: localAuthToken,
+      }),
+    });
+  },
+  refreshSession(accessToken: string) {
+    return request<ControlPlaneSession>(
+      '/v1/auth/refresh',
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  signOut(accessToken: string) {
+    return request<{ status: string }>(
+      '/v1/auth/sign-out',
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
   },
   getActor(accessToken: string) {
     return request<ControlPlaneActor>('/v1/auth/me', undefined, accessToken);
@@ -240,6 +279,13 @@ export const storeControlPlaneClient = {
       accessToken,
     );
   },
+  listRuntimeSyncSpokes(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneSyncSpokeRecord[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/sync-spokes`,
+      undefined,
+      accessToken,
+    );
+  },
   listRuntimeSyncEnvelopes(accessToken: string, tenantId: string, branchId: string) {
     return request<{ records: ControlPlaneSyncEnvelopeRecord[] }>(
       `/v1/tenants/${tenantId}/branches/${branchId}/runtime/sync-envelopes`,
@@ -272,6 +318,18 @@ export const storeControlPlaneClient = {
       {
         method: 'POST',
         body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  bootstrapRuntimeHubIdentity(accessToken: string, tenantId: string, branchId: string, installationId: string) {
+    return request<ControlPlaneRuntimeHubBootstrap>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/hub-bootstrap`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          installation_id: installationId,
+        }),
       },
       accessToken,
     );

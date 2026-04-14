@@ -44,7 +44,7 @@ class AuthService:
         self._workforce_repo = WorkforceRepository(session)
         self._audit_repo = AuditRepository(session)
 
-    async def exchange_oidc_token(self, token: str) -> str:
+    async def exchange_oidc_token(self, token: str):
         claims = self._identity_provider.validate_token(token)
         user = await self._identity_repo.upsert_user(
             external_subject=claims.external_subject,
@@ -62,7 +62,7 @@ class AuthService:
             ttl_minutes=self._settings.session_ttl_minutes,
         )
         await self._session.commit()
-        return session_record.token
+        return session_record
 
     async def get_actor_context(self, token: str) -> ActorContext:
         session_record = await self._identity_repo.get_app_session(token)
@@ -99,6 +99,24 @@ class AuthService:
             tenant_memberships=tenant_memberships,
             branch_memberships=branch_memberships,
         )
+
+    async def sign_out(self, token: str) -> None:
+        await self._identity_repo.delete_session(token)
+        await self._session.commit()
+
+    async def refresh_session(self, token: str):
+        session_record = await self._identity_repo.get_app_session(token)
+        if session_record is None or session_record.expires_at < utc_now():
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+        user = await self._identity_repo.get_user_by_id(session_record.user_id)
+        if user is None or not user.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+        refreshed_session = await self._identity_repo.rotate_session(
+            session_record=session_record,
+            ttl_minutes=self._settings.session_ttl_minutes,
+        )
+        await self._session.commit()
+        return refreshed_session
 
     async def _accept_pending_owner_invites(self, user_id: str, claims: IdentityClaims) -> None:
         pending_invites = await self._tenant_repo.list_pending_owner_invites(claims.email)

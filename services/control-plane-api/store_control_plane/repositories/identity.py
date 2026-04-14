@@ -84,9 +84,54 @@ class IdentityRepository:
         await self._session.flush()
         return session_record
 
+    async def rotate_session(self, *, session_record: AppSession, ttl_minutes: int) -> AppSession:
+        replacement = await self.create_session(user_id=session_record.user_id, ttl_minutes=ttl_minutes)
+        await self._session.delete(session_record)
+        await self._session.flush()
+        return replacement
+
+    async def ensure_runtime_user(
+        self,
+        *,
+        email: str,
+        full_name: str,
+        synthetic_subject: str,
+    ) -> User:
+        user = await self.get_user_by_external_subject(synthetic_subject)
+        if user is None:
+            user = await self.get_user_by_email(email)
+        if user is None:
+            user = User(
+                id=new_id(),
+                external_subject=synthetic_subject,
+                email=email.lower(),
+                full_name=full_name,
+                provider="store_desktop_activation",
+                is_active=True,
+                last_login_at=utc_now(),
+            )
+            self._session.add(user)
+        else:
+            user.external_subject = synthetic_subject
+            user.email = email.lower()
+            user.full_name = full_name
+            user.provider = "store_desktop_activation"
+            user.is_active = True
+            user.last_login_at = utc_now()
+        await self._session.flush()
+        return user
+
     async def get_app_session(self, token: str) -> AppSession | None:
         statement = select(AppSession).where(AppSession.token == token)
         return await self._session.scalar(statement)
+
+    async def delete_session(self, token: str) -> bool:
+        session_record = await self.get_app_session(token)
+        if session_record is None:
+            return False
+        await self._session.delete(session_record)
+        await self._session.flush()
+        return True
 
     async def touch_session(self, session_record: AppSession) -> None:
         session_record.last_seen_at = utc_now()

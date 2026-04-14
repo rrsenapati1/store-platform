@@ -11,10 +11,10 @@ from .procurement_finance import PurchaseInvoice, PurchaseInvoiceLine, SupplierP
 from .purchasing import PurchaseOrder, PurchaseOrderLine, Supplier
 from .role import RoleCapability, RoleDefinition
 from .runtime import PrintJob
-from .sync_runtime import HubSyncStatus, SyncConflict, SyncEnvelope, SyncMutationLog
+from .sync_runtime import HubSpokeObservation, HubSyncStatus, SyncConflict, SyncEnvelope, SyncMutationLog
 from .supplier_reporting import SupplierReportSnapshot, VendorDispute
 from .tenant import Branch, OwnerInvite, Tenant
-from .workforce import DeviceClaim, DeviceRegistration, StaffProfile
+from .workforce import DeviceClaim, DeviceRegistration, StaffProfile, StoreDesktopActivation
 
 __all__ = [
     "AppSession",
@@ -38,6 +38,7 @@ __all__ = [
     "GoodsReceipt",
     "GoodsReceiptLine",
     "HubSyncStatus",
+    "HubSpokeObservation",
     "InventoryLedgerEntry",
     "OwnerInvite",
     "Payment",
@@ -62,6 +63,7 @@ __all__ = [
     "TransferOrder",
     "DeviceRegistration",
     "StaffProfile",
+    "StoreDesktopActivation",
     "Supplier",
     "SupplierReportSnapshot",
     "SupplierPayment",

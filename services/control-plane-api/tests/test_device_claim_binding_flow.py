@@ -113,10 +113,13 @@ def test_packaged_runtime_claim_requires_owner_approval_before_device_binding():
             "device_code": "BLR-POS-01",
             "session_surface": "store_desktop",
             "assigned_staff_profile_id": staff_profile_id,
+            "is_branch_hub": True,
         },
     )
     assert approval.status_code == 200
     assert approval.json()["device"]["device_code"] == "BLR-POS-01"
+    assert approval.json()["device"]["is_branch_hub"] is True
+    assert approval.json()["device"]["sync_access_secret"]
     assert approval.json()["claim"]["status"] == "APPROVED"
 
     second_claim = client.post(
@@ -135,3 +138,172 @@ def test_packaged_runtime_claim_requires_owner_approval_before_device_binding():
     assert second_claim.json()["status"] == "APPROVED"
     assert second_claim.json()["bound_device_id"] == approval.json()["device"]["id"]
     assert second_claim.json()["bound_device_code"] == "BLR-POS-01"
+
+
+def test_packaged_runtime_claim_cannot_approve_a_second_branch_hub():
+    database_url = sqlite_test_database_url("device-claims-hub-guard")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    admin_session = _exchange(client, subject="platform-admin-1", email="admin@store.local", name="Platform Admin")
+    admin_headers = {"authorization": f"Bearer {admin_session['access_token']}"}
+
+    tenant = client.post(
+        "/v1/platform/tenants",
+        headers=admin_headers,
+        json={"name": "Acme Retail", "slug": "acme-retail-hub-guard"},
+    )
+    assert tenant.status_code == 200
+    tenant_id = tenant.json()["id"]
+
+    owner_invite = client.post(
+        f"/v1/platform/tenants/{tenant_id}/owner-invites",
+        headers=admin_headers,
+        json={"email": "owner@acme.local", "full_name": "Acme Owner"},
+    )
+    assert owner_invite.status_code == 200
+
+    owner_session = _exchange(client, subject="owner-1", email="owner@acme.local", name="Acme Owner")
+    owner_headers = {"authorization": f"Bearer {owner_session['access_token']}"}
+
+    branch = client.post(
+        f"/v1/tenants/{tenant_id}/branches",
+        headers=owner_headers,
+        json={"name": "Bengaluru Flagship", "code": "blr-flagship", "gstin": "29ABCDE1234F1Z5"},
+    )
+    assert branch.status_code == 200
+    branch_id = branch.json()["id"]
+
+    client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/devices",
+        headers=owner_headers,
+        json={
+            "device_name": "Existing Branch Hub",
+            "device_code": "BLR-HUB-01",
+            "session_surface": "store_desktop",
+            "is_branch_hub": True,
+        },
+    )
+
+    claim = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/runtime/device-claim",
+        headers=owner_headers,
+        json={
+            "installation_id": "store-runtime-zxyw9876vuts5432",
+            "runtime_kind": "packaged_desktop",
+            "hostname": "COUNTER-02",
+            "operating_system": "windows",
+            "architecture": "x86_64",
+            "app_version": "0.1.0",
+        },
+    )
+    assert claim.status_code == 200
+
+    approval = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/device-claims/{claim.json()['claim_id']}/approve",
+        headers=owner_headers,
+        json={
+            "device_name": "Second Hub Candidate",
+            "device_code": "BLR-HUB-02",
+            "session_surface": "store_desktop",
+            "is_branch_hub": True,
+        },
+    )
+    assert approval.status_code == 400
+    assert approval.json()["detail"] == "Branch hub already registered"
+
+
+def test_packaged_branch_hub_can_bootstrap_runtime_sync_identity():
+    database_url = sqlite_test_database_url("device-claims-hub-bootstrap")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    admin_session = _exchange(client, subject="platform-admin-1", email="admin@store.local", name="Platform Admin")
+    admin_headers = {"authorization": f"Bearer {admin_session['access_token']}"}
+
+    tenant = client.post(
+        "/v1/platform/tenants",
+        headers=admin_headers,
+        json={"name": "Acme Retail", "slug": "acme-retail-hub-bootstrap"},
+    )
+    assert tenant.status_code == 200
+    tenant_id = tenant.json()["id"]
+
+    owner_invite = client.post(
+        f"/v1/platform/tenants/{tenant_id}/owner-invites",
+        headers=admin_headers,
+        json={"email": "owner@acme.local", "full_name": "Acme Owner"},
+    )
+    assert owner_invite.status_code == 200
+
+    owner_session = _exchange(client, subject="owner-1", email="owner@acme.local", name="Acme Owner")
+    owner_headers = {"authorization": f"Bearer {owner_session['access_token']}"}
+
+    branch = client.post(
+        f"/v1/tenants/{tenant_id}/branches",
+        headers=owner_headers,
+        json={"name": "Bengaluru Flagship", "code": "blr-flagship", "gstin": "29ABCDE1234F1Z5"},
+    )
+    assert branch.status_code == 200
+    branch_id = branch.json()["id"]
+
+    claim = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/runtime/device-claim",
+        headers=owner_headers,
+        json={
+            "installation_id": "store-runtime-abcd1234efgh5678",
+            "runtime_kind": "packaged_desktop",
+            "hostname": "BLR-HUB-01",
+            "operating_system": "windows",
+            "architecture": "x86_64",
+            "app_version": "0.1.0",
+        },
+    )
+    assert claim.status_code == 200
+
+    approval = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/device-claims/{claim.json()['claim_id']}/approve",
+        headers=owner_headers,
+        json={
+            "device_name": "Branch Hub",
+            "device_code": "BLR-HUB-01",
+            "session_surface": "store_desktop",
+            "is_branch_hub": True,
+        },
+    )
+    assert approval.status_code == 200
+    assert approval.json()["device"]["is_branch_hub"] is True
+
+    bootstrap = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/runtime/hub-bootstrap",
+        headers=owner_headers,
+        json={"installation_id": "store-runtime-abcd1234efgh5678"},
+    )
+    assert bootstrap.status_code == 200
+    assert bootstrap.json()["device_id"] == approval.json()["device"]["id"]
+    assert bootstrap.json()["device_code"] == "BLR-HUB-01"
+    assert bootstrap.json()["installation_id"] == "store-runtime-abcd1234efgh5678"
+    assert bootstrap.json()["sync_access_secret"]
+    assert bootstrap.json()["issued_at"]
+
+    heartbeat = client.get(
+        "/v1/sync/heartbeat",
+        headers={
+            "x-store-device-id": bootstrap.json()["device_id"],
+            "x-store-device-secret": bootstrap.json()["sync_access_secret"],
+        },
+    )
+    assert heartbeat.status_code == 200
+    assert heartbeat.json()["status"] == "current"

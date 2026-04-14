@@ -18,6 +18,7 @@ import type {
   ControlPlaneDeviceClaimRecord,
   ControlPlaneDeviceRecord,
   ControlPlaneDeviceRegistration,
+  ControlPlaneStoreDesktopActivation,
   ControlPlaneGstExportJob,
   ControlPlaneGstExportReport,
   ControlPlaneGoodsReceipt,
@@ -698,7 +699,7 @@ export const ownerControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-    payload: { device_name: string; device_code: string; session_surface: string; assigned_staff_profile_id?: string | null },
+    payload: { device_name: string; device_code: string; session_surface: string; assigned_staff_profile_id?: string | null; is_branch_hub?: boolean },
   ) {
     return request<ControlPlaneDeviceRegistration>(
       `/v1/tenants/${tenantId}/branches/${branchId}/devices`,
@@ -721,13 +722,22 @@ export const ownerControlPlaneClient = {
     tenantId: string,
     branchId: string,
     claimId: string,
-    payload: { device_name: string; device_code: string; session_surface: string; assigned_staff_profile_id?: string | null },
+    payload: { device_name: string; device_code: string; session_surface: string; assigned_staff_profile_id?: string | null; is_branch_hub?: boolean },
   ) {
     return request<ControlPlaneDeviceClaimApproval>(
       `/v1/tenants/${tenantId}/branches/${branchId}/device-claims/${claimId}/approve`,
       {
         method: 'POST',
         body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  issueStoreDesktopActivation(accessToken: string, tenantId: string, branchId: string, deviceId: string) {
+    return request<ControlPlaneStoreDesktopActivation>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/devices/${deviceId}/desktop-activation`,
+      {
+        method: 'POST',
       },
       accessToken,
     );

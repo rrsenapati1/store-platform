@@ -16,7 +16,12 @@ export function isNativeStoreRuntimeShellAvailable(): boolean {
 
 function toRuntimeShellStatus(value: unknown): StoreRuntimeShellStatus {
   if (isStoreRuntimeShellStatus(value)) {
-    return value;
+    return {
+      ...value,
+      hub_service_state: value.hub_service_state ?? null,
+      hub_service_url: value.hub_service_url ?? null,
+      hub_manifest_url: value.hub_manifest_url ?? null,
+    };
   }
   throw new Error('Native runtime shell bridge returned an invalid payload.');
 }

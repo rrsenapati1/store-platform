@@ -112,6 +112,7 @@ export interface ControlPlaneActor {
 export interface ControlPlaneSession {
   access_token: string;
   token_type: string;
+  expires_at: string;
 }
 
 export interface ControlPlanePlatformTenantRecord {
@@ -229,9 +230,36 @@ export interface ControlPlaneRuntimeDeviceClaimResolution {
   bound_device_code?: string | null;
 }
 
+export interface ControlPlaneRuntimeHubBootstrap {
+  device_id: string;
+  device_code: string;
+  installation_id: string;
+  sync_access_secret: string;
+  issued_at: string;
+}
+
 export interface ControlPlaneDeviceClaimApproval {
   claim: ControlPlaneDeviceClaimRecord;
   device: ControlPlaneDeviceRegistration;
+}
+
+export interface ControlPlaneStoreDesktopActivation {
+  device_id: string;
+  staff_profile_id: string;
+  activation_code: string;
+  status: string;
+  expires_at: string;
+}
+
+export interface ControlPlaneStoreDesktopActivationSession {
+  access_token: string;
+  token_type: string;
+  expires_at: string;
+  device_id: string;
+  staff_profile_id: string;
+  local_auth_token: string;
+  offline_valid_until: string;
+  activation_version: number;
 }
 
 export interface ControlPlaneRuntimeHeartbeat {
@@ -259,6 +287,18 @@ export interface ControlPlaneSyncStatus {
   oldest_unsynced_mutation_age_seconds?: number | null;
   runtime_state: string;
   last_local_spoke_sync_at?: string | null;
+}
+
+export interface ControlPlaneSyncSpokeRecord {
+  spoke_device_id: string;
+  hub_device_id: string;
+  runtime_kind: string;
+  hostname?: string | null;
+  operating_system?: string | null;
+  app_version?: string | null;
+  connection_state: string;
+  last_seen_at: string;
+  last_local_sync_at?: string | null;
 }
 
 export interface ControlPlaneSyncConflictRecord {

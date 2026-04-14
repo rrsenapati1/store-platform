@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, TimestampMixin
@@ -57,3 +57,22 @@ class DeviceClaim(Base, TimestampMixin):
     approved_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), default=None, index=True)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+
+
+class StoreDesktopActivation(Base, TimestampMixin):
+    __tablename__ = "store_desktop_activations"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    device_id: Mapped[str] = mapped_column(ForeignKey("device_registrations.id", ondelete="CASCADE"), index=True)
+    staff_profile_id: Mapped[str] = mapped_column(ForeignKey("staff_profiles.id", ondelete="CASCADE"), index=True)
+    activation_code_hash: Mapped[str] = mapped_column(String(128), index=True)
+    local_auth_token_hash: Mapped[str | None] = mapped_column(String(128), default=None, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="ISSUED")
+    activation_version: Mapped[int] = mapped_column(Integer, default=1)
+    issued_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), default=None, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), index=True)
+    offline_valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+    redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+    last_unlocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)

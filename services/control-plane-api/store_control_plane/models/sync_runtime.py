@@ -106,3 +106,29 @@ class HubSyncStatus(Base, TimestampMixin):
     oldest_unsynced_mutation_age_seconds: Mapped[int] = mapped_column(Integer, default=0)
     runtime_state: Mapped[str] = mapped_column(String(32), default="CURRENT")
     last_local_spoke_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+
+
+class HubSpokeObservation(Base, TimestampMixin):
+    __tablename__ = "hub_spoke_observations"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "branch_id",
+            "hub_device_id",
+            "spoke_device_id",
+            name="uq_hub_spoke_observation_scope",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    hub_device_id: Mapped[str] = mapped_column(ForeignKey("device_registrations.id", ondelete="CASCADE"), index=True)
+    spoke_device_id: Mapped[str] = mapped_column(String(128), index=True)
+    runtime_kind: Mapped[str] = mapped_column(String(64))
+    hostname: Mapped[str | None] = mapped_column(String(255), default=None)
+    operating_system: Mapped[str | None] = mapped_column(String(64), default=None)
+    app_version: Mapped[str | None] = mapped_column(String(64), default=None)
+    connection_state: Mapped[str] = mapped_column(String(32), default="DISCOVERED")
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utc_now)
+    last_local_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)

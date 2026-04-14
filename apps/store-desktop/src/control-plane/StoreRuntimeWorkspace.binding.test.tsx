@@ -3,8 +3,13 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { mockInvoke } = vi.hoisted(() => ({
-  mockInvoke: vi.fn(async (command: string) => {
+const { tauriState, mockInvoke } = vi.hoisted(() => ({
+  tauriState: {
+    session: null as unknown,
+    localAuth: null as unknown,
+    hubIdentity: null as unknown,
+  },
+  mockInvoke: vi.fn(async (command: string, payload?: { session?: unknown; localAuth?: unknown; hubIdentity?: unknown }) => {
     if (command === 'cmd_load_store_runtime_cache') {
       return null;
     }
@@ -32,6 +37,39 @@ const { mockInvoke } = vi.hoisted(() => ({
         runtime_home: 'C:/StoreRuntime',
         cache_db_path: 'C:/StoreRuntime/store-runtime-cache.sqlite3',
       };
+    }
+    if (command === 'cmd_load_store_runtime_session') {
+      return tauriState.session;
+    }
+    if (command === 'cmd_save_store_runtime_session') {
+      tauriState.session = payload?.session ?? null;
+      return tauriState.session;
+    }
+    if (command === 'cmd_clear_store_runtime_session') {
+      tauriState.session = null;
+      return null;
+    }
+    if (command === 'cmd_load_store_runtime_local_auth') {
+      return tauriState.localAuth;
+    }
+    if (command === 'cmd_save_store_runtime_local_auth') {
+      tauriState.localAuth = payload?.localAuth ?? null;
+      return tauriState.localAuth;
+    }
+    if (command === 'cmd_clear_store_runtime_local_auth') {
+      tauriState.localAuth = null;
+      return null;
+    }
+    if (command === 'cmd_load_store_runtime_hub_identity') {
+      return tauriState.hubIdentity;
+    }
+    if (command === 'cmd_save_store_runtime_hub_identity') {
+      tauriState.hubIdentity = payload?.hubIdentity ?? null;
+      return tauriState.hubIdentity;
+    }
+    if (command === 'cmd_clear_store_runtime_hub_identity') {
+      tauriState.hubIdentity = null;
+      return null;
     }
     if (command === 'cmd_save_store_runtime_cache') {
       return {
@@ -73,6 +111,9 @@ describe('packaged runtime device binding', () => {
 
   beforeEach(() => {
     (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ = {};
+    tauriState.session = null;
+    tauriState.localAuth = null;
+    tauriState.hubIdentity = null;
 
     const responses = [
       jsonResponse({ access_token: 'session-cashier', token_type: 'Bearer' }),

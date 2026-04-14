@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import HubSyncStatus, SyncConflict, SyncEnvelope, SyncMutationLog
+from ..models import HubSpokeObservation, HubSyncStatus, SyncConflict, SyncEnvelope, SyncMutationLog
 from ..utils import new_id
 
 
@@ -266,3 +266,74 @@ class SyncRuntimeRepository:
             setattr(status_record, key, value)
         await self._session.flush()
         return status_record
+
+    async def list_hub_spoke_observations(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+    ) -> list[HubSpokeObservation]:
+        statement = (
+            select(HubSpokeObservation)
+            .where(
+                HubSpokeObservation.tenant_id == tenant_id,
+                HubSpokeObservation.branch_id == branch_id,
+            )
+            .order_by(
+                HubSpokeObservation.connection_state.asc(),
+                HubSpokeObservation.last_seen_at.desc(),
+                HubSpokeObservation.spoke_device_id.asc(),
+            )
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def replace_hub_spoke_observations(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        hub_device_id: str,
+        observations: list[dict[str, object]],
+        observed_at,
+    ) -> list[HubSpokeObservation]:
+        statement = select(HubSpokeObservation).where(
+            HubSpokeObservation.tenant_id == tenant_id,
+            HubSpokeObservation.branch_id == branch_id,
+            HubSpokeObservation.hub_device_id == hub_device_id,
+        )
+        existing_records = list((await self._session.scalars(statement)).all())
+        existing_by_spoke = {record.spoke_device_id: record for record in existing_records}
+        observed_spoke_ids: set[str] = set()
+
+        for payload in observations:
+            spoke_device_id = str(payload["spoke_device_id"])
+            observed_spoke_ids.add(spoke_device_id)
+            record = existing_by_spoke.get(spoke_device_id)
+            if record is None:
+                record = HubSpokeObservation(
+                    id=new_id(),
+                    tenant_id=tenant_id,
+                    branch_id=branch_id,
+                    hub_device_id=hub_device_id,
+                    spoke_device_id=spoke_device_id,
+                )
+                self._session.add(record)
+                existing_records.append(record)
+            record.runtime_kind = str(payload["runtime_kind"])
+            record.hostname = str(payload["hostname"]) if payload.get("hostname") else None
+            record.operating_system = str(payload["operating_system"]) if payload.get("operating_system") else None
+            record.app_version = str(payload["app_version"]) if payload.get("app_version") else None
+            record.connection_state = str(payload["connection_state"])
+            record.last_seen_at = observed_at
+            record.last_local_sync_at = payload.get("last_local_sync_at")
+
+        for record in existing_records:
+            if record.spoke_device_id in observed_spoke_ids:
+                continue
+            record.connection_state = "DISCONNECTED"
+
+        await self._session.flush()
+        return sorted(
+            existing_records,
+            key=lambda record: (record.connection_state, -(record.last_seen_at.timestamp() if record.last_seen_at else 0), record.spoke_device_id),
+        )

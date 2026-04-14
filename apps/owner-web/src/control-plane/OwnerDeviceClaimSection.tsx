@@ -1,6 +1,6 @@
 import { startTransition, useMemo, useState } from 'react';
 import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@store/ui';
-import type { ControlPlaneDeviceClaimApproval, ControlPlaneDeviceClaimRecord } from '@store/types';
+import type { ControlPlaneDeviceClaimApproval, ControlPlaneDeviceClaimRecord, ControlPlaneStoreDesktopActivation } from '@store/types';
 import { ownerControlPlaneClient } from './client';
 
 type OwnerDeviceClaimSectionProps = {
@@ -24,7 +24,9 @@ export function OwnerDeviceClaimSection({
   const [selectedClaimId, setSelectedClaimId] = useState('');
   const [deviceName, setDeviceName] = useState('');
   const [deviceCode, setDeviceCode] = useState('');
+  const [isBranchHub, setIsBranchHub] = useState(false);
   const [latestApproval, setLatestApproval] = useState<ControlPlaneDeviceClaimApproval | null>(null);
+  const [latestActivation, setLatestActivation] = useState<ControlPlaneStoreDesktopActivation | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
 
@@ -45,6 +47,7 @@ export function OwnerDeviceClaimSection({
         setClaims(response.records);
         setSelectedClaimId(response.records[0]?.id ?? '');
         setLatestApproval(null);
+        setLatestActivation(null);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load device claims');
@@ -69,6 +72,7 @@ export function OwnerDeviceClaimSection({
           device_name: deviceName,
           device_code: deviceCode,
           session_surface: 'store_desktop',
+          is_branch_hub: isBranchHub,
         },
       );
       startTransition(() => {
@@ -79,10 +83,36 @@ export function OwnerDeviceClaimSection({
         setSelectedClaimId(approval.claim.id);
         setDeviceName('');
         setDeviceCode('');
+        setIsBranchHub(false);
+        setLatestActivation(null);
       });
       onApproved?.(approval);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to approve selected claim');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function issueDesktopActivation() {
+    const approvedDeviceId = latestApproval?.device.id ?? selectedClaim?.approved_device_id ?? null;
+    if (!accessToken || !tenantId || !branchId || !approvedDeviceId) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const activation = await ownerControlPlaneClient.issueStoreDesktopActivation(
+        accessToken,
+        tenantId,
+        branchId,
+        approvedDeviceId,
+      );
+      startTransition(() => {
+        setLatestActivation(activation);
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to issue desktop activation');
     } finally {
       setIsBusy(false);
     }
@@ -133,11 +163,29 @@ export function OwnerDeviceClaimSection({
 
       <FormField id="device-claim-device-name" label="Approved device name" value={deviceName} onChange={setDeviceName} />
       <FormField id="device-claim-device-code" label="Approved device code" value={deviceCode} onChange={setDeviceCode} />
+      <label
+        htmlFor="device-claim-is-branch-hub"
+        style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', color: '#25314f', fontWeight: 600 }}
+      >
+        <input
+          id="device-claim-is-branch-hub"
+          type="checkbox"
+          checked={isBranchHub}
+          onChange={(event) => setIsBranchHub(event.target.checked)}
+        />
+        Designate as branch hub
+      </label>
       <ActionButton
         onClick={() => void approveSelectedClaim()}
         disabled={isBusy || !selectedClaim || selectedClaim?.status === 'APPROVED' || !deviceName || !deviceCode}
       >
         Approve selected claim
+      </ActionButton>
+      <ActionButton
+        onClick={() => void issueDesktopActivation()}
+        disabled={isBusy || !(latestApproval?.device.id ?? selectedClaim?.approved_device_id)}
+      >
+        Issue desktop activation
       </ActionButton>
 
       {latestApproval ? (
@@ -148,6 +196,21 @@ export function OwnerDeviceClaimSection({
               { label: 'Claim', value: latestApproval.claim.claim_code },
               { label: 'Device', value: latestApproval.device.device_name },
               { label: 'Device code', value: latestApproval.device.device_code },
+              { label: 'Runtime role', value: latestApproval.device.is_branch_hub ? 'Branch hub' : 'Store desktop' },
+              { label: 'Hub sync secret', value: latestApproval.device.sync_access_secret ?? 'Issued only for designated hub devices' },
+            ]}
+          />
+        </div>
+      ) : null}
+
+      {latestActivation ? (
+        <div style={{ marginTop: '16px' }}>
+          <h3 style={{ marginBottom: '10px' }}>Latest desktop activation</h3>
+          <DetailList
+            items={[
+              { label: 'Activation code', value: latestActivation.activation_code },
+              { label: 'Status', value: latestActivation.status },
+              { label: 'Expires at', value: latestActivation.expires_at },
             ]}
           />
         </div>

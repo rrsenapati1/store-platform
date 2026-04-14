@@ -10,6 +10,11 @@ class OIDCExchangeRequest(BaseModel):
 class SessionTokenResponse(BaseModel):
     access_token: str
     token_type: str = "Bearer"
+    expires_at: str
+
+
+class SignOutResponse(BaseModel):
+    status: str
 
 
 class ActorTenantMembership(BaseModel):

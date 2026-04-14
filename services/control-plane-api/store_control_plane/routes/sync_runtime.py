@@ -17,6 +17,10 @@ from ..schemas import (
     SyncPullResponse,
     SyncPushRequest,
     SyncPushResponse,
+    SyncSpokeListResponse,
+    SyncSpokeObserveRequest,
+    SyncSpokeObserveResponse,
+    SyncSpokeRecord,
     SyncStatusResponse,
 )
 from ..services import ActorContext, SyncDeviceContext, SyncRuntimeService, assert_branch_any_capability
@@ -53,6 +57,20 @@ async def sync_heartbeat(
         runtime_state=runtime_state.upper(),
     )
     return SyncHeartbeatResponse(**record)
+
+
+@router.post("/v1/sync/spokes/observe", response_model=SyncSpokeObserveResponse)
+async def observe_sync_spokes(
+    payload: SyncSpokeObserveRequest,
+    device: SyncDeviceContext = Depends(get_current_sync_device),
+    session: AsyncSession = Depends(get_session),
+) -> SyncSpokeObserveResponse:
+    service = SyncRuntimeService(session)
+    response = await service.observe_spokes(
+        device=device,
+        spokes=[spoke.model_dump() for spoke in payload.spokes],
+    )
+    return SyncSpokeObserveResponse(**response)
 
 
 @router.post("/v1/sync/push", response_model=SyncPushResponse)
@@ -128,3 +146,16 @@ async def list_sync_envelopes(
     service = SyncRuntimeService(session)
     records = await service.list_sync_envelopes(tenant_id=tenant_id, branch_id=branch_id, limit=limit)
     return SyncEnvelopeListResponse(records=[SyncEnvelopeRecord(**record) for record in records])
+
+
+@router.get("/v1/tenants/{tenant_id}/branches/{branch_id}/runtime/sync-spokes", response_model=SyncSpokeListResponse)
+async def list_sync_spokes(
+    tenant_id: str,
+    branch_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> SyncSpokeListResponse:
+    _assert_runtime_monitoring_access(actor, tenant_id=tenant_id, branch_id=branch_id)
+    service = SyncRuntimeService(session)
+    records = await service.list_sync_spokes(tenant_id=tenant_id, branch_id=branch_id)
+    return SyncSpokeListResponse(records=[SyncSpokeRecord(**record) for record in records])

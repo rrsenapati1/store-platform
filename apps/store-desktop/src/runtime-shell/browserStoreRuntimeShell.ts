@@ -34,6 +34,9 @@ export function createBrowserStoreRuntimeShell(
         claim_code: null,
         runtime_home: null,
         cache_db_path: null,
+        hub_service_state: null,
+        hub_service_url: null,
+        hub_manifest_url: null,
       };
     },
   };

@@ -13,6 +13,9 @@ export interface StoreRuntimeShellStatus {
   claim_code: string | null;
   runtime_home: string | null;
   cache_db_path: string | null;
+  hub_service_state: string | null;
+  hub_service_url: string | null;
+  hub_manifest_url: string | null;
 }
 
 export interface BrowserRuntimeShellWindow {
@@ -46,5 +49,8 @@ export function isStoreRuntimeShellStatus(value: unknown): value is StoreRuntime
     && (typeof value.installation_id === 'string' || value.installation_id === null)
     && (typeof value.claim_code === 'string' || value.claim_code === null)
     && (typeof value.runtime_home === 'string' || value.runtime_home === null)
-    && (typeof value.cache_db_path === 'string' || value.cache_db_path === null);
+    && (typeof value.cache_db_path === 'string' || value.cache_db_path === null)
+    && (typeof value.hub_service_state === 'string' || value.hub_service_state === null || typeof value.hub_service_state === 'undefined')
+    && (typeof value.hub_service_url === 'string' || value.hub_service_url === null || typeof value.hub_service_url === 'undefined')
+    && (typeof value.hub_manifest_url === 'string' || value.hub_manifest_url === null || typeof value.hub_manifest_url === 'undefined');
 }

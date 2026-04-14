@@ -1,6 +1,8 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::sync::{Mutex, OnceLock};
 
 pub(crate) const CACHE_DB_FILE_NAME: &str = "store-runtime-cache.sqlite3";
 const CACHE_RUNTIME_HOME_ENV: &str = "STORE_RUNTIME_HOME";
@@ -51,4 +53,10 @@ pub(crate) fn resolve_hostname() -> Option<String> {
     }
 
     None
+}
+
+#[cfg(test)]
+pub(crate) fn runtime_home_test_guard() -> &'static Mutex<()> {
+    static GUARD: OnceLock<Mutex<()>> = OnceLock::new();
+    GUARD.get_or_init(|| Mutex::new(()))
 }

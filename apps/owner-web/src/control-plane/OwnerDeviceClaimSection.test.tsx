@@ -67,10 +67,18 @@ describe('owner device claim section', () => {
           device_name: 'Counter Desktop 1',
           device_code: 'BLR-POS-01',
           session_surface: 'store_desktop',
+          is_branch_hub: true,
           status: 'ACTIVE',
           assigned_staff_profile_id: 'staff-1',
-          sync_access_secret: null,
+          sync_access_secret: 'hub-secret-1',
         },
+      }),
+      jsonResponse({
+        device_id: 'device-1',
+        staff_profile_id: 'staff-1',
+        activation_code: 'ACTV-1234-5678',
+        status: 'ISSUED',
+        expires_at: '2026-04-14T07:30:00',
       }),
     ];
 
@@ -88,7 +96,7 @@ describe('owner device claim section', () => {
     vi.restoreAllMocks();
   });
 
-  test('loads a pending packaged-runtime claim and approves it into a branch device', async () => {
+  test('loads a pending packaged-runtime claim, approves it into a branch device, and issues a desktop activation', async () => {
     const onApproved = vi.fn();
 
     render(
@@ -106,10 +114,15 @@ describe('owner device claim section', () => {
 
     fireEvent.change(screen.getByLabelText('Approved device name'), { target: { value: 'Counter Desktop 1' } });
     fireEvent.change(screen.getByLabelText('Approved device code'), { target: { value: 'BLR-POS-01' } });
+    fireEvent.click(screen.getByLabelText('Designate as branch hub'));
     fireEvent.click(screen.getByRole('button', { name: 'Approve selected claim' }));
 
     expect(await screen.findByText('Approved runtime device')).toBeInTheDocument();
     expect(screen.getByText('BLR-POS-01')).toBeInTheDocument();
+    expect(screen.getByText('Branch hub')).toBeInTheDocument();
+    expect(screen.getByText('hub-secret-1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Issue desktop activation' }));
+    expect(await screen.findByText('ACTV-1234-5678')).toBeInTheDocument();
     expect(onApproved).toHaveBeenCalledTimes(1);
   });
 });

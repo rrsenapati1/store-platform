@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_actor, get_session
-from ..schemas import DeviceRegistrationListResponse, DeviceRegistrationRecord, PrintJobCompletionRequest, PrintJobListResponse, PrintJobQueueRequest, PrintJobResponse, RuntimeDeviceClaimResolveRequest, RuntimeDeviceClaimResolveResponse, RuntimeDeviceHeartbeatResponse
+from ..schemas import DeviceRegistrationListResponse, DeviceRegistrationRecord, PrintJobCompletionRequest, PrintJobListResponse, PrintJobQueueRequest, PrintJobResponse, RuntimeDeviceClaimResolveRequest, RuntimeDeviceClaimResolveResponse, RuntimeDeviceHeartbeatResponse, RuntimeHubBootstrapRequest, RuntimeHubBootstrapResponse
 from ..services import ActorContext, RuntimeService, WorkforceService, assert_branch_any_capability
 
 router = APIRouter(prefix="/v1/tenants", tags=["runtime"])
@@ -63,6 +63,25 @@ async def resolve_runtime_device_claim(
         app_version=payload.app_version,
     )
     return RuntimeDeviceClaimResolveResponse(**claim)
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/runtime/hub-bootstrap", response_model=RuntimeHubBootstrapResponse)
+async def bootstrap_runtime_hub_identity(
+    tenant_id: str,
+    branch_id: str,
+    payload: RuntimeHubBootstrapRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> RuntimeHubBootstrapResponse:
+    _assert_runtime_access(actor, tenant_id=tenant_id, branch_id=branch_id)
+    service = RuntimeService(session)
+    bootstrap = await service.bootstrap_branch_hub_runtime_identity(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        actor=actor,
+        installation_id=payload.installation_id,
+    )
+    return RuntimeHubBootstrapResponse(**bootstrap)
 
 
 @router.post("/{tenant_id}/branches/{branch_id}/runtime/devices/{device_id}/heartbeat", response_model=RuntimeDeviceHeartbeatResponse)

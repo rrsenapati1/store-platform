@@ -1,6 +1,11 @@
 import { startTransition, useState } from 'react';
 import { ActionButton, DetailList, SectionCard } from '@store/ui';
-import type { ControlPlaneSyncConflictRecord, ControlPlaneSyncEnvelopeRecord, ControlPlaneSyncStatus } from '@store/types';
+import type {
+  ControlPlaneSyncConflictRecord,
+  ControlPlaneSyncEnvelopeRecord,
+  ControlPlaneSyncSpokeRecord,
+  ControlPlaneSyncStatus,
+} from '@store/types';
 import { storeControlPlaneClient } from './client';
 
 type StoreSyncRuntimeSectionProps = {
@@ -12,6 +17,7 @@ type StoreSyncRuntimeSectionProps = {
 export function StoreSyncRuntimeSection({ accessToken, tenantId, branchId }: StoreSyncRuntimeSectionProps) {
   const [syncStatus, setSyncStatus] = useState<ControlPlaneSyncStatus | null>(null);
   const [conflicts, setConflicts] = useState<ControlPlaneSyncConflictRecord[]>([]);
+  const [spokes, setSpokes] = useState<ControlPlaneSyncSpokeRecord[]>([]);
   const [envelopes, setEnvelopes] = useState<ControlPlaneSyncEnvelopeRecord[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
@@ -23,14 +29,16 @@ export function StoreSyncRuntimeSection({ accessToken, tenantId, branchId }: Sto
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const [statusResponse, conflictResponse, envelopeResponse] = await Promise.all([
+      const [statusResponse, conflictResponse, spokeResponse, envelopeResponse] = await Promise.all([
         storeControlPlaneClient.getRuntimeSyncStatus(accessToken, tenantId, branchId),
         storeControlPlaneClient.listRuntimeSyncConflicts(accessToken, tenantId, branchId),
+        storeControlPlaneClient.listRuntimeSyncSpokes(accessToken, tenantId, branchId),
         storeControlPlaneClient.listRuntimeSyncEnvelopes(accessToken, tenantId, branchId),
       ]);
       startTransition(() => {
         setSyncStatus(statusResponse);
         setConflicts(conflictResponse.records);
+        setSpokes(spokeResponse.records);
         setEnvelopes(envelopeResponse.records);
       });
     } catch (error) {
@@ -72,6 +80,16 @@ export function StoreSyncRuntimeSection({ accessToken, tenantId, branchId }: Sto
           {conflicts.map((record) => (
             <li key={record.id}>
               {record.table_name} :: {record.record_id} :: {record.reason}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {spokes.length ? (
+        <ul style={{ marginBottom: '16px', marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
+          {spokes.map((record) => (
+            <li key={record.spoke_device_id}>
+              {record.spoke_device_id} :: {record.connection_state} :: {record.hostname ?? record.runtime_kind}
             </li>
           ))}
         </ul>

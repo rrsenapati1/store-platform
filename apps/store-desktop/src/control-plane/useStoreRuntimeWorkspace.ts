@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';
 import type {
   ControlPlaneActor,
   ControlPlaneBatchExpiryReport,
@@ -15,9 +15,9 @@ import type {
   ControlPlaneSale,
   ControlPlaneSaleRecord,
   ControlPlaneSaleReturn,
+  ControlPlaneStoreDesktopActivationSession,
   ControlPlaneTenant,
 } from '@store/types';
-import { storeControlPlaneClient } from './client';
 import {
   createResolvedStoreRuntimeCache,
   type StoreRuntimeCachePersistence,
@@ -32,8 +32,41 @@ import {
   replayPendingRuntimeMutations,
   shouldQueueRuntimeOutboxMutation,
 } from './runtimeOutbox';
+import {
+  clearStoreRuntimeSession,
+  isStoreRuntimeSessionExpired,
+  loadStoreRuntimeSession,
+  saveStoreRuntimeSession,
+  type StoreRuntimeSessionRecord,
+} from './storeRuntimeSessionStore';
+import { resolveStoreRuntimeSessionRestorePolicy } from './storeRuntimeSessionRestorePolicy';
+import {
+  clearStoreRuntimeLocalAuth,
+  isStoreRuntimeLocalAuthOfflineExpired,
+  loadStoreRuntimeLocalAuth,
+  saveStoreRuntimeLocalAuth,
+  type StoreRuntimeLocalAuthRecord,
+  STORE_RUNTIME_LOCAL_AUTH_SCHEMA_VERSION,
+} from './storeRuntimeLocalAuthStore';
+import {
+  loadStoreRuntimeHubIdentity,
+  type StoreRuntimeHubIdentityRecord,
+} from './storeRuntimeHubIdentityStore';
+import {
+  createStoreRuntimePinSalt,
+  hashStoreRuntimePin,
+  isStoreRuntimePinFormatValid,
+  isStoreRuntimePinLocked,
+  recordFailedStoreRuntimePinAttempt,
+  recordSuccessfulStoreRuntimePinUnlock,
+  STORE_RUNTIME_PIN_ATTEMPT_LIMIT,
+  STORE_RUNTIME_PIN_LOCKOUT_SECONDS,
+  verifyStoreRuntimePin,
+} from './storeRuntimePinAuth';
+import { isStoreRuntimeDeveloperBootstrapEnabled } from './storeRuntimeAuthMode';
+import { ensureStoreRuntimeHubIdentity } from './runtimeHubIdentity';
 import { loadStoreRuntimeShellStatus, useStoreRuntimeShellStatus } from './useStoreRuntimeShellStatus';
-
+import { ControlPlaneRequestError, storeControlPlaneClient } from './client';
 type CacheStatus = 'EMPTY' | 'HYDRATED' | 'SYNCED';
 
 export function useStoreRuntimeWorkspace() {
@@ -41,8 +74,18 @@ export function useStoreRuntimeWorkspace() {
     runtimeShellError,
     runtimeShellStatus,
   } = useStoreRuntimeShellStatus();
+  const [activationCode, setActivationCode] = useState('');
+  const [pendingPinEnrollmentSession, setPendingPinEnrollmentSession] = useState<ControlPlaneStoreDesktopActivationSession | null>(null);
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [unlockPin, setUnlockPin] = useState('');
   const [korsenexToken, setKorsenexToken] = useState('');
   const [accessToken, setAccessToken] = useState('');
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  const [hasLoadedLocalAuth, setHasLoadedLocalAuth] = useState(false);
+  const [localAuthRecord, setLocalAuthRecord] = useState<StoreRuntimeLocalAuthRecord | null>(null);
+  const [hubIdentityRecord, setHubIdentityRecord] = useState<StoreRuntimeHubIdentityRecord | null>(null);
+  const [isLocalUnlocked, setIsLocalUnlocked] = useState(false);
   const [actor, setActor] = useState<ControlPlaneActor | null>(null);
   const [tenant, setTenant] = useState<ControlPlaneTenant | null>(null);
   const [branches, setBranches] = useState<ControlPlaneBranchRecord[]>([]);
@@ -88,7 +131,16 @@ export function useStoreRuntimeWorkspace() {
   const [expiryWriteOffReason, setExpiryWriteOffReason] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+  const sessionRecordRef = useRef<StoreRuntimeSessionRecord | null>(null);
   const isSessionLive = Boolean(accessToken);
+  const supportsDeveloperSessionBootstrap = runtimeShellStatus?.runtime_kind !== 'packaged_desktop'
+    && isStoreRuntimeDeveloperBootstrapEnabled();
+  const requiresPinEnrollment = pendingPinEnrollmentSession !== null;
+  const requiresLocalUnlock = runtimeShellStatus?.runtime_kind === 'packaged_desktop'
+    && hasLoadedLocalAuth
+    && localAuthRecord !== null
+    && !isLocalUnlocked
+    && !requiresPinEnrollment;
 
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? actor?.branch_memberships[0]?.tenant_id ?? '';
   const branchId = actor?.branch_memberships[0]?.branch_id ?? branches[0]?.branch_id ?? '';
@@ -101,6 +153,132 @@ export function useStoreRuntimeWorkspace() {
         return next;
       });
       setErrorMessage(message);
+    });
+  }
+
+  function resetRuntimeWorkspaceState() {
+    sessionRecordRef.current = null;
+    startTransition(() => {
+      setPendingPinEnrollmentSession(null);
+      setNewPin('');
+      setConfirmPin('');
+      setUnlockPin('');
+      setIsLocalUnlocked(false);
+      setAccessToken('');
+      setSessionExpiresAt(null);
+      setActor(null);
+      setTenant(null);
+      setBranches([]);
+      setBranchCatalogItems([]);
+      setBatchExpiryReport(null);
+      setInventorySnapshot([]);
+      setSales([]);
+      setRuntimeDevices([]);
+      setSelectedRuntimeDeviceId('');
+      setRuntimeDeviceClaim(null);
+      setRuntimeHeartbeat(null);
+      setPrintJobs([]);
+      setLatestPrintJob(null);
+      setLatestBatchWriteOff(null);
+      setLatestScanLookup(null);
+      setLatestSale(null);
+      setLatestSaleReturn(null);
+      setLatestExchange(null);
+      setPendingMutations([]);
+      setPendingMutationCount(0);
+      setCacheStatus('EMPTY');
+      setLastCachedAt(null);
+      setErrorMessage('');
+    });
+  }
+
+  function applyCachedRuntimeSnapshot(cachedSnapshot: StoreRuntimeCacheSnapshot) {
+    startTransition(() => {
+      setActor(cachedSnapshot.actor);
+      setTenant(cachedSnapshot.tenant);
+      setBranches(cachedSnapshot.branches);
+      setBranchCatalogItems(cachedSnapshot.branch_catalog_items);
+      setInventorySnapshot(cachedSnapshot.inventory_snapshot);
+      setSales(cachedSnapshot.sales);
+      setRuntimeDevices(cachedSnapshot.runtime_devices);
+      setSelectedRuntimeDeviceId(cachedSnapshot.selected_runtime_device_id || (cachedSnapshot.runtime_devices[0]?.id ?? ''));
+      setRuntimeHeartbeat(cachedSnapshot.runtime_heartbeat);
+      setPrintJobs(cachedSnapshot.print_jobs);
+      setLatestPrintJob(cachedSnapshot.latest_print_job);
+      setLatestSale(cachedSnapshot.latest_sale);
+      setLatestSaleReturn(cachedSnapshot.latest_sale_return);
+      setLatestExchange(cachedSnapshot.latest_exchange);
+      setPendingMutations(cachedSnapshot.pending_mutations);
+      setCacheStatus('HYDRATED');
+      setLastCachedAt(cachedSnapshot.cached_at);
+      setPendingMutationCount(cachedSnapshot.pending_mutations.length);
+    });
+  }
+
+  async function bootstrapRuntimeSession(nextSession: StoreRuntimeSessionRecord) {
+    const nextActor = await storeControlPlaneClient.getActor(nextSession.access_token);
+    const nextTenantId = nextActor.tenant_memberships[0]?.tenant_id ?? nextActor.branch_memberships[0]?.tenant_id;
+    if (!nextTenantId) {
+      throw new Error('Runtime session is not bound to a tenant');
+    }
+    const tenantSummary = await storeControlPlaneClient.getTenantSummary(nextSession.access_token, nextTenantId);
+    const branchList = await storeControlPlaneClient.listBranches(nextSession.access_token, nextTenantId);
+    const activeBranchId = nextActor.branch_memberships[0]?.branch_id ?? branchList.records[0]?.branch_id;
+    const resolvedRuntimeShellStatus = await loadStoreRuntimeShellStatus().catch(() => runtimeShellStatus);
+    const [catalogResponse, snapshotResponse, salesResponse, devicesResponse] = activeBranchId
+      ? await Promise.all([
+          storeControlPlaneClient.listBranchCatalogItems(nextSession.access_token, nextTenantId, activeBranchId),
+          storeControlPlaneClient.listInventorySnapshot(nextSession.access_token, nextTenantId, activeBranchId),
+          storeControlPlaneClient.listSales(nextSession.access_token, nextTenantId, activeBranchId),
+          storeControlPlaneClient.listRuntimeDevices(nextSession.access_token, nextTenantId, activeBranchId),
+        ])
+      : [{ records: [] }, { records: [] }, { records: [] }, { records: [] }];
+    const runtimeDeviceBinding = activeBranchId
+      ? await resolveStoreRuntimeDeviceBinding({
+          accessToken: nextSession.access_token,
+          tenantId: nextTenantId,
+          branchId: activeBranchId,
+          runtimeDevices: devicesResponse.records,
+          runtimeShellStatus: resolvedRuntimeShellStatus,
+        })
+      : { selectedRuntimeDeviceId: '', runtimeDeviceClaim: null };
+    const resolvedHubIdentity = hubIdentityRecord ?? await loadStoreRuntimeHubIdentity();
+    const nextHubIdentity = activeBranchId
+      ? await ensureStoreRuntimeHubIdentity({
+          accessToken: nextSession.access_token,
+          tenantId: nextTenantId,
+          branchId: activeBranchId,
+          selectedRuntimeDeviceId: runtimeDeviceBinding.selectedRuntimeDeviceId,
+          runtimeDevices: devicesResponse.records,
+          runtimeShellStatus: resolvedRuntimeShellStatus,
+          currentHubIdentity: resolvedHubIdentity,
+        })
+      : null;
+    if (activeBranchId) {
+      await replayPendingRuntimeActions({
+        accessTokenOverride: nextSession.access_token,
+        tenantIdOverride: nextTenantId,
+        branchIdOverride: activeBranchId,
+        selectedRuntimeDeviceIdOverride: runtimeDeviceBinding.selectedRuntimeDeviceId,
+      });
+    }
+
+    sessionRecordRef.current = nextSession;
+    startTransition(() => {
+      setAccessToken(nextSession.access_token);
+      setSessionExpiresAt(nextSession.expires_at);
+      setActor(nextActor);
+      setTenant(tenantSummary);
+      setBranches(branchList.records);
+      setBranchCatalogItems(catalogResponse.records);
+      setInventorySnapshot(snapshotResponse.records);
+      setSales(salesResponse.records);
+      setRuntimeDevices(devicesResponse.records);
+      setSelectedRuntimeDeviceId(runtimeDeviceBinding.selectedRuntimeDeviceId);
+      setRuntimeDeviceClaim(runtimeDeviceBinding.runtimeDeviceClaim);
+      setHubIdentityRecord(nextHubIdentity);
+      setCacheStatus('SYNCED');
+      setActivationCode('');
     });
   }
 
@@ -162,6 +340,26 @@ export function useStoreRuntimeWorkspace() {
   useEffect(() => {
     let isCancelled = false;
 
+    void loadStoreRuntimeHubIdentity()
+      .then((record) => {
+        if (!isCancelled) {
+          setHubIdentityRecord(record);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setHubIdentityRecord(null);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+
     void (async () => {
       const runtimeCache = createResolvedStoreRuntimeCache();
       const cachedSnapshot = await runtimeCache.load();
@@ -173,34 +371,105 @@ export function useStoreRuntimeWorkspace() {
       setCachePersistence(persistence);
       setLastCachedAt(persistence.cached_at);
 
+      const shouldDeferCacheHydration = runtimeShellStatus?.runtime_kind === 'packaged_desktop'
+        && (!hasLoadedLocalAuth || (localAuthRecord !== null && !isLocalUnlocked));
       if (!cachedSnapshot) {
         return;
       }
-
-      setActor(cachedSnapshot.actor);
-      setTenant(cachedSnapshot.tenant);
-      setBranches(cachedSnapshot.branches);
-      setBranchCatalogItems(cachedSnapshot.branch_catalog_items);
-      setInventorySnapshot(cachedSnapshot.inventory_snapshot);
-      setSales(cachedSnapshot.sales);
-      setRuntimeDevices(cachedSnapshot.runtime_devices);
-      setSelectedRuntimeDeviceId(cachedSnapshot.selected_runtime_device_id || (cachedSnapshot.runtime_devices[0]?.id ?? ''));
-      setRuntimeHeartbeat(cachedSnapshot.runtime_heartbeat);
-      setPrintJobs(cachedSnapshot.print_jobs);
-      setLatestPrintJob(cachedSnapshot.latest_print_job);
-      setLatestSale(cachedSnapshot.latest_sale);
-      setLatestSaleReturn(cachedSnapshot.latest_sale_return);
-      setLatestExchange(cachedSnapshot.latest_exchange);
-      setPendingMutations(cachedSnapshot.pending_mutations);
-      setCacheStatus('HYDRATED');
-      setLastCachedAt(cachedSnapshot.cached_at);
-      setPendingMutationCount(cachedSnapshot.pending_mutations.length);
+      if (shouldDeferCacheHydration) {
+        return;
+      }
+      applyCachedRuntimeSnapshot(cachedSnapshot);
     })();
 
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [hasLoadedLocalAuth, isLocalUnlocked, localAuthRecord, runtimeShellStatus?.runtime_kind]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    void (async () => {
+      const loadedLocalAuth = await loadStoreRuntimeLocalAuth();
+      if (isCancelled) {
+        return;
+      }
+      const packagedInstallationId = runtimeShellStatus?.runtime_kind === 'packaged_desktop'
+        ? runtimeShellStatus.installation_id ?? null
+        : null;
+      if (
+        loadedLocalAuth
+        && packagedInstallationId
+        && loadedLocalAuth.installation_id !== packagedInstallationId
+      ) {
+        await clearStoreRuntimeLocalAuth();
+        if (!isCancelled) {
+          setLocalAuthRecord(null);
+          setHasLoadedLocalAuth(true);
+        }
+        return;
+      }
+      setLocalAuthRecord(loadedLocalAuth);
+      setHasLoadedLocalAuth(true);
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [runtimeShellStatus?.installation_id, runtimeShellStatus?.runtime_kind]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    void (async () => {
+      if (!hasLoadedLocalAuth) {
+        return;
+      }
+      const persistedSession = await loadStoreRuntimeSession();
+      if (isCancelled || !persistedSession?.access_token) {
+        return;
+      }
+      const restorePolicy = resolveStoreRuntimeSessionRestorePolicy({
+        runtimeShellKind: runtimeShellStatus?.runtime_kind ?? null,
+        hasLocalAuthRecord: localAuthRecord !== null,
+      });
+      if (restorePolicy === 'DEFER_TO_LOCAL_AUTH') {
+        return;
+      }
+      if (restorePolicy === 'CLEAR_STALE_PACKAGED_SESSION') {
+        await clearStoreRuntimeSession();
+        return;
+      }
+      if (isStoreRuntimeSessionExpired(persistedSession)) {
+        await clearStoreRuntimeSession();
+        if (!isCancelled) {
+          resetRuntimeWorkspaceState();
+          setErrorMessage('Stored runtime session expired. Sign in again.');
+        }
+        return;
+      }
+      setIsBusy(true);
+      setErrorMessage('');
+      try {
+        await bootstrapRuntimeSession(persistedSession);
+      } catch (error) {
+        await clearStoreRuntimeSession();
+        if (!isCancelled) {
+          resetRuntimeWorkspaceState();
+          setErrorMessage(error instanceof Error ? error.message : 'Stored runtime session could not be restored');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsBusy(false);
+        }
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [hasLoadedLocalAuth, localAuthRecord, runtimeShellStatus?.runtime_kind]);
 
   useEffect(() => {
     const hasRuntimeState =
@@ -299,60 +568,236 @@ export function useStoreRuntimeWorkspace() {
   ]);
 
   async function startSession() {
+    if (!supportsDeveloperSessionBootstrap) {
+      setErrorMessage('Browser preview does not support manual session bootstrap. Use the approved packaged desktop activation flow.');
+      return;
+    }
     setIsBusy(true);
     setErrorMessage('');
     try {
       const session = await storeControlPlaneClient.exchangeSession(korsenexToken);
-      const nextActor = await storeControlPlaneClient.getActor(session.access_token);
-      const nextTenantId = nextActor.tenant_memberships[0]?.tenant_id ?? nextActor.branch_memberships[0]?.tenant_id;
-      if (!nextTenantId) {
-        throw new Error('Runtime session is not bound to a tenant');
-      }
-      const tenantSummary = await storeControlPlaneClient.getTenantSummary(session.access_token, nextTenantId);
-      const branchList = await storeControlPlaneClient.listBranches(session.access_token, nextTenantId);
-      const activeBranchId = nextActor.branch_memberships[0]?.branch_id ?? branchList.records[0]?.branch_id;
-      const resolvedRuntimeShellStatus = await loadStoreRuntimeShellStatus().catch(() => runtimeShellStatus);
-      const [catalogResponse, snapshotResponse, salesResponse, devicesResponse] = activeBranchId
-        ? await Promise.all([
-            storeControlPlaneClient.listBranchCatalogItems(session.access_token, nextTenantId, activeBranchId),
-            storeControlPlaneClient.listInventorySnapshot(session.access_token, nextTenantId, activeBranchId),
-            storeControlPlaneClient.listSales(session.access_token, nextTenantId, activeBranchId),
-            storeControlPlaneClient.listRuntimeDevices(session.access_token, nextTenantId, activeBranchId),
-          ])
-        : [{ records: [] }, { records: [] }, { records: [] }, { records: [] }];
-      const runtimeDeviceBinding = activeBranchId
-        ? await resolveStoreRuntimeDeviceBinding({
-            accessToken: session.access_token,
-            tenantId: nextTenantId,
-            branchId: activeBranchId,
-            runtimeDevices: devicesResponse.records,
-            runtimeShellStatus: resolvedRuntimeShellStatus,
-          })
-        : { selectedRuntimeDeviceId: '', runtimeDeviceClaim: null };
-      if (activeBranchId) {
-        await replayPendingRuntimeActions({
-          accessTokenOverride: session.access_token,
-          tenantIdOverride: nextTenantId,
-          branchIdOverride: activeBranchId,
-          selectedRuntimeDeviceIdOverride: runtimeDeviceBinding.selectedRuntimeDeviceId,
-        });
-      }
-
-      startTransition(() => {
-        setAccessToken(session.access_token);
-        setActor(nextActor);
-        setTenant(tenantSummary);
-        setBranches(branchList.records);
-        setBranchCatalogItems(catalogResponse.records);
-        setInventorySnapshot(snapshotResponse.records);
-        setSales(salesResponse.records);
-        setRuntimeDevices(devicesResponse.records);
-        setSelectedRuntimeDeviceId(runtimeDeviceBinding.selectedRuntimeDeviceId);
-        setRuntimeDeviceClaim(runtimeDeviceBinding.runtimeDeviceClaim);
-        setCacheStatus('SYNCED');
-      });
+      await bootstrapRuntimeSession(session);
+      await saveStoreRuntimeSession({ access_token: session.access_token, expires_at: session.expires_at });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to start runtime session');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function activateDesktopAccess() {
+    if (!runtimeShellStatus?.installation_id || !activationCode) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const session = await storeControlPlaneClient.activateStoreDesktopSession(
+        runtimeShellStatus.installation_id,
+        activationCode,
+      );
+      startTransition(() => {
+        setPendingPinEnrollmentSession(session);
+        setNewPin('');
+        setConfirmPin('');
+        setActivationCode('');
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to activate desktop access');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function enrollRuntimePin() {
+    if (!pendingPinEnrollmentSession || !runtimeShellStatus?.installation_id) {
+      return;
+    }
+    const normalizedNewPin = newPin.trim();
+    const normalizedConfirmPin = confirmPin.trim();
+    if (!isStoreRuntimePinFormatValid(normalizedNewPin)) {
+      setErrorMessage('PIN must be exactly 4 digits.');
+      return;
+    }
+    if (normalizedNewPin !== normalizedConfirmPin) {
+      setErrorMessage('PIN confirmation did not match.');
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const pinSalt = createStoreRuntimePinSalt();
+      const pinHash = await hashStoreRuntimePin(normalizedNewPin, pinSalt);
+      const localAuthRecordToSave: StoreRuntimeLocalAuthRecord = {
+        schema_version: STORE_RUNTIME_LOCAL_AUTH_SCHEMA_VERSION,
+        installation_id: runtimeShellStatus.installation_id,
+        device_id: pendingPinEnrollmentSession.device_id,
+        staff_profile_id: pendingPinEnrollmentSession.staff_profile_id,
+        local_auth_token: pendingPinEnrollmentSession.local_auth_token,
+        activation_version: pendingPinEnrollmentSession.activation_version,
+        offline_valid_until: pendingPinEnrollmentSession.offline_valid_until,
+        pin_attempt_limit: STORE_RUNTIME_PIN_ATTEMPT_LIMIT,
+        pin_lockout_seconds: STORE_RUNTIME_PIN_LOCKOUT_SECONDS,
+        pin_salt: pinSalt,
+        pin_hash: pinHash,
+        failed_attempts: 0,
+        locked_until: null,
+        enrolled_at: new Date().toISOString(),
+        last_unlocked_at: new Date().toISOString(),
+      };
+      await saveStoreRuntimeLocalAuth(localAuthRecordToSave);
+      await saveStoreRuntimeSession({
+        access_token: pendingPinEnrollmentSession.access_token,
+        expires_at: pendingPinEnrollmentSession.expires_at,
+      });
+      setLocalAuthRecord(localAuthRecordToSave);
+      setIsLocalUnlocked(true);
+      setPendingPinEnrollmentSession(null);
+      setNewPin('');
+      setConfirmPin('');
+      await bootstrapRuntimeSession(pendingPinEnrollmentSession);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to save runtime PIN');
+      return;
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function unlockRuntimeWithPin() {
+    if (!localAuthRecord || !runtimeShellStatus?.installation_id) {
+      return;
+    }
+    if (isStoreRuntimePinLocked(localAuthRecord)) {
+      setErrorMessage('Runtime PIN is temporarily locked. Try again later.');
+      return;
+    }
+    if (!isStoreRuntimePinFormatValid(unlockPin)) {
+      setErrorMessage('PIN must be exactly 4 digits.');
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const pinMatches = await verifyStoreRuntimePin(unlockPin, localAuthRecord);
+      if (!pinMatches) {
+        const failedLocalAuth = recordFailedStoreRuntimePinAttempt(localAuthRecord);
+        await saveStoreRuntimeLocalAuth(failedLocalAuth);
+        setLocalAuthRecord(failedLocalAuth);
+        setErrorMessage(
+          failedLocalAuth.locked_until
+            ? 'Runtime PIN is temporarily locked due to repeated failures.'
+            : 'PIN did not match this device.',
+        );
+        return;
+      }
+
+      const persistedSession = await loadStoreRuntimeSession();
+      if (persistedSession?.access_token && !isStoreRuntimeSessionExpired(persistedSession)) {
+        const updatedLocalAuth = recordSuccessfulStoreRuntimePinUnlock(localAuthRecord);
+        await saveStoreRuntimeLocalAuth(updatedLocalAuth);
+        setLocalAuthRecord(updatedLocalAuth);
+        setIsLocalUnlocked(true);
+        setUnlockPin('');
+        await bootstrapRuntimeSession(persistedSession);
+        return;
+      }
+      if (persistedSession?.access_token) {
+        await clearStoreRuntimeSession();
+      }
+
+      try {
+        const session = await storeControlPlaneClient.unlockStoreDesktopSession(
+          runtimeShellStatus.installation_id,
+          localAuthRecord.local_auth_token,
+        );
+        const updatedLocalAuth = recordSuccessfulStoreRuntimePinUnlock(
+          {
+            ...localAuthRecord,
+            local_auth_token: session.local_auth_token,
+            activation_version: session.activation_version,
+          },
+          {
+            offlineValidUntil: session.offline_valid_until,
+          },
+        );
+        await saveStoreRuntimeLocalAuth(updatedLocalAuth);
+        await saveStoreRuntimeSession({
+          access_token: session.access_token,
+          expires_at: session.expires_at,
+        });
+        setLocalAuthRecord(updatedLocalAuth);
+        setIsLocalUnlocked(true);
+        setUnlockPin('');
+        await bootstrapRuntimeSession(session);
+        return;
+      } catch (error) {
+        if (error instanceof ControlPlaneRequestError && (error.status === 401 || error.status === 403 || error.status === 409)) {
+          await clearStoreRuntimeSession();
+          await clearStoreRuntimeLocalAuth();
+          setLocalAuthRecord(null);
+          resetRuntimeWorkspaceState();
+          setErrorMessage('Runtime unlock is no longer valid. Ask the owner to issue a new activation.');
+          return;
+        }
+        if (!isStoreRuntimeLocalAuthOfflineExpired(localAuthRecord)) {
+          const updatedLocalAuth = recordSuccessfulStoreRuntimePinUnlock(localAuthRecord);
+          await saveStoreRuntimeLocalAuth(updatedLocalAuth);
+          setLocalAuthRecord(updatedLocalAuth);
+          setIsLocalUnlocked(true);
+          setUnlockPin('');
+          setErrorMessage('Control plane unavailable. Cached runtime unlocked locally.');
+          return;
+        }
+        setErrorMessage('Offline runtime unlock expired. Reconnect to the control plane to continue.');
+        return;
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to unlock runtime');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function refreshRuntimeSession() {
+    const currentAccessToken = sessionRecordRef.current?.access_token ?? accessToken;
+    if (!currentAccessToken) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const session = await storeControlPlaneClient.refreshSession(currentAccessToken);
+      await bootstrapRuntimeSession(session);
+      await saveStoreRuntimeSession({ access_token: session.access_token, expires_at: session.expires_at });
+    } catch (error) {
+      if (error instanceof ControlPlaneRequestError && error.status === 401) {
+        await clearStoreRuntimeSession();
+        resetRuntimeWorkspaceState();
+        setErrorMessage('Runtime session expired. Sign in again.');
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to refresh runtime session');
+      }
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function signOut() {
+    const currentAccessToken = sessionRecordRef.current?.access_token ?? accessToken;
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      if (currentAccessToken) {
+        await storeControlPlaneClient.signOut(currentAccessToken);
+      }
+      await clearStoreRuntimeSession();
+      resetRuntimeWorkspaceState();
+      if (localAuthRecord) {
+        setErrorMessage('Runtime session signed out. Unlock with PIN to continue on this device.');
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to sign out of the runtime session');
     } finally {
       setIsBusy(false);
     }
@@ -696,7 +1141,11 @@ export function useStoreRuntimeWorkspace() {
     cacheBackendLabel: cachePersistence.backend_label,
     cacheBackendLocation: cachePersistence.location,
     cacheStatus,
+    confirmPin,
+    activationCode,
     scannedBarcode,
+    activateDesktopAccess,
+    enrollRuntimePin,
     createExchange,
     createBatchExpiryWriteOff,
     createSaleReturn,
@@ -712,8 +1161,10 @@ export function useStoreRuntimeWorkspace() {
     inventorySnapshot,
     isSessionLive,
     isBusy,
+    hasLoadedLocalAuth,
     korsenexToken,
     lastCachedAt,
+    localAuthRecord,
     latestPrintJob,
     latestBatchWriteOff,
     latestScanLookup,
@@ -739,26 +1190,40 @@ export function useStoreRuntimeWorkspace() {
     runtimeInstallationId: runtimeShellStatus?.installation_id ?? null,
     runtimeClaimCode: runtimeDeviceClaim?.claim_code ?? runtimeShellStatus?.claim_code ?? null,
     runtimeBindingStatus: runtimeDeviceClaim?.status ?? (runtimeShellStatus?.runtime_kind === 'packaged_desktop' ? 'UNBOUND' : 'BROWSER_MANAGED'),
+    runtimeHubDeviceCode: hubIdentityRecord?.device_code ?? null,
+    runtimeHubIdentityState: hubIdentityRecord ? 'READY' : 'NOT_CONFIGURED',
+    runtimeHubIssuedAt: hubIdentityRecord?.issued_at ?? null,
+    runtimeHubManifestUrl: runtimeShellStatus?.hub_manifest_url ?? null,
+    runtimeHubServiceState: runtimeShellStatus?.hub_service_state ?? null,
+    runtimeHubServiceUrl: runtimeShellStatus?.hub_service_url ?? null,
     runtimeOperatingSystem: runtimeShellStatus?.operating_system ?? null,
     runtimeShellBridgeState: runtimeShellStatus?.bridge_state ?? 'unavailable',
     runtimeShellError,
     runtimeShellKind: runtimeShellStatus?.runtime_kind ?? null,
     runtimeShellLabel: runtimeShellStatus?.runtime_label ?? null,
     runtimeDeviceClaim,
+    supportsDeveloperSessionBootstrap,
+    requiresLocalUnlock,
+    requiresPinEnrollment,
     replacementQuantity,
     refundAmount,
     refundMethod,
+    refreshRuntimeSession,
     returnQuantity,
     saleQuantity,
     sales,
+    sessionExpiresAt,
     selectedRuntimeDeviceId,
+    setConfirmPin,
     setCustomerGstin,
     setCustomerName,
     setExpiryWriteOffQuantity,
     setExpiryWriteOffReason,
     setExchangeReturnQuantity,
     setExchangeSettlementMethod,
+    setActivationCode,
     setKorsenexToken,
+    setNewPin,
     setPaymentMethod,
     setScannedBarcode,
     setSelectedRuntimeDeviceId,
@@ -767,11 +1232,16 @@ export function useStoreRuntimeWorkspace() {
     setRefundMethod,
     setReturnQuantity,
     setSaleQuantity,
+    setUnlockPin,
+    signOut,
     startSession,
     tenantId,
     tenant,
     completeFirstPrintJob,
     lookupScannedBarcode,
+    newPin,
+    unlockPin,
+    unlockRuntimeWithPin,
   };
 }
 

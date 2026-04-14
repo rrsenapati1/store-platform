@@ -44,6 +44,19 @@ function buildBindingTone(bindingStatus: StoreRuntimeWorkspaceState['runtimeBind
   return 'neutral';
 }
 
+function buildHubIdentityTone(hubIdentityState: StoreRuntimeWorkspaceState['runtimeHubIdentityState']) {
+  return hubIdentityState === 'READY' ? 'success' : 'neutral';
+}
+
+function buildHubServiceLabel(workspace: StoreRuntimeWorkspaceState) {
+  if (!workspace.runtimeHubServiceUrl) {
+    return 'Not exposed';
+  }
+  return workspace.runtimeHubServiceState
+    ? `${workspace.runtimeHubServiceState} :: ${workspace.runtimeHubServiceUrl}`
+    : workspace.runtimeHubServiceUrl;
+}
+
 export function StoreRuntimeShellSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   return (
     <SectionCard eyebrow="Packaged runtime shell" title="Shell identity">
@@ -58,8 +71,16 @@ export function StoreRuntimeShellSection({ workspace }: { workspace: StoreRuntim
             label: 'Binding status',
             value: <StatusBadge label={workspace.runtimeBindingStatus} tone={buildBindingTone(workspace.runtimeBindingStatus)} />,
           },
+          {
+            label: 'Hub sync identity',
+            value: <StatusBadge label={workspace.runtimeHubIdentityState} tone={buildHubIdentityTone(workspace.runtimeHubIdentityState)} />,
+          },
           { label: 'Installation fingerprint', value: workspace.runtimeInstallationId ?? 'Browser-managed' },
           { label: 'Claim code', value: workspace.runtimeClaimCode ?? 'Browser-managed' },
+          { label: 'Hub device code', value: workspace.runtimeHubDeviceCode ?? 'Not configured' },
+          { label: 'Hub credential issued', value: workspace.runtimeHubIssuedAt ?? 'Not configured' },
+          { label: 'Hub local service', value: buildHubServiceLabel(workspace) },
+          { label: 'Spoke manifest route', value: workspace.runtimeHubManifestUrl ?? 'Unavailable' },
           { label: 'Hostname', value: workspace.runtimeHostname ?? 'Unavailable' },
           { label: 'Platform', value: buildPlatformLabel(workspace.runtimeOperatingSystem, workspace.runtimeArchitecture) },
           { label: 'App version', value: workspace.runtimeAppVersion ?? 'Web dev shell' },

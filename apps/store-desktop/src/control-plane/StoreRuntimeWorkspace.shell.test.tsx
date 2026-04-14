@@ -11,5 +11,6 @@ describe('store runtime shell identity', () => {
     expect(await screen.findByText('Shell identity')).toBeInTheDocument();
     expect(screen.getByText('Browser web runtime')).toBeInTheDocument();
     expect(screen.getByText('localhost')).toBeInTheDocument();
+    expect(screen.getByText('Not exposed')).toBeInTheDocument();
   });
 });

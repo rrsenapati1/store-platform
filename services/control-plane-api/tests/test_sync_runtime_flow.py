@@ -91,7 +91,7 @@ def test_branch_hub_sync_transport_and_monitoring_routes() -> None:
         "/v1/sync/heartbeat",
         headers=device_headers,
         params={
-            "connected_spoke_count": 4,
+            "connected_spoke_count": 0,
             "last_local_spoke_sync_at": "2026-04-14T10:00:00",
             "oldest_unsynced_mutation_age_seconds": 180,
             "local_outbox_depth": 3,
@@ -101,8 +101,38 @@ def test_branch_hub_sync_transport_and_monitoring_routes() -> None:
     assert heartbeat.status_code == 200
     assert heartbeat.json()["status"] == "current"
     assert heartbeat.json()["runtime_state"] == "DEGRADED"
-    assert heartbeat.json()["connected_spoke_count"] == 4
+    assert heartbeat.json()["connected_spoke_count"] == 0
     assert heartbeat.json()["local_outbox_depth"] == 3
+
+    spoke_observe = client.post(
+        "/v1/sync/spokes/observe",
+        headers=device_headers,
+        json={
+            "spokes": [
+                {
+                    "spoke_device_id": "spoke-counter-01",
+                    "runtime_kind": "packaged_desktop",
+                    "hostname": "COUNTER-02",
+                    "operating_system": "windows",
+                    "app_version": "0.1.0",
+                    "connection_state": "CONNECTED",
+                    "last_local_sync_at": "2026-04-14T10:01:30",
+                },
+                {
+                    "spoke_device_id": "spoke-counter-02",
+                    "runtime_kind": "browser_preview",
+                    "hostname": "OWNER-LAPTOP",
+                    "operating_system": "windows",
+                    "app_version": "0.1.0",
+                    "connection_state": "DISCOVERED",
+                    "last_local_sync_at": None,
+                },
+            ]
+        },
+    )
+    assert spoke_observe.status_code == 200
+    assert spoke_observe.json()["connected_spoke_count"] == 1
+    assert spoke_observe.json()["observed_spoke_count"] == 2
 
     accepted_push = client.post(
         "/v1/sync/push",
@@ -196,10 +226,21 @@ def test_branch_hub_sync_transport_and_monitoring_routes() -> None:
     assert sync_status.json()["branch_cursor"] == 1
     assert sync_status.json()["last_pull_cursor"] == 1
     assert sync_status.json()["open_conflict_count"] == 1
-    assert sync_status.json()["connected_spoke_count"] == 4
+    assert sync_status.json()["connected_spoke_count"] == 1
     assert sync_status.json()["local_outbox_depth"] == 3
     assert sync_status.json()["pending_mutation_count"] == 3
     assert sync_status.json()["runtime_state"] == "DEGRADED"
+
+    sync_spokes = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/runtime/sync-spokes",
+        headers=owner_headers,
+    )
+    assert sync_spokes.status_code == 200
+    assert len(sync_spokes.json()["records"]) == 2
+    assert sync_spokes.json()["records"][0]["spoke_device_id"] == "spoke-counter-01"
+    assert sync_spokes.json()["records"][0]["connection_state"] == "CONNECTED"
+    assert sync_spokes.json()["records"][1]["spoke_device_id"] == "spoke-counter-02"
+    assert sync_spokes.json()["records"][1]["connection_state"] == "DISCOVERED"
 
     sync_conflicts = client.get(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/runtime/sync-conflicts",

@@ -86,6 +86,32 @@ describe('store runtime sync monitoring', () => {
       jsonResponse({
         records: [
           {
+            spoke_device_id: 'spoke-counter-01',
+            hub_device_id: 'device-hub-1',
+            runtime_kind: 'packaged_desktop',
+            hostname: 'COUNTER-02',
+            operating_system: 'windows',
+            app_version: '0.1.0',
+            connection_state: 'CONNECTED',
+            last_seen_at: '2026-04-14T10:01:30',
+            last_local_sync_at: '2026-04-14T10:01:30',
+          },
+          {
+            spoke_device_id: 'spoke-counter-02',
+            hub_device_id: 'device-hub-1',
+            runtime_kind: 'browser_preview',
+            hostname: 'OWNER-LAPTOP',
+            operating_system: 'windows',
+            app_version: '0.1.0',
+            connection_state: 'DISCOVERED',
+            last_seen_at: '2026-04-14T10:01:20',
+            last_local_sync_at: null,
+          },
+        ],
+      }),
+      jsonResponse({
+        records: [
+          {
             id: 'env-1',
             device_id: 'device-hub-1',
             idempotency_key: 'push-2',
@@ -129,6 +155,8 @@ describe('store runtime sync monitoring', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load sync monitoring' }));
 
     expect(await screen.findByText('DEGRADED')).toBeInTheDocument();
+    expect(screen.getByText(/spoke-counter-01 :: CONNECTED :: COUNTER-02/)).toBeInTheDocument();
+    expect(screen.getByText(/spoke-counter-02 :: DISCOVERED :: OWNER-LAPTOP/)).toBeInTheDocument();
     expect(screen.getByText(/sales :: sale-1 :: VERSION_MISMATCH/)).toBeInTheDocument();
     expect(screen.getByText(/sync_push :: CONFLICT/)).toBeInTheDocument();
     expect(screen.getByText('Read-only branch runtime posture for staff sessions.')).toBeInTheDocument();

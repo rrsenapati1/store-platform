@@ -96,6 +96,18 @@ class RuntimeDeviceClaimResolveResponse(BaseModel):
     bound_device_code: str | None = None
 
 
+class RuntimeHubBootstrapRequest(BaseModel):
+    installation_id: str
+
+
+class RuntimeHubBootstrapResponse(BaseModel):
+    device_id: str
+    device_code: str
+    installation_id: str
+    sync_access_secret: str
+    issued_at: str
+
+
 class DeviceClaimRecord(BaseModel):
     id: str
     tenant_id: str
@@ -124,8 +136,49 @@ class DeviceClaimApproveRequest(BaseModel):
     device_code: str
     session_surface: str
     assigned_staff_profile_id: str | None = None
+    is_branch_hub: bool = False
 
 
 class DeviceClaimApprovalResponse(BaseModel):
     claim: DeviceClaimRecord
     device: DeviceRegistrationResponse
+
+
+class StoreDesktopActivationIssueResponse(BaseModel):
+    device_id: str
+    staff_profile_id: str
+    activation_code: str
+    status: str
+    expires_at: str
+
+
+class StoreDesktopActivationRedeemRequest(BaseModel):
+    installation_id: str
+    activation_code: str
+
+
+class StoreDesktopActivationRedeemResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_at: str
+    device_id: str
+    staff_profile_id: str
+    local_auth_token: str
+    offline_valid_until: str
+    activation_version: int
+
+
+class StoreDesktopUnlockRequest(BaseModel):
+    installation_id: str
+    local_auth_token: str
+
+
+class StoreDesktopUnlockResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_at: str
+    device_id: str
+    staff_profile_id: str
+    local_auth_token: str
+    offline_valid_until: str
+    activation_version: int

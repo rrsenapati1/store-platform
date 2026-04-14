@@ -1,3 +1,5 @@
+use crate::runtime_hub_identity::{load_hub_identity, runtime_hub_identity_path_for};
+use crate::runtime_hub_service::{clear_runtime_hub_service, ensure_runtime_hub_service};
 use crate::runtime_paths::{resolve_hostname, runtime_cache_db_path, runtime_home_dir};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -19,6 +21,9 @@ pub struct StoreRuntimeShellStatus {
     pub claim_code: Option<String>,
     pub runtime_home: Option<String>,
     pub cache_db_path: Option<String>,
+    pub hub_service_state: Option<String>,
+    pub hub_service_url: Option<String>,
+    pub hub_manifest_url: Option<String>,
 }
 
 #[tauri::command]
@@ -33,6 +38,14 @@ fn resolve_runtime_shell_status(
     cache_db_path: PathBuf,
 ) -> Result<StoreRuntimeShellStatus, String> {
     let installation_id = load_or_create_installation_id(&runtime_home)?;
+    let hub_identity = load_hub_identity(&runtime_hub_identity_path_for(&runtime_home))?;
+    let hub_service_status = hub_identity
+        .filter(|identity| identity.installation_id == installation_id)
+        .map(|identity| ensure_runtime_hub_service(&identity))
+        .transpose()?;
+    if hub_service_status.is_none() {
+        clear_runtime_hub_service();
+    }
 
     Ok(StoreRuntimeShellStatus {
         runtime_kind: "packaged_desktop".to_string(),
@@ -46,6 +59,9 @@ fn resolve_runtime_shell_status(
         installation_id: Some(installation_id),
         runtime_home: Some(runtime_home.display().to_string()),
         cache_db_path: Some(cache_db_path.display().to_string()),
+        hub_service_state: hub_service_status.as_ref().map(|status| status.state.clone()),
+        hub_service_url: hub_service_status.as_ref().map(|status| status.base_url.clone()),
+        hub_manifest_url: hub_service_status.map(|status| status.manifest_url),
     })
 }
 
@@ -83,7 +99,13 @@ fn load_or_create_installation_id(runtime_home: &Path) -> Result<String, String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime_hub_identity::{
+        runtime_hub_identity_path_for, save_hub_identity, StoreRuntimeHubIdentityRecord,
+    };
+    use crate::runtime_hub_service::clear_runtime_hub_service;
     use tempfile::tempdir;
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
 
     #[test]
     fn runtime_shell_status_persists_a_stable_installation_identity() {
@@ -116,5 +138,59 @@ mod tests {
         assert!(first.installation_id.as_deref().is_some_and(|value| value.starts_with("store-runtime-")));
         assert_eq!(first.runtime_home.as_deref(), Some(runtime_home.display().to_string().as_str()));
         assert!(first.cache_db_path.as_deref().is_some_and(|value| value.ends_with("store-runtime-cache.sqlite3")));
+        assert_eq!(first.hub_service_state, None);
+        assert_eq!(first.hub_service_url, None);
+        assert_eq!(first.hub_manifest_url, None);
+    }
+
+    #[test]
+    fn runtime_shell_status_exposes_loopback_hub_service_for_hub_identities() {
+        let temp = tempdir().expect("create temp dir");
+        let runtime_home = temp.path().to_path_buf();
+        let cache_db_path = runtime_home.join("store-runtime-cache.sqlite3");
+        std::fs::create_dir_all(&runtime_home).expect("create runtime home");
+
+        save_hub_identity(&runtime_hub_identity_path_for(&runtime_home), &StoreRuntimeHubIdentityRecord {
+            schema_version: 1,
+            installation_id: "store-runtime-abcd1234efgh5678".to_string(),
+            tenant_id: "tenant-acme".to_string(),
+            branch_id: "branch-1".to_string(),
+            device_id: "device-hub-1".to_string(),
+            device_code: "BLR-HUB-01".to_string(),
+            sync_access_secret: "hub-secret-1".to_string(),
+            issued_at: "2026-04-14T08:00:00.000Z".to_string(),
+        }).expect("save hub identity");
+        std::fs::write(
+            runtime_home.join(INSTALLATION_ID_FILE_NAME),
+            "store-runtime-abcd1234efgh5678",
+        ).expect("seed installation id");
+
+        let status = resolve_runtime_shell_status("0.1.0".to_string(), runtime_home, cache_db_path)
+            .expect("resolve shell status");
+
+        assert_eq!(status.hub_service_state.as_deref(), Some("ready"));
+        let health_response = http_get(
+            status.hub_service_url.as_deref().expect("hub service url"),
+            "/healthz",
+        );
+        assert!(health_response.contains("\"status\":\"ready\""));
+        let manifest_response = http_get(
+            status.hub_service_url.as_deref().expect("hub service url"),
+            "/v1/spoke-manifest",
+        );
+        assert!(manifest_response.contains("\"hub_device_id\":\"device-hub-1\""));
+        assert!(manifest_response.contains("\"auth_mode\":\"spoke_runtime_token_pending\""));
+
+        clear_runtime_hub_service();
+    }
+
+    fn http_get(base_url: &str, path: &str) -> String {
+        let host = base_url.trim_start_matches("http://");
+        let mut stream = TcpStream::connect(host).expect("connect to hub service");
+        let request = format!("GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n", path, host);
+        stream.write_all(request.as_bytes()).expect("write request");
+        let mut response = String::new();
+        stream.read_to_string(&mut response).expect("read response");
+        response
     }
 }

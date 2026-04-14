@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import DeviceClaim, DeviceRegistration, StaffProfile
+from ..models import DeviceClaim, DeviceRegistration, StaffProfile, StoreDesktopActivation
 from ..utils import new_id
 
 
@@ -136,6 +136,10 @@ class WorkforceRepository:
         )
         return await self._session.scalar(statement)
 
+    async def get_device_registration_by_installation_id_global(self, *, installation_id: str) -> DeviceRegistration | None:
+        statement = select(DeviceRegistration).where(DeviceRegistration.installation_id == installation_id)
+        return await self._session.scalar(statement)
+
     async def list_branch_devices(self, *, tenant_id: str, branch_id: str) -> list[DeviceRegistration]:
         statement = (
             select(DeviceRegistration)
@@ -176,6 +180,18 @@ class WorkforceRepository:
 
     async def touch_device_registration(self, *, device: DeviceRegistration, seen_at) -> DeviceRegistration:
         device.last_seen_at = seen_at
+        await self._session.flush()
+        return device
+
+    async def rotate_device_sync_secret(
+        self,
+        *,
+        device: DeviceRegistration,
+        sync_secret_hash: str,
+        sync_secret_issued_at,
+    ) -> DeviceRegistration:
+        device.sync_secret_hash = sync_secret_hash
+        device.sync_secret_issued_at = sync_secret_issued_at
         await self._session.flush()
         return device
 
@@ -274,6 +290,106 @@ class WorkforceRepository:
         claim.last_seen_at = approved_at
         await self._session.flush()
         return claim
+
+    async def supersede_store_desktop_activations(self, *, device_id: str) -> None:
+        statement = select(StoreDesktopActivation).where(
+            StoreDesktopActivation.device_id == device_id,
+            StoreDesktopActivation.status.in_(("ISSUED", "ACTIVE")),
+        )
+        for activation in (await self._session.scalars(statement)).all():
+            activation.status = "SUPERSEDED"
+        await self._session.flush()
+
+    async def get_next_store_desktop_activation_version(self, *, device_id: str) -> int:
+        statement = select(func.max(StoreDesktopActivation.activation_version)).where(
+            StoreDesktopActivation.device_id == device_id,
+        )
+        current = await self._session.scalar(statement)
+        return int(current or 0) + 1
+
+    async def create_store_desktop_activation(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        device_id: str,
+        staff_profile_id: str,
+        activation_code_hash: str,
+        activation_version: int,
+        issued_by_user_id: str | None,
+        expires_at,
+    ) -> StoreDesktopActivation:
+        activation = StoreDesktopActivation(
+            id=new_id(),
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_id=device_id,
+            staff_profile_id=staff_profile_id,
+            activation_code_hash=activation_code_hash,
+            activation_version=activation_version,
+            status="ISSUED",
+            issued_by_user_id=issued_by_user_id,
+            expires_at=expires_at,
+        )
+        self._session.add(activation)
+        await self._session.flush()
+        return activation
+
+    async def get_store_desktop_activation(
+        self,
+        *,
+        device_id: str,
+        activation_code_hash: str,
+    ) -> StoreDesktopActivation | None:
+        statement = (
+            select(StoreDesktopActivation)
+            .where(
+                StoreDesktopActivation.device_id == device_id,
+                StoreDesktopActivation.activation_code_hash == activation_code_hash,
+                StoreDesktopActivation.status == "ISSUED",
+            )
+            .order_by(StoreDesktopActivation.created_at.desc(), StoreDesktopActivation.id.desc())
+        )
+        return await self._session.scalar(statement)
+
+    async def redeem_store_desktop_activation(
+        self,
+        *,
+        activation: StoreDesktopActivation,
+        local_auth_token_hash: str,
+        redeemed_at,
+        offline_valid_until,
+    ) -> StoreDesktopActivation:
+        activation.status = "ACTIVE"
+        activation.local_auth_token_hash = local_auth_token_hash
+        activation.redeemed_at = redeemed_at
+        activation.last_unlocked_at = redeemed_at
+        activation.offline_valid_until = offline_valid_until
+        await self._session.flush()
+        return activation
+
+    async def get_active_store_desktop_activation_by_local_auth_token(
+        self,
+        *,
+        device_id: str,
+        local_auth_token_hash: str,
+    ) -> StoreDesktopActivation | None:
+        statement = (
+            select(StoreDesktopActivation)
+            .where(
+                StoreDesktopActivation.device_id == device_id,
+                StoreDesktopActivation.local_auth_token_hash == local_auth_token_hash,
+                StoreDesktopActivation.status == "ACTIVE",
+            )
+            .order_by(StoreDesktopActivation.created_at.desc(), StoreDesktopActivation.id.desc())
+        )
+        return await self._session.scalar(statement)
+
+    async def touch_store_desktop_activation_unlock(self, *, activation: StoreDesktopActivation, unlocked_at, offline_valid_until) -> StoreDesktopActivation:
+        activation.last_unlocked_at = unlocked_at
+        activation.offline_valid_until = offline_valid_until
+        await self._session.flush()
+        return activation
 
     async def list_branch_device_claims(self, *, tenant_id: str, branch_id: str) -> list[DeviceClaim]:
         statement = (

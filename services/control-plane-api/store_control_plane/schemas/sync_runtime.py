@@ -61,6 +61,42 @@ class SyncHeartbeatResponse(BaseModel):
     last_heartbeat_at: datetime | None = None
 
 
+class SyncSpokeObservationRequest(BaseModel):
+    spoke_device_id: str
+    runtime_kind: str
+    hostname: str | None = None
+    operating_system: str | None = None
+    app_version: str | None = None
+    connection_state: str = "DISCOVERED"
+    last_local_sync_at: datetime | None = None
+
+
+class SyncSpokeObserveRequest(BaseModel):
+    spokes: list[SyncSpokeObservationRequest]
+
+
+class SyncSpokeObserveResponse(BaseModel):
+    observed_spoke_count: int
+    connected_spoke_count: int
+    last_local_spoke_sync_at: datetime | None = None
+
+
+class SyncSpokeRecord(BaseModel):
+    spoke_device_id: str
+    hub_device_id: str
+    runtime_kind: str
+    hostname: str | None = None
+    operating_system: str | None = None
+    app_version: str | None = None
+    connection_state: str
+    last_seen_at: datetime
+    last_local_sync_at: datetime | None = None
+
+
+class SyncSpokeListResponse(BaseModel):
+    records: list[SyncSpokeRecord]
+
+
 class SyncStatusResponse(BaseModel):
     hub_device_id: str | None = None
     source_device_id: str | None = None

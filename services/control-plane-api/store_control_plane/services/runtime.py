@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import secrets
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import AuditRepository, BarcodeRepository, BillingRepository, CatalogRepository, RuntimeRepository, TenantRepository, WorkforceRepository
 from .barcode_policy import build_barcode_label_preview, normalize_barcode
+from .sync_runtime_auth import hash_sync_access_secret
+from .auth import ActorContext
 from ..utils import utc_now
 
 
@@ -88,16 +92,73 @@ class RuntimeService:
                 "device_name": device.device_name,
                 "device_code": device.device_code,
                 "session_surface": device.session_surface,
+                "is_branch_hub": device.is_branch_hub,
                 "status": device.status,
                 "assigned_staff_profile_id": device.assigned_staff_profile_id,
                 "assigned_staff_full_name": profiles.get(device.assigned_staff_profile_id).full_name
                 if device.assigned_staff_profile_id and profiles.get(device.assigned_staff_profile_id)
                 else None,
+                "installation_id": device.installation_id,
                 "last_seen_at": device.last_seen_at,
             }
             for device in devices
             if device.status == "ACTIVE"
         ]
+
+    async def bootstrap_branch_hub_runtime_identity(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        actor: ActorContext,
+        installation_id: str,
+    ) -> dict[str, object]:
+        await self._assert_branch_exists(tenant_id=tenant_id, branch_id=branch_id)
+        device = await self._workforce_repo.get_device_registration_by_installation_id(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            installation_id=installation_id,
+        )
+        if device is None or device.status != "ACTIVE" or device.session_surface != "store_desktop":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approved packaged runtime device not found")
+        if not device.is_branch_hub:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Device is not a branch hub")
+
+        if not await self._actor_can_bootstrap_branch_hub_identity(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor=actor,
+            device=device,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Assigned hub operator or tenant owner access required",
+            )
+
+        issued_at = utc_now()
+        sync_access_secret = secrets.token_urlsafe(24)
+        await self._workforce_repo.rotate_device_sync_secret(
+            device=device,
+            sync_secret_hash=hash_sync_access_secret(sync_access_secret),
+            sync_secret_issued_at=issued_at,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor.user_id,
+            action="runtime_device.hub_identity_bootstrapped",
+            entity_type="device_registration",
+            entity_id=device.id,
+            payload={"device_code": device.device_code, "installation_id": installation_id},
+        )
+        await self._session.commit()
+        return {
+            "device_id": device.id,
+            "device_code": device.device_code,
+            "installation_id": installation_id,
+            "sync_access_secret": sync_access_secret,
+            "issued_at": issued_at.isoformat(),
+        }
 
     async def record_device_heartbeat(
         self,
@@ -352,6 +413,19 @@ class RuntimeService:
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
         if branch is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+
+    async def _actor_can_bootstrap_branch_hub_identity(self, *, tenant_id: str, branch_id: str, actor: ActorContext, device) -> bool:
+        if actor.is_platform_admin:
+            return True
+        if any(membership.tenant_id == tenant_id and membership.role_name == "tenant_owner" for membership in actor.tenant_memberships):
+            return True
+        if not device.assigned_staff_profile_id:
+            return False
+        profile = await self._workforce_repo.get_staff_profile_by_id(
+            tenant_id=tenant_id,
+            staff_profile_id=device.assigned_staff_profile_id,
+        )
+        return profile is not None and profile.user_id == actor.user_id
 
     async def _get_active_device(self, *, tenant_id: str, branch_id: str, device_id: str):
         await self._assert_branch_exists(tenant_id=tenant_id, branch_id=branch_id)
