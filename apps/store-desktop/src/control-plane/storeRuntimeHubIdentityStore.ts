@@ -1,4 +1,8 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import {
+  resolveBrowserStorage as resolveSharedBrowserStorage,
+  type StorageLike,
+} from '../storage/browserStorage';
 
 const STORE_RUNTIME_HUB_IDENTITY_KEY = 'store.runtime-hub-identity.v1';
 export const STORE_RUNTIME_HUB_IDENTITY_SCHEMA_VERSION = 1;
@@ -34,20 +38,8 @@ function isHubIdentityRecord(value: unknown): value is StoreRuntimeHubIdentityRe
     && typeof value.issued_at === 'string';
 }
 
-function resolveBrowserStorage(): Storage | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const storage = window.localStorage ?? null;
-  if (
-    !storage
-    || typeof storage.getItem !== 'function'
-    || typeof storage.setItem !== 'function'
-    || typeof storage.removeItem !== 'function'
-  ) {
-    return null;
-  }
-  return storage;
+function resolveBrowserStorage(): StorageLike | null {
+  return resolveSharedBrowserStorage();
 }
 
 export async function loadStoreRuntimeHubIdentity(): Promise<StoreRuntimeHubIdentityRecord | null> {

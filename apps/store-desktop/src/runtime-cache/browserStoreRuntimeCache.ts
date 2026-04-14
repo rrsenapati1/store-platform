@@ -1,12 +1,14 @@
 import {
   STORE_RUNTIME_CACHE_KEY,
-  type StorageLike,
   type StoreRuntimeCacheAdapter,
   type StoreRuntimeCachePersistence,
   type StoreRuntimeCacheSnapshot,
-  isStorageLike,
   isStoreRuntimeCacheSnapshot,
 } from './storeRuntimeCacheContract';
+import {
+  resolveBrowserStorage as resolveSharedBrowserStorage,
+  type StorageLike,
+} from '../storage/browserStorage';
 
 type StorageResolver = () => StorageLike | null | undefined;
 
@@ -26,10 +28,7 @@ function buildPersistence(args: {
 }
 
 export function resolveBrowserStorage(): StorageLike | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  return isStorageLike(window.localStorage) ? window.localStorage : null;
+  return resolveSharedBrowserStorage();
 }
 
 export function createBrowserStoreRuntimeCache(resolveStorage: StorageResolver = resolveBrowserStorage): StoreRuntimeCacheAdapter {

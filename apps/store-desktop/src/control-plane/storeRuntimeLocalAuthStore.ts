@@ -1,4 +1,8 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import {
+  resolveBrowserStorage as resolveSharedBrowserStorage,
+  type StorageLike,
+} from '../storage/browserStorage';
 
 const STORE_RUNTIME_LOCAL_AUTH_KEY = 'store.runtime-local-auth.v1';
 export const STORE_RUNTIME_LOCAL_AUTH_SCHEMA_VERSION = 1;
@@ -48,20 +52,8 @@ function isLocalAuthRecord(value: unknown): value is StoreRuntimeLocalAuthRecord
     && (typeof value.last_unlocked_at === 'string' || value.last_unlocked_at === null);
 }
 
-function resolveBrowserStorage(): Storage | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const storage = window.localStorage ?? null;
-  if (
-    !storage
-    || typeof storage.getItem !== 'function'
-    || typeof storage.setItem !== 'function'
-    || typeof storage.removeItem !== 'function'
-  ) {
-    return null;
-  }
-  return storage;
+function resolveBrowserStorage(): StorageLike | null {
+  return resolveSharedBrowserStorage();
 }
 
 export async function loadStoreRuntimeLocalAuth(): Promise<StoreRuntimeLocalAuthRecord | null> {

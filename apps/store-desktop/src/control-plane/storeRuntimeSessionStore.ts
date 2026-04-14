@@ -1,4 +1,8 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import {
+  resolveBrowserStorage as resolveSharedBrowserStorage,
+  type StorageLike,
+} from '../storage/browserStorage';
 
 const STORE_RUNTIME_SESSION_KEY = 'store.runtime-session.v1';
 
@@ -18,20 +22,8 @@ function isSessionRecord(value: unknown): value is StoreRuntimeSessionRecord {
     && typeof (value as Record<string, unknown>).expires_at === 'string';
 }
 
-function resolveBrowserStorage(): Storage | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const storage = window.localStorage ?? null;
-  if (
-    !storage
-    || typeof storage.getItem !== 'function'
-    || typeof storage.setItem !== 'function'
-    || typeof storage.removeItem !== 'function'
-  ) {
-    return null;
-  }
-  return storage;
+function resolveBrowserStorage(): StorageLike | null {
+  return resolveSharedBrowserStorage();
 }
 
 export async function loadStoreRuntimeSession(): Promise<StoreRuntimeSessionRecord | null> {

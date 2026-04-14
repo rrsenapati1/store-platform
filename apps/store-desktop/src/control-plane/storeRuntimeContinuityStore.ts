@@ -1,5 +1,10 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 import type { ControlPlaneInventorySnapshotRecord } from '@store/types';
+import {
+  isStorageLike,
+  resolveBrowserStorage as resolveSharedBrowserStorage,
+  type StorageLike,
+} from '../storage/browserStorage';
 
 export const STORE_RUNTIME_CONTINUITY_KEY = 'store.runtime-continuity.v1';
 export const STORE_RUNTIME_CONTINUITY_SCHEMA_VERSION = 1;
@@ -90,19 +95,11 @@ export interface StoreRuntimeContinuityAdapter {
   getPersistence(): Promise<StoreRuntimeContinuityPersistence>;
 }
 
-type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 type StorageResolver = () => StorageLike | null | undefined;
 type ContinuityInvoke = (command: string, payload?: Record<string, unknown>) => Promise<unknown>;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-function isStorageLike(value: unknown): value is StorageLike {
-  return isObject(value)
-    && typeof value.getItem === 'function'
-    && typeof value.setItem === 'function'
-    && typeof value.removeItem === 'function';
 }
 
 function isOfflineSaleLineRecord(value: unknown): value is StoreRuntimeOfflineSaleLineRecord {
@@ -228,10 +225,7 @@ function buildBrowserPersistence(args: {
 }
 
 function resolveBrowserStorage(): StorageLike | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  return isStorageLike(window.localStorage) ? window.localStorage : null;
+  return resolveSharedBrowserStorage();
 }
 
 function createBrowserStoreRuntimeContinuityStore(
