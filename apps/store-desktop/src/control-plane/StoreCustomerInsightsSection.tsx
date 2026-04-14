@@ -1,4 +1,4 @@
-import { startTransition, useState } from 'react';
+import { useState } from 'react';
 import { ActionButton, DetailList, SectionCard } from '@store/ui';
 import type { ControlPlaneBranchCustomerReport, ControlPlaneCustomerDirectoryRecord } from '@store/types';
 import { storeControlPlaneClient } from './client';
@@ -26,10 +26,8 @@ export function StoreCustomerInsightsSection({ accessToken, tenantId, branchId }
         storeControlPlaneClient.listCustomers(accessToken, tenantId),
         storeControlPlaneClient.getBranchCustomerReport(accessToken, tenantId, branchId),
       ]);
-      startTransition(() => {
-        setDirectory(directoryResponse.records);
-        setBranchReport(reportResponse);
-      });
+      setDirectory(directoryResponse.records);
+      setBranchReport(reportResponse);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer insights');
     } finally {

@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ControlPlanePrintJob } from '@store/types';
 import {
   createResolvedStoreRuntimeHardware,
@@ -38,6 +38,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
   onErrorMessage: (message: string) => void;
 }) {
   const hardwareAdapterRef = useRef(createResolvedStoreRuntimeHardware());
+  const isMountedRef = useRef(false);
   const [hardwareStatus, setHardwareStatus] = useState<StoreRuntimeHardwareStatus | null>(null);
   const [hardwareError, setHardwareError] = useState<string | null>(null);
   const printDispatchInFlightRef = useRef(false);
@@ -45,10 +46,23 @@ export function useStoreRuntimeHardwareIntegration(args: {
   const applyPrintJobsChange = useEffectEvent(args.onPrintJobsChange);
   const applyLatestPrintJobChange = useEffectEvent(args.onLatestPrintJobChange);
   const applyErrorMessage = useEffectEvent(args.onErrorMessage);
+  const applyStateTransition = useEffectEvent((callback: () => void) => {
+    if (!isMountedRef.current) {
+      return;
+    }
+    callback();
+  });
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const refreshHardwareStatus = useEffectEvent(async () => {
     const nextStatus = await hardwareAdapterRef.current.getStatus();
-    startTransition(() => {
+    applyStateTransition(() => {
       setHardwareStatus(nextStatus);
       setHardwareError(null);
     });
@@ -61,7 +75,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
     void refreshHardwareStatus().catch((error) => {
       if (!isCancelled) {
         const message = error instanceof Error ? error.message : 'Unable to load runtime hardware status';
-        startTransition(() => {
+        applyStateTransition(() => {
           setHardwareError(message);
         });
       }
@@ -97,10 +111,13 @@ export function useStoreRuntimeHardwareIntegration(args: {
         if (isCancelled) {
           return;
         }
-        startTransition(() => {
+        applyStateTransition(() => {
           setHardwareStatus(nextHardwareStatus);
           setHardwareError(null);
         });
+        if (nextHardwareStatus.bridge_state !== 'ready') {
+          return;
+        }
 
         const queuedJobs = await storeControlPlaneClient.listRuntimePrintJobs(
           args.accessToken,
@@ -111,12 +128,12 @@ export function useStoreRuntimeHardwareIntegration(args: {
         if (isCancelled) {
           return;
         }
-        startTransition(() => {
+        applyStateTransition(() => {
           applyPrintJobsChange(queuedJobs.records);
         });
 
         const nextJob = queuedJobs.records[0];
-        if (!nextJob || nextHardwareStatus.bridge_state !== 'ready') {
+        if (!nextJob) {
           return;
         }
 
@@ -125,7 +142,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
           if (isCancelled) {
             return;
           }
-          startTransition(() => {
+          applyStateTransition(() => {
             setHardwareStatus(dispatchStatus);
             setHardwareError(null);
           });
@@ -141,7 +158,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
           if (isCancelled) {
             return;
           }
-          startTransition(() => {
+          applyStateTransition(() => {
             applyLatestPrintJobChange(completed);
             applyPrintJobsChange(queuedJobs.records.filter((job) => job.id !== nextJob.id));
             applyErrorMessage('');
@@ -150,14 +167,14 @@ export function useStoreRuntimeHardwareIntegration(args: {
           const message = error instanceof Error ? error.message : 'Unable to dispatch runtime print job';
           const refreshedStatus = await hardwareAdapterRef.current.getStatus().catch(() => null);
           if (!isCancelled && refreshedStatus) {
-            startTransition(() => {
+            applyStateTransition(() => {
               setHardwareStatus(refreshedStatus);
             });
           }
 
           if (shouldLeavePrintJobQueued(message)) {
             if (!isCancelled) {
-              startTransition(() => {
+              applyStateTransition(() => {
                 setHardwareError(message);
                 applyErrorMessage(message);
               });
@@ -177,7 +194,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
             if (isCancelled) {
               return;
             }
-            startTransition(() => {
+            applyStateTransition(() => {
               applyLatestPrintJobChange(failed);
               applyPrintJobsChange(queuedJobs.records.filter((job) => job.id !== nextJob.id));
               setHardwareError(message);
@@ -185,12 +202,20 @@ export function useStoreRuntimeHardwareIntegration(args: {
             });
           } catch {
             if (!isCancelled) {
-              startTransition(() => {
+              applyStateTransition(() => {
                 setHardwareError(message);
                 applyErrorMessage(message);
               });
             }
           }
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          const message = error instanceof Error ? error.message : 'Unable to load runtime hardware status';
+          applyStateTransition(() => {
+            setHardwareError(message);
+            applyErrorMessage(message);
+          });
         }
       } finally {
         printDispatchInFlightRef.current = false;
@@ -217,11 +242,12 @@ export function useStoreRuntimeHardwareIntegration(args: {
     applyErrorMessage,
     applyLatestPrintJobChange,
     applyPrintJobsChange,
+    applyStateTransition,
   ]);
 
   async function savePrinterProfile(profile: StoreRuntimeHardwareProfileInput) {
     const nextStatus = await hardwareAdapterRef.current.saveProfile(profile);
-    startTransition(() => {
+    applyStateTransition(() => {
       setHardwareStatus(nextStatus);
       setHardwareError(null);
     });

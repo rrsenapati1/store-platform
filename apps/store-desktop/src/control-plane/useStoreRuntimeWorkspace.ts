@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   ControlPlaneActor,
   ControlPlaneBatchExpiryReport,
@@ -135,6 +135,9 @@ export function useStoreRuntimeWorkspace() {
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const sessionRecordRef = useRef<StoreRuntimeSessionRecord | null>(null);
+  const applyStateTransition = (callback: () => void) => {
+    callback();
+  };
   const isSessionLive = Boolean(accessToken);
   const supportsDeveloperSessionBootstrap = runtimeShellStatus?.runtime_kind !== 'packaged_desktop'
     && isStoreRuntimeDeveloperBootstrapEnabled();
@@ -156,17 +159,17 @@ export function useStoreRuntimeWorkspace() {
     isSessionLive,
     isLocalUnlocked,
     onPrintJobsChange(nextPrintJobs) {
-      startTransition(() => {
+      applyStateTransition(() => {
         setPrintJobs(nextPrintJobs);
       });
     },
     onLatestPrintJobChange(nextLatestPrintJob) {
-      startTransition(() => {
+      applyStateTransition(() => {
         setLatestPrintJob(nextLatestPrintJob);
       });
     },
     onErrorMessage(message) {
-      startTransition(() => {
+      applyStateTransition(() => {
         setErrorMessage(message);
       });
     },
@@ -176,7 +179,7 @@ export function useStoreRuntimeWorkspace() {
     isSessionLive,
     isLocalUnlocked,
     onBarcodeDetected(barcode) {
-      startTransition(() => {
+      applyStateTransition(() => {
         setScannedBarcode(barcode);
       });
       void lookupScannedBarcode(barcode);
@@ -194,19 +197,19 @@ export function useStoreRuntimeWorkspace() {
     selectedRuntimeDeviceId,
     hubIdentityRecord,
     onInventorySnapshotChange(nextInventorySnapshot) {
-      startTransition(() => {
+      applyStateTransition(() => {
         setInventorySnapshot(nextInventorySnapshot);
       });
     },
     onSalesChange(nextSales) {
-      startTransition(() => {
+      applyStateTransition(() => {
         setSales(nextSales);
       });
     },
   });
 
   function queuePendingMutation(mutation: StoreRuntimePendingMutation, message: string) {
-    startTransition(() => {
+    applyStateTransition(() => {
       setPendingMutations((current) => {
         const next = [...current, mutation];
         setPendingMutationCount(next.length);
@@ -218,7 +221,7 @@ export function useStoreRuntimeWorkspace() {
 
   function resetRuntimeWorkspaceState() {
     sessionRecordRef.current = null;
-    startTransition(() => {
+    applyStateTransition(() => {
       setPendingPinEnrollmentSession(null);
       setNewPin('');
       setConfirmPin('');
@@ -253,7 +256,7 @@ export function useStoreRuntimeWorkspace() {
   }
 
   function applyCachedRuntimeSnapshot(cachedSnapshot: StoreRuntimeCacheSnapshot) {
-    startTransition(() => {
+    applyStateTransition(() => {
       setActor(cachedSnapshot.actor);
       setTenant(cachedSnapshot.tenant);
       setBranches(cachedSnapshot.branches);
@@ -324,7 +327,7 @@ export function useStoreRuntimeWorkspace() {
     }
 
     sessionRecordRef.current = nextSession;
-    startTransition(() => {
+    applyStateTransition(() => {
       setAccessToken(nextSession.access_token);
       setSessionExpiresAt(nextSession.expires_at);
       setActor(nextActor);
@@ -379,7 +382,7 @@ export function useStoreRuntimeWorkspace() {
       }
     }
 
-    startTransition(() => {
+    applyStateTransition(() => {
       setPendingMutations(replayResult.remainingMutations);
       setPendingMutationCount(replayResult.remainingMutations.length);
       if (replayResult.latestHeartbeat) {
@@ -656,7 +659,7 @@ export function useStoreRuntimeWorkspace() {
         runtimeShellStatus.installation_id,
         activationCode,
       );
-      startTransition(() => {
+      applyStateTransition(() => {
         setPendingPinEnrollmentSession(session);
         setNewPin('');
         setConfirmPin('');
@@ -883,7 +886,7 @@ export function useStoreRuntimeWorkspace() {
           return;
         }
         const offlineSale = await offlineContinuity.createOfflineSale(draftPayload);
-        startTransition(() => {
+        applyStateTransition(() => {
           setLatestPrintJob(null);
           setCustomerName('');
           setCustomerGstin('');
@@ -909,7 +912,7 @@ export function useStoreRuntimeWorkspace() {
           storeControlPlaneClient.listSales(accessToken, tenantId, branchId),
           storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId),
         ]);
-        startTransition(() => {
+        applyStateTransition(() => {
           setLatestSale(sale);
           setSales(salesResponse.records);
           setInventorySnapshot(snapshotResponse.records);
@@ -929,7 +932,7 @@ export function useStoreRuntimeWorkspace() {
           throw error;
         }
         const offlineSale = await offlineContinuity.createOfflineSale(draftPayload);
-        startTransition(() => {
+        applyStateTransition(() => {
           setLatestPrintJob(null);
           setCustomerName('');
           setCustomerGstin('');
@@ -958,7 +961,7 @@ export function useStoreRuntimeWorkspace() {
     setErrorMessage('');
     try {
       const lookup = await storeControlPlaneClient.lookupCatalogScan(accessToken, tenantId, branchId, barcodeToLookup);
-      startTransition(() => {
+      applyStateTransition(() => {
         setLatestScanLookup(lookup);
       });
     } catch (error) {
@@ -983,7 +986,7 @@ export function useStoreRuntimeWorkspace() {
         replacement_lines: [{ product_id: saleLine.product_id, quantity: Number(replacementQuantity) }],
       });
       const snapshotResponse = await storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId);
-      startTransition(() => {
+      applyStateTransition(() => {
         setLatestExchange(exchange);
         setLatestSaleReturn(exchange.sale_return);
         setLatestSale(exchange.replacement_sale);
@@ -1014,7 +1017,7 @@ export function useStoreRuntimeWorkspace() {
         lines: [{ product_id: saleLine.product_id, quantity: Number(returnQuantity) }],
       });
       const snapshotResponse = await storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId);
-      startTransition(() => {
+      applyStateTransition(() => {
         setLatestSaleReturn(saleReturn);
         setInventorySnapshot(snapshotResponse.records);
         setLatestPrintJob(null);
@@ -1036,7 +1039,7 @@ export function useStoreRuntimeWorkspace() {
     setErrorMessage('');
     try {
       const report = await storeControlPlaneClient.getBatchExpiryReport(accessToken, tenantId, branchId);
-      startTransition(() => {
+      applyStateTransition(() => {
         setBatchExpiryReport(report);
       });
     } catch (error) {
@@ -1062,7 +1065,7 @@ export function useStoreRuntimeWorkspace() {
         storeControlPlaneClient.getBatchExpiryReport(accessToken, tenantId, branchId),
         storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId),
       ]);
-      startTransition(() => {
+      applyStateTransition(() => {
         setLatestBatchWriteOff(writeOff);
         setBatchExpiryReport(report);
         setInventorySnapshot(snapshot.records);
@@ -1087,7 +1090,7 @@ export function useStoreRuntimeWorkspace() {
         device_id: selectedRuntimeDeviceId,
         copies: 1,
       });
-      startTransition(() => {
+      applyStateTransition(() => {
         setLatestPrintJob(printJob);
       });
     } catch (error) {
@@ -1128,7 +1131,7 @@ export function useStoreRuntimeWorkspace() {
           copies: 1,
         },
       );
-      startTransition(() => {
+      applyStateTransition(() => {
         setLatestPrintJob(printJob);
       });
     } catch (error) {
@@ -1165,7 +1168,7 @@ export function useStoreRuntimeWorkspace() {
         branchId,
         selectedRuntimeDeviceId,
       );
-      startTransition(() => {
+      applyStateTransition(() => {
         setRuntimeHeartbeat(heartbeat);
       });
     } catch (error) {
@@ -1199,7 +1202,7 @@ export function useStoreRuntimeWorkspace() {
         branchId,
         selectedRuntimeDeviceId,
       );
-      startTransition(() => {
+      applyStateTransition(() => {
         setPrintJobs(response.records);
       });
     } catch (error) {
@@ -1225,7 +1228,7 @@ export function useStoreRuntimeWorkspace() {
         firstJob.id,
         { status: 'COMPLETED' },
       );
-      startTransition(() => {
+      applyStateTransition(() => {
         setLatestPrintJob(completed);
         setPrintJobs((currentJobs) => currentJobs.filter((job) => job.id !== firstJob.id));
       });

@@ -1,4 +1,4 @@
-import { startTransition, useState } from 'react';
+import { useState } from 'react';
 import type {
   ControlPlaneSyncConflictRecord,
   ControlPlaneSyncEnvelopeRecord,
@@ -38,12 +38,10 @@ export function useStoreRuntimeSyncMonitoring({
         storeControlPlaneClient.listRuntimeSyncSpokes(accessToken, tenantId, branchId),
         storeControlPlaneClient.listRuntimeSyncEnvelopes(accessToken, tenantId, branchId),
       ]);
-      startTransition(() => {
-        setSyncStatus(statusResponse);
-        setConflicts(conflictResponse.records);
-        setSpokes(spokeResponse.records);
-        setEnvelopes(envelopeResponse.records);
-      });
+      setSyncStatus(statusResponse);
+      setConflicts(conflictResponse.records);
+      setSpokes(spokeResponse.records);
+      setEnvelopes(envelopeResponse.records);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load sync monitoring');
     } finally {

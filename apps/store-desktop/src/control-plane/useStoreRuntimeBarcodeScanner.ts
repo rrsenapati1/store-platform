@@ -1,5 +1,5 @@
 import { parseHidBuffer } from '@store/barcode';
-import { startTransition, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
 const SCANNER_INTER_KEY_TIMEOUT_MS = 80;
 
@@ -57,9 +57,7 @@ export function useStoreRuntimeBarcodeScanner(args: {
           return;
         }
         const detectedAt = new Date().toISOString();
-        startTransition(() => {
-          setLastScanAt(detectedAt);
-        });
+        setLastScanAt(detectedAt);
         applyBarcodeDetected(barcode);
         return;
       }

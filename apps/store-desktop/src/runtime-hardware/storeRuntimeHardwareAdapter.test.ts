@@ -130,4 +130,30 @@ describe('resolved store runtime hardware adapter', () => {
       },
     });
   });
+
+  test('falls back to browser hardware status when the native command is unavailable', async () => {
+    const adapter = createResolvedStoreRuntimeHardware({
+      invoke: vi.fn(async () => {
+        throw new Error('Unexpected command: cmd_get_store_runtime_hardware_status');
+      }),
+      isNativeRuntime: () => true,
+    });
+
+    await expect(adapter.getStatus()).resolves.toEqual({
+      bridge_state: 'browser_fallback',
+      printers: [],
+      profile: {
+        receipt_printer_name: null,
+        label_printer_name: null,
+        updated_at: null,
+      },
+      diagnostics: {
+        scanner_capture_state: 'browser_fallback',
+        last_print_status: null,
+        last_print_message: null,
+        last_printed_at: null,
+        last_scan_at: null,
+      },
+    });
+  });
 });

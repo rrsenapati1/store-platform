@@ -2,6 +2,23 @@
 
 ## 2026-04-14
 
+- Completed CP-021 on packaged runtime hardware integration:
+  - added a dedicated runtime-hardware contract with native and browser adapters instead of hardcoding printer or scanner behavior into the workspace hook
+  - added native packaged-runtime persistence and commands for hardware profile, diagnostics, printer discovery, and print dispatch through the Tauri shell
+  - automated packaged-runtime print queue execution so approved desktop devices can discover assigned printers, dispatch invoice and barcode jobs locally, and surface print diagnostics without manual payload simulation
+  - added packaged-runtime keyboard-wedge barcode scanner capture so desktop sessions can detect HID scans directly in the runtime shell and route them into live branch scan lookup
+  - hardened the packaged hardware boundary to fail closed when native hardware commands are unavailable and skip print polling until the bridge is genuinely ready
+  - added a global Vitest cleanup harness for store-desktop so runtime hook work is fully unmounted between tests instead of leaving JSDOM teardown races
+- Added regression coverage for:
+  - native hardware adapter fallback when the packaged command is unavailable
+  - packaged runtime print auto-dispatch through the native hardware bridge
+  - packaged runtime HID barcode scanner capture
+  - full desktop test teardown with global cleanup
+- Verified:
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml --lib`
 - Completed CP-015 on local runtime outbox continuity:
   - added a dedicated `runtimeOutbox` module in `apps/store-desktop` so non-authoritative runtime actions can be queued and replayed without inflating the main workspace hook
   - kept the boundary narrow to degraded runtime heartbeats and invoice or credit-note print requests instead of pretending offline business writes are authoritative

@@ -1,4 +1,4 @@
-import { startTransition, useState } from 'react';
+import { useState } from 'react';
 import { ActionButton, DetailList, SectionCard } from '@store/ui';
 import type {
   ControlPlaneSupplierAgingReport,
@@ -72,20 +72,18 @@ export function StoreSupplierReportingSection({ accessToken, tenantId, branchId 
         storeControlPlaneClient.getSupplierPerformanceReport(accessToken, tenantId, branchId),
         storeControlPlaneClient.getSupplierPaymentActivity(accessToken, tenantId, branchId),
       ]);
-      startTransition(() => {
-        setSnapshot({
-          payables,
-          aging,
-          statements,
-          dueSchedule,
-          disputes,
-          exceptions,
-          settlement,
-          blockers,
-          escalations,
-          performance,
-          paymentActivity,
-        });
+      setSnapshot({
+        payables,
+        aging,
+        statements,
+        dueSchedule,
+        disputes,
+        exceptions,
+        settlement,
+        blockers,
+        escalations,
+        performance,
+        paymentActivity,
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load supplier reporting');

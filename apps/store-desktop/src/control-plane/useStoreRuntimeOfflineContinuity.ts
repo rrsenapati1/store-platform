@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   ControlPlaneActor,
   ControlPlaneBranchCatalogItem,
@@ -194,10 +194,8 @@ export function useStoreRuntimeOfflineContinuity({
 
   async function persistSnapshot(nextSnapshot: StoreRuntimeContinuitySnapshot) {
     const persistence = await continuityStoreRef.current!.save(nextSnapshot);
-    startTransition(() => {
-      setContinuitySnapshot(nextSnapshot);
-      setContinuityPersistence(persistence);
-    });
+    setContinuitySnapshot(nextSnapshot);
+    setContinuityPersistence(persistence);
     return nextSnapshot;
   }
 
@@ -334,9 +332,7 @@ export function useStoreRuntimeOfflineContinuity({
     };
     await persistSnapshot(nextSnapshot);
     onInventorySnapshotChange(nextDraft.updatedInventory);
-    startTransition(() => {
-      setStatusMessage('Cloud unavailable. Branch continuity mode is active.');
-    });
+    setStatusMessage('Cloud unavailable. Branch continuity mode is active.');
     return nextDraft.sale;
   }
 
@@ -437,9 +433,7 @@ export function useStoreRuntimeOfflineContinuity({
           )),
         };
         if (shouldQueueRuntimeOutboxMutation(error)) {
-          startTransition(() => {
-            setStatusMessage('Cloud unavailable. Branch continuity mode is active.');
-          });
+          setStatusMessage('Cloud unavailable. Branch continuity mode is active.');
           await persistSnapshot(workingSnapshot);
           return { acceptedCount, conflictCount };
         }
@@ -462,17 +456,15 @@ export function useStoreRuntimeOfflineContinuity({
       }
     }
 
-    startTransition(() => {
-      if (conflictCount > 0) {
-        setStatusMessage('Some offline sales require operator review before they can be reconciled.');
-      } else if (workingSnapshot.offline_sales.some((sale) => sale.reconciliation_state === 'PENDING_REPLAY')) {
-        setStatusMessage('Offline sales are still pending reconciliation.');
-      } else if (acceptedCount > 0) {
-        setStatusMessage('Offline sales reconciled with the control plane.');
-      } else {
-        setStatusMessage('');
-      }
-    });
+    if (conflictCount > 0) {
+      setStatusMessage('Some offline sales require operator review before they can be reconciled.');
+    } else if (workingSnapshot.offline_sales.some((sale) => sale.reconciliation_state === 'PENDING_REPLAY')) {
+      setStatusMessage('Offline sales are still pending reconciliation.');
+    } else if (acceptedCount > 0) {
+      setStatusMessage('Offline sales reconciled with the control plane.');
+    } else {
+      setStatusMessage('');
+    }
 
     return { acceptedCount, conflictCount };
   }
