@@ -23,7 +23,7 @@ def _exchange(client: TestClient, *, subject: str, email: str, name: str) -> dic
 
 async def _run_worker_once(client: TestClient) -> dict[str, int]:
     async with client.app.state.session_factory() as session:
-        worker_service = OperationsWorkerService(session)
+        worker_service = OperationsWorkerService(session, settings=client.app.state.settings)
         return await worker_service.process_due_jobs(limit=10, now=utc_now())
 
 
@@ -35,6 +35,8 @@ def test_owner_creates_gst_export_job_and_attaches_irn_for_sale_invoice():
             bootstrap_database=True,
             korsenex_idp_mode="stub",
             platform_admin_emails=["admin@store.local"],
+            compliance_secret_key="4YwWqS6E2m2Gf2m74tNw-KH6nB5c1ETb8T-WcC1wh6g=",
+            compliance_irp_mode="stub",
         )
     )
 
@@ -175,6 +177,17 @@ def test_owner_creates_gst_export_job_and_attaches_irn_for_sale_invoice():
     assert export_jobs.json()["records"][0]["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
     assert export_jobs.json()["records"][0]["status"] == "QUEUED"
 
+    profile = client.put(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/provider-profile",
+        headers=owner_headers,
+        json={
+            "provider_name": "iris_direct",
+            "api_username": "acme-irp-user",
+            "api_password": "super-secret",
+        },
+    )
+    assert profile.status_code == 200
+
     processed = asyncio.run(_run_worker_once(client))
     assert processed["completed"] == 1
     assert processed["dead_lettered"] == 0
@@ -184,23 +197,12 @@ def test_owner_creates_gst_export_job_and_attaches_irn_for_sale_invoice():
         headers=owner_headers,
     )
     assert export_jobs.status_code == 200
-    assert export_jobs.json()["pending_count"] == 1
-    assert export_jobs.json()["attached_count"] == 0
-    assert export_jobs.json()["records"][0]["status"] == "IRN_PENDING"
-
-    attachment = client.post(
-        f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports/{export_job.json()['id']}/attach-irn",
-        headers=owner_headers,
-        json={
-            "irn": "IRN-001",
-            "ack_no": "ACK-001",
-            "signed_qr_payload": "signed-qr-001",
-        },
-    )
-    assert attachment.status_code == 200
-    assert attachment.json()["status"] == "IRN_ATTACHED"
-    assert attachment.json()["irn"] == "IRN-001"
-    assert attachment.json()["ack_no"] == "ACK-001"
+    assert export_jobs.json()["pending_count"] == 0
+    assert export_jobs.json()["attached_count"] == 1
+    assert export_jobs.json()["records"][0]["status"] == "IRN_ATTACHED"
+    assert export_jobs.json()["records"][0]["provider_status"] == "SUBMITTED"
+    assert export_jobs.json()["records"][0]["irn"] == "IRN-STUB-SINV-BLRFLAGSHIP-0001"
+    assert export_jobs.json()["records"][0]["ack_no"] == "ACK-STUB-SINV-BLRFLAGSHIP-0001"
 
     export_jobs = client.get(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports",
@@ -210,7 +212,7 @@ def test_owner_creates_gst_export_job_and_attaches_irn_for_sale_invoice():
     assert export_jobs.json()["pending_count"] == 0
     assert export_jobs.json()["attached_count"] == 1
     assert export_jobs.json()["records"][0]["status"] == "IRN_ATTACHED"
-    assert export_jobs.json()["records"][0]["irn"] == "IRN-001"
+    assert export_jobs.json()["records"][0]["irn"] == "IRN-STUB-SINV-BLRFLAGSHIP-0001"
 
     sales_register = client.get(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",

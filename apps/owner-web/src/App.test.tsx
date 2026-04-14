@@ -282,7 +282,7 @@ describe('owner onboarding flow', () => {
 
     expect(screen.getByText('Catalog barcode operations')).toBeInTheDocument();
     expect(screen.getByText('Batch expiry and lot control')).toBeInTheDocument();
-    expect(screen.getByText('Compliance export jobs')).toBeInTheDocument();
+    expect(screen.getByText('IRP submission queue')).toBeInTheDocument();
     expect(screen.getByText('Customer insights')).toBeInTheDocument();
   });
 });

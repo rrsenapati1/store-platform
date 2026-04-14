@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import GstExportJob, IrnAttachment, Sale
+from ..models import BranchIrpProfile, GstExportJob, IrnAttachment, Sale
 from ..utils import new_id
 
 
@@ -30,6 +30,18 @@ class ComplianceRepository:
             GstExportJob.tenant_id == tenant_id,
             GstExportJob.branch_id == branch_id,
             GstExportJob.sale_id == sale_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def get_branch_irp_profile(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+    ) -> BranchIrpProfile | None:
+        statement = select(BranchIrpProfile).where(
+            BranchIrpProfile.tenant_id == tenant_id,
+            BranchIrpProfile.branch_id == branch_id,
         )
         return await self._session.scalar(statement)
 
@@ -72,6 +84,39 @@ class ComplianceRepository:
         )
         result = await self._session.execute(statement)
         return [GstExportBundle(job=job, attachment=attachment) for job, attachment in result.all()]
+
+    async def upsert_branch_irp_profile(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        provider_name: str,
+        api_username: str,
+        encrypted_api_password: str,
+        status: str,
+        last_error_message: str | None,
+    ) -> BranchIrpProfile:
+        profile = await self.get_branch_irp_profile(tenant_id=tenant_id, branch_id=branch_id)
+        if profile is None:
+            profile = BranchIrpProfile(
+                id=new_id(),
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                provider_name=provider_name,
+                api_username=api_username,
+                encrypted_api_password=encrypted_api_password,
+                status=status,
+                last_error_message=last_error_message,
+            )
+            self._session.add(profile)
+        else:
+            profile.provider_name = provider_name
+            profile.api_username = api_username
+            profile.encrypted_api_password = encrypted_api_password
+            profile.status = status
+            profile.last_error_message = last_error_message
+        await self._session.flush()
+        return profile
 
     async def create_export_job(
         self,
@@ -133,6 +178,32 @@ class ComplianceRepository:
 
     async def set_export_status(self, job: GstExportJob, *, status: str) -> GstExportJob:
         job.status = status
+        await self._session.flush()
+        return job
+
+    async def update_export_job_submission(
+        self,
+        job: GstExportJob,
+        *,
+        provider_name: str | None = None,
+        provider_status: str | None = None,
+        prepared_payload: dict | None = None,
+        submission_attempt_count: int | None = None,
+        last_submitted_at=None,
+        last_error_code: str | None = None,
+        last_error_message: str | None = None,
+    ) -> GstExportJob:
+        if provider_name is not None:
+            job.provider_name = provider_name
+        if provider_status is not None:
+            job.provider_status = provider_status
+        if prepared_payload is not None:
+            job.prepared_payload = prepared_payload
+        if submission_attempt_count is not None:
+            job.submission_attempt_count = submission_attempt_count
+        job.last_submitted_at = last_submitted_at
+        job.last_error_code = last_error_code
+        job.last_error_message = last_error_message
         await self._session.flush()
         return job
 

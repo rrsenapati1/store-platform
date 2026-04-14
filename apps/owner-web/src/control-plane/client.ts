@@ -14,6 +14,7 @@ import type {
   ControlPlaneCatalogProductRecord,
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
+  ControlPlaneComplianceProviderProfile,
   ControlPlaneDeviceClaimApproval,
   ControlPlaneDeviceClaimRecord,
   ControlPlaneDeviceRecord,
@@ -572,18 +573,33 @@ export const ownerControlPlaneClient = {
       accessToken,
     );
   },
-  attachIrn(
+  getComplianceProviderProfile(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneComplianceProviderProfile>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/compliance/provider-profile`,
+      undefined,
+      accessToken,
+    );
+  },
+  updateComplianceProviderProfile(
     accessToken: string,
     tenantId: string,
     branchId: string,
-    jobId: string,
-    payload: { irn: string; ack_no: string; signed_qr_payload: string },
+    payload: { provider_name: string; api_username: string; api_password?: string | null },
   ) {
+    return request<ControlPlaneComplianceProviderProfile>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/compliance/provider-profile`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  retryGstExportSubmission(accessToken: string, tenantId: string, branchId: string, jobId: string) {
     return request<ControlPlaneGstExportJob>(
-      `/v1/tenants/${tenantId}/branches/${branchId}/compliance/gst-exports/${jobId}/attach-irn`,
+      `/v1/tenants/${tenantId}/branches/${branchId}/compliance/gst-exports/${jobId}/retry-submission`,
       {
         method: 'POST',
-        body: JSON.stringify(payload),
       },
       accessToken,
     );

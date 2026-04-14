@@ -17,7 +17,7 @@ def test_run_control_plane_smoke_covers_admin_owner_and_runtime_paths() -> None:
     assert result.batch_write_off_remaining_quantity == 10.0
     assert result.sale_invoice_number == "SINV-BLRFLAGSHIP-0001"
     assert result.gst_export_status == "IRN_ATTACHED"
-    assert result.attached_irn == "IRN-SMOKE-001"
+    assert result.attached_irn == "IRN-STUB-SINV-BLRFLAGSHIP-0001"
     assert result.customer_directory_count == 1
     assert result.customer_history_sales_count == 1
     assert result.customer_report_repeat_count == 0

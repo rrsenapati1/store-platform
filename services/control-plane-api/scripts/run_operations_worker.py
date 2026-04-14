@@ -32,6 +32,7 @@ async def run_worker_once(settings: Settings) -> WorkerOutcome:
         async with session_factory() as session:
             worker = OperationsWorkerService(
                 session,
+                settings=settings,
                 lease_seconds=settings.operations_worker_lease_seconds,
                 retry_delay_seconds=settings.operations_job_retry_delay_seconds,
             )

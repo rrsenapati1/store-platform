@@ -37,6 +37,8 @@ def create_app(
     korsenex_idp_audience: str | None = None,
     legacy_write_mode: str | None = None,
     platform_admin_emails: list[str] | None = None,
+    compliance_secret_key: str | None = None,
+    compliance_irp_mode: str | None = None,
 ) -> FastAPI:
     settings = build_settings(
         database_url=database_url,
@@ -46,6 +48,8 @@ def create_app(
         korsenex_idp_audience=korsenex_idp_audience,
         legacy_write_mode=legacy_write_mode,
         platform_admin_emails=platform_admin_emails,
+        compliance_secret_key=compliance_secret_key,
+        compliance_irp_mode=compliance_irp_mode,
     )
     engine, session_factory = create_session_factory(settings.database_url)
 

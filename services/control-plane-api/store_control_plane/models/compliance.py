@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, TimestampMixin
@@ -25,6 +27,13 @@ class GstExportJob(Base, TimestampMixin):
     hsn_sac_summary: Mapped[str] = mapped_column(String(255))
     grand_total: Mapped[float] = mapped_column(default=0.0)
     status: Mapped[str] = mapped_column(String(32), default="IRN_PENDING")
+    provider_name: Mapped[str | None] = mapped_column(String(64), default=None)
+    provider_status: Mapped[str | None] = mapped_column(String(64), default=None)
+    prepared_payload: Mapped[dict | None] = mapped_column(JSON, default=None)
+    submission_attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+    last_error_code: Mapped[str | None] = mapped_column(String(64), default=None)
+    last_error_message: Mapped[str | None] = mapped_column(String(1024), default=None)
 
 
 class IrnAttachment(Base, TimestampMixin):
@@ -42,3 +51,20 @@ class IrnAttachment(Base, TimestampMixin):
     irn: Mapped[str] = mapped_column(String(128))
     ack_no: Mapped[str] = mapped_column(String(128))
     signed_qr_payload: Mapped[str] = mapped_column(String(2048))
+
+
+class BranchIrpProfile(Base, TimestampMixin):
+    __tablename__ = "branch_irp_profiles"
+    __table_args__ = (
+        UniqueConstraint("branch_id", name="uq_branch_irp_profiles_branch"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    provider_name: Mapped[str] = mapped_column(String(64))
+    api_username: Mapped[str] = mapped_column(String(255))
+    encrypted_api_password: Mapped[str] = mapped_column(String(4096))
+    status: Mapped[str] = mapped_column(String(32), default="CONFIGURED")
+    last_validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+    last_error_message: Mapped[str | None] = mapped_column(String(1024), default=None)

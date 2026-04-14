@@ -5,7 +5,7 @@ from .barcode import BarcodeAllocationRequest, BarcodeAllocationResponse, Barcod
 from .billing import CreditNoteResponse, CreditNoteTaxLineResponse, InvoiceTaxLineResponse, PaymentResponse, RefundApprovalRequest, SaleCreateRequest, SaleLineCreateRequest, SaleLineResponse, SaleListResponse, SaleRecord, SaleResponse, SaleReturnCreateRequest, SaleReturnLineCreateRequest, SaleReturnLineResponse, SaleReturnListResponse, SaleReturnRecord, SaleReturnResponse
 from .exchanges import ExchangeCreateRequest, ExchangePaymentAllocationResponse, ExchangeResponse
 from .catalog import BranchCatalogItemListResponse, BranchCatalogItemRecord, BranchCatalogItemResponse, BranchCatalogItemUpsertRequest, CatalogProductCreateRequest, CatalogProductListResponse, CatalogProductRecord, CatalogProductResponse
-from .compliance import AttachIrnRequest, GstExportCreateRequest, GstExportJobListResponse, GstExportJobResponse
+from .compliance import AttachIrnRequest, BranchIrpProfileResponse, BranchIrpProfileUpsertRequest, GstExportCreateRequest, GstExportJobListResponse, GstExportJobResponse
 from .customers import BranchCustomerReportResponse, BranchCustomerReturnRecord, BranchCustomerTopRecord, CustomerDirectoryRecord, CustomerDirectoryResponse, CustomerExchangeHistoryRecord, CustomerHistoryCustomer, CustomerHistoryResponse, CustomerHistorySummary, CustomerReturnHistoryRecord, CustomerSaleHistoryRecord
 from .inventory import GoodsReceiptCreateRequest, GoodsReceiptLineResponse, GoodsReceiptListResponse, GoodsReceiptRecord, GoodsReceiptResponse, InventoryLedgerListResponse, InventoryLedgerRecord, InventorySnapshotListResponse, InventorySnapshotRecord, ReceivingBoardRecord, ReceivingBoardResponse, StockAdjustmentCreateRequest, StockAdjustmentResponse, StockCountCreateRequest, StockCountResponse, TransferBoardRecord, TransferBoardResponse, TransferCreateRequest, TransferResponse
 from .memberships import BranchMembershipCreateRequest, MembershipResponse, TenantMembershipCreateRequest
@@ -89,6 +89,8 @@ __all__ = [
     "DeviceClaimListResponse",
     "DeviceClaimRecord",
     "AttachIrnRequest",
+    "BranchIrpProfileResponse",
+    "BranchIrpProfileUpsertRequest",
     "InvoiceTaxLineResponse",
     "GoodsReceiptCreateRequest",
     "GoodsReceiptBatchLotCreateRequest",

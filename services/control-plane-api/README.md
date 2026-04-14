@@ -65,6 +65,31 @@ For a single batch run during local debugging:
 python scripts/run_operations_worker.py --once
 ```
 
+## IRP Configuration
+
+`CP-020` adds a real provider-backed GST or IRP path. Production deploys must configure the global solution-provider settings in `.env`, and each branch must save its own taxpayer IRP profile from owner web before queued B2B exports can submit successfully.
+
+Environment variables:
+
+- `STORE_CONTROL_PLANE_COMPLIANCE_SECRET_KEY`
+  - Fernet-compatible key used to encrypt branch taxpayer passwords at rest.
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_MODE`
+  - `disabled`, `stub`, or `iris_direct`
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_CLIENT_ID`
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_CLIENT_SECRET`
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_AUTH_URL`
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_GENERATE_IRN_URL`
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_GET_BY_DOCUMENT_URL`
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_GET_GSTIN_DETAILS_URL`
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_PUBLIC_KEY_PEM`
+- `STORE_CONTROL_PLANE_COMPLIANCE_IRP_TIMEOUT_SECONDS`
+
+Notes:
+
+- `stub` mode is for tests and isolated local development only.
+- `iris_direct` expects solution-provider endpoints and client credentials to already be provisioned.
+- Branch taxpayer credentials are configured from the owner-web compliance section and are never returned to the UI after save.
+
 ## Runbook-Grade Verification
 
 From `services/control-plane-api/` after Postgres is up and `.env` is configured:

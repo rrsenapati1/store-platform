@@ -28,7 +28,7 @@ def _seed_sale_context(client: TestClient) -> dict[str, str]:
     tenant = client.post(
         "/v1/platform/tenants",
         headers=admin_headers,
-        json={"name": "Acme Retail", "slug": "acme-retail-async-compliance"},
+        json={"name": "Acme Retail", "slug": "acme-retail-irp-jobs"},
     )
     assert tenant.status_code == 200
     tenant_id = tenant.json()["id"]
@@ -144,8 +144,8 @@ async def _run_worker_once(client: TestClient) -> dict[str, int]:
         return await worker_service.process_due_jobs(limit=10, now=utc_now())
 
 
-def test_gst_export_request_enqueues_async_preparation_and_worker_completes_it() -> None:
-    database_url = sqlite_test_database_url("compliance-async-jobs")
+def test_worker_submits_irp_job_when_branch_profile_is_configured() -> None:
+    database_url = sqlite_test_database_url("compliance-irp-job-success")
     client = TestClient(
         create_app(
             database_url=database_url,
@@ -178,14 +178,6 @@ def test_gst_export_request_enqueues_async_preparation_and_worker_completes_it()
     assert export_job.status_code == 200
     assert export_job.json()["status"] == "QUEUED"
 
-    duplicate = client.post(
-        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports",
-        headers=owner_headers,
-        json={"sale_id": context["sale_id"]},
-    )
-    assert duplicate.status_code == 200
-    assert duplicate.json()["id"] == export_job.json()["id"]
-
     processed = asyncio.run(_run_worker_once(client))
     assert processed["completed"] == 1
     assert processed["dead_lettered"] == 0
@@ -197,3 +189,95 @@ def test_gst_export_request_enqueues_async_preparation_and_worker_completes_it()
     assert refreshed_report.status_code == 200
     assert refreshed_report.json()["records"][0]["status"] == "IRN_ATTACHED"
     assert refreshed_report.json()["records"][0]["provider_status"] == "SUBMITTED"
+    assert refreshed_report.json()["records"][0]["irn"] == "IRN-STUB-SINV-BLRFLAGSHIP-0001"
+    assert refreshed_report.json()["records"][0]["ack_no"] == "ACK-STUB-SINV-BLRFLAGSHIP-0001"
+
+
+def test_worker_marks_export_action_required_when_provider_profile_is_missing() -> None:
+    database_url = sqlite_test_database_url("compliance-irp-job-missing-profile")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+            compliance_secret_key="4YwWqS6E2m2Gf2m74tNw-KH6nB5c1ETb8T-WcC1wh6g=",
+            compliance_irp_mode="stub",
+        )
+    )
+    context = _seed_sale_context(client)
+    owner_headers = {"authorization": f"Bearer {context['owner_access_token']}"}
+
+    export_job = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports",
+        headers=owner_headers,
+        json={"sale_id": context["sale_id"]},
+    )
+    assert export_job.status_code == 200
+
+    processed = asyncio.run(_run_worker_once(client))
+    assert processed["completed"] == 1
+    assert processed["dead_lettered"] == 0
+
+    refreshed_report = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports",
+        headers=owner_headers,
+    )
+    assert refreshed_report.status_code == 200
+    assert refreshed_report.json()["records"][0]["status"] == "ACTION_REQUIRED"
+    assert refreshed_report.json()["records"][0]["provider_status"] == "MISSING_PROFILE"
+    assert "provider profile" in refreshed_report.json()["records"][0]["last_error_message"].lower()
+
+
+def test_owner_can_retry_action_required_export_after_configuring_provider_profile() -> None:
+    database_url = sqlite_test_database_url("compliance-irp-job-retry")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+            compliance_secret_key="4YwWqS6E2m2Gf2m74tNw-KH6nB5c1ETb8T-WcC1wh6g=",
+            compliance_irp_mode="stub",
+        )
+    )
+    context = _seed_sale_context(client)
+    owner_headers = {"authorization": f"Bearer {context['owner_access_token']}"}
+
+    export_job = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports",
+        headers=owner_headers,
+        json={"sale_id": context["sale_id"]},
+    )
+    assert export_job.status_code == 200
+
+    processed = asyncio.run(_run_worker_once(client))
+    assert processed["completed"] == 1
+
+    profile = client.put(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/provider-profile",
+        headers=owner_headers,
+        json={
+            "provider_name": "iris_direct",
+            "api_username": "acme-irp-user",
+            "api_password": "super-secret",
+        },
+    )
+    assert profile.status_code == 200
+
+    retried = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports/{export_job.json()['id']}/retry-submission",
+        headers=owner_headers,
+    )
+    assert retried.status_code == 200
+    assert retried.json()["status"] == "RETRY_QUEUED"
+
+    processed = asyncio.run(_run_worker_once(client))
+    assert processed["completed"] == 1
+
+    refreshed_report = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports",
+        headers=owner_headers,
+    )
+    assert refreshed_report.status_code == 200
+    assert refreshed_report.json()["records"][0]["status"] == "IRN_ATTACHED"

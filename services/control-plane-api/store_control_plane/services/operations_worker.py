@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from secrets import token_urlsafe
 
+from ..config import Settings
 from ..repositories import OperationsRepository
 from .gst_export_jobs import GstExportJobService
 from .operations_queue import serialize_operations_job
@@ -10,8 +11,9 @@ from .supplier_report_jobs import SupplierReportJobService
 
 
 class OperationsWorkerService:
-    def __init__(self, session, *, lease_seconds: int = 60, retry_delay_seconds: int = 60):
+    def __init__(self, session, *, settings: Settings | None = None, lease_seconds: int = 60, retry_delay_seconds: int = 60):
         self._session = session
+        self._settings = settings or Settings()
         self._repo = OperationsRepository(session)
         self._lease_seconds = lease_seconds
         self._retry_delay_seconds = retry_delay_seconds
@@ -96,7 +98,7 @@ class OperationsWorkerService:
 
     async def _dispatch_job(self, job) -> dict[str, object]:
         if job.job_type == "GST_EXPORT_PREPARE":
-            handler = GstExportJobService(self._session)
+            handler = GstExportJobService(self._session, self._settings)
             payload = job.payload or {}
             return await handler.handle_prepare(
                 tenant_id=job.tenant_id,

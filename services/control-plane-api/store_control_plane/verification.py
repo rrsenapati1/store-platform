@@ -71,7 +71,7 @@ def _get_json(client: TestClient, path: str, *, headers: dict[str, str]) -> dict
 
 async def _run_worker_once(client: TestClient) -> dict[str, int]:
     async with client.app.state.session_factory() as session:
-        worker_service = OperationsWorkerService(session)
+        worker_service = OperationsWorkerService(session, settings=client.app.state.settings)
         return await worker_service.process_due_jobs(limit=10, now=utc_now())
 
 
@@ -82,6 +82,8 @@ def run_control_plane_smoke(*, database_url: str, platform_admin_email: str = "a
             bootstrap_database=True,
             korsenex_idp_mode="stub",
             platform_admin_emails=[platform_admin_email],
+            compliance_secret_key="4YwWqS6E2m2Gf2m74tNw-KH6nB5c1ETb8T-WcC1wh6g=",
+            compliance_irp_mode="stub",
         )
     ) as client:
         smoke_suffix = uuid4().hex[:8]
@@ -266,6 +268,16 @@ def run_control_plane_smoke(*, database_url: str, platform_admin_email: str = "a
             },
         )
         sale_id = sale["id"]
+        profile_response = client.put(
+            f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/provider-profile",
+            headers=owner_headers,
+            json={
+                "provider_name": "iris_direct",
+                "api_username": "acme-irp-user",
+                "api_password": "super-secret",
+            },
+        )
+        profile_response.raise_for_status()
         gst_export = _post_json(
             client,
             f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports",
@@ -273,11 +285,10 @@ def run_control_plane_smoke(*, database_url: str, platform_admin_email: str = "a
             payload={"sale_id": sale_id},
         )
         asyncio.run(_run_worker_once(client))
-        irn_attachment = _post_json(
+        irn_attachment = _get_json(
             client,
-            f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports/{gst_export['id']}/attach-irn",
+            f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports",
             headers=owner_headers,
-            payload={"irn": "IRN-SMOKE-001", "ack_no": "ACK-SMOKE-001", "signed_qr_payload": "signed-qr-smoke-001"},
         )
 
         invoice_print_job = _post_json(
@@ -380,8 +391,8 @@ def run_control_plane_smoke(*, database_url: str, platform_admin_email: str = "a
             batch_write_off_status=batch_write_off["status"],
             batch_write_off_remaining_quantity=batch_write_off["remaining_quantity"],
             sale_invoice_number=sale["invoice_number"],
-            gst_export_status=irn_attachment["status"],
-            attached_irn=irn_attachment["irn"],
+            gst_export_status=irn_attachment["records"][0]["status"],
+            attached_irn=irn_attachment["records"][0]["irn"],
             customer_directory_count=len(customer_directory["records"]),
             customer_history_sales_count=customer_history["sales_summary"]["sales_count"],
             customer_report_repeat_count=branch_customer_report["repeat_customer_count"],

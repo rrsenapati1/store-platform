@@ -1207,10 +1207,22 @@ export interface ControlPlaneGstExportJob {
   hsn_sac_summary: string;
   grand_total: number;
   status: string;
+  provider_name?: string | null;
+  provider_status?: string | null;
+  last_error_code?: string | null;
+  last_error_message?: string | null;
   irn?: string | null;
   ack_no?: string | null;
   signed_qr_payload?: string | null;
   created_at: string;
+}
+
+export interface ControlPlaneComplianceProviderProfile {
+  provider_name?: string | null;
+  api_username?: string | null;
+  has_password: boolean;
+  status: string;
+  last_error_message?: string | null;
 }
 
 export interface ControlPlaneGstExportReport {
