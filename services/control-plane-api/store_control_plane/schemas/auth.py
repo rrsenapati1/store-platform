@@ -13,6 +13,21 @@ class SessionTokenResponse(BaseModel):
     expires_at: str
 
 
+class RuntimeActivationRedeemRequest(BaseModel):
+    installation_id: str
+    activation_code: str
+
+
+class RuntimeActivationRedeemResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_at: str
+    device_id: str
+    staff_profile_id: str
+    runtime_profile: str
+    session_surface: str
+
+
 class SignOutResponse(BaseModel):
     status: str
 

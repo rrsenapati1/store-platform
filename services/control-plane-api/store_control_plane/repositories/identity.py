@@ -96,6 +96,7 @@ class IdentityRepository:
         email: str,
         full_name: str,
         synthetic_subject: str,
+        provider: str = "store_runtime_activation",
     ) -> User:
         user = await self.get_user_by_external_subject(synthetic_subject)
         if user is None:
@@ -106,7 +107,7 @@ class IdentityRepository:
                 external_subject=synthetic_subject,
                 email=email.lower(),
                 full_name=full_name,
-                provider="store_desktop_activation",
+                provider=provider,
                 is_active=True,
                 last_login_at=utc_now(),
             )
@@ -115,7 +116,7 @@ class IdentityRepository:
             user.external_subject = synthetic_subject
             user.email = email.lower()
             user.full_name = full_name
-            user.provider = "store_desktop_activation"
+            user.provider = provider
             user.is_active = True
             user.last_login_at = utc_now()
         await self._session.flush()

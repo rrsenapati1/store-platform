@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import Settings
 from ..dependencies import get_current_actor, get_identity_provider, get_session, get_settings
 from ..dependencies.auth import bearer_scheme
-from ..schemas import ActorBranchMembership, ActorResponse, ActorTenantMembership, OIDCExchangeRequest, SessionTokenResponse, SignOutResponse, StoreDesktopActivationRedeemRequest, StoreDesktopActivationRedeemResponse, StoreDesktopUnlockRequest, StoreDesktopUnlockResponse
+from ..schemas import ActorBranchMembership, ActorResponse, ActorTenantMembership, OIDCExchangeRequest, RuntimeActivationRedeemRequest, RuntimeActivationRedeemResponse, SessionTokenResponse, SignOutResponse, StoreDesktopActivationRedeemRequest, StoreDesktopActivationRedeemResponse, StoreDesktopUnlockRequest, StoreDesktopUnlockResponse
 from ..services import ActorContext, AuthService, WorkforceService
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
@@ -41,6 +41,21 @@ async def redeem_store_desktop_activation(
         session_ttl_minutes=settings.session_ttl_minutes,
     )
     return StoreDesktopActivationRedeemResponse(**response)
+
+
+@router.post("/runtime/activate", response_model=RuntimeActivationRedeemResponse)
+async def redeem_runtime_activation(
+    payload: RuntimeActivationRedeemRequest,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> RuntimeActivationRedeemResponse:
+    service = WorkforceService(session)
+    response = await service.redeem_runtime_activation(
+        installation_id=payload.installation_id,
+        activation_code=payload.activation_code,
+        session_ttl_minutes=settings.session_ttl_minutes,
+    )
+    return RuntimeActivationRedeemResponse(**response)
 
 
 @router.post("/store-desktop/unlock", response_model=StoreDesktopUnlockResponse)

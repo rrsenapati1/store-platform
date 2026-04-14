@@ -408,6 +408,16 @@ export interface ControlPlaneStoreDesktopActivation {
   expires_at: string;
 }
 
+export interface ControlPlaneRuntimeActivation {
+  device_id: string;
+  staff_profile_id: string;
+  activation_code: string;
+  status: string;
+  expires_at: string;
+  runtime_profile: string;
+  session_surface: string;
+}
+
 export interface ControlPlaneSpokeRuntimeActivation {
   activation_code: string;
   pairing_mode: 'approval_code' | 'qr';
@@ -425,6 +435,16 @@ export interface ControlPlaneStoreDesktopActivationSession {
   local_auth_token: string;
   offline_valid_until: string;
   activation_version: number;
+}
+
+export interface ControlPlaneRuntimeActivationSession {
+  access_token: string;
+  token_type: string;
+  expires_at: string;
+  device_id: string;
+  staff_profile_id: string;
+  runtime_profile: string;
+  session_surface: string;
 }
 
 export interface ControlPlaneOfflineSaleReplayLine {

@@ -309,6 +309,12 @@ class WorkforceRepository:
         current = await self._session.scalar(statement)
         return int(current or 0) + 1
 
+    async def supersede_runtime_device_activations(self, *, device_id: str) -> None:
+        await self.supersede_store_desktop_activations(device_id=device_id)
+
+    async def get_next_runtime_device_activation_version(self, *, device_id: str) -> int:
+        return await self.get_next_store_desktop_activation_version(device_id=device_id)
+
     async def create_store_desktop_activation(
         self,
         *,
@@ -336,6 +342,29 @@ class WorkforceRepository:
         self._session.add(activation)
         await self._session.flush()
         return activation
+
+    async def create_runtime_device_activation(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        device_id: str,
+        staff_profile_id: str,
+        activation_code_hash: str,
+        activation_version: int,
+        issued_by_user_id: str | None,
+        expires_at,
+    ) -> StoreDesktopActivation:
+        return await self.create_store_desktop_activation(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_id=device_id,
+            staff_profile_id=staff_profile_id,
+            activation_code_hash=activation_code_hash,
+            activation_version=activation_version,
+            issued_by_user_id=issued_by_user_id,
+            expires_at=expires_at,
+        )
 
     async def create_spoke_runtime_activation(
         self,
@@ -395,6 +424,17 @@ class WorkforceRepository:
             .order_by(StoreDesktopActivation.created_at.desc(), StoreDesktopActivation.id.desc())
         )
         return await self._session.scalar(statement)
+
+    async def get_runtime_device_activation(
+        self,
+        *,
+        device_id: str,
+        activation_code_hash: str,
+    ) -> StoreDesktopActivation | None:
+        return await self.get_store_desktop_activation(
+            device_id=device_id,
+            activation_code_hash=activation_code_hash,
+        )
 
     async def redeem_store_desktop_activation(
         self,

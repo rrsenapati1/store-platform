@@ -156,6 +156,16 @@ class StoreDesktopActivationIssueResponse(BaseModel):
     expires_at: str
 
 
+class RuntimeActivationIssueResponse(BaseModel):
+    device_id: str
+    staff_profile_id: str
+    activation_code: str
+    status: str
+    expires_at: str
+    runtime_profile: str
+    session_surface: str
+
+
 class StoreDesktopActivationRedeemRequest(BaseModel):
     installation_id: str
     activation_code: str

@@ -89,6 +89,10 @@ def build_store_desktop_local_auth_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def build_runtime_user_subject(*, session_surface: str, staff_profile_id: str) -> str:
+    return f"{session_surface}-activation:{staff_profile_id}"
+
+
 class WorkforceService:
     def __init__(self, session: AsyncSession):
         self._session = session
@@ -99,8 +103,7 @@ class WorkforceService:
         self._identity_repo = IdentityRepository(session)
         self._commercial_access = CommercialAccessService(session)
 
-    async def _resolve_runtime_user_for_profile(self, *, device, profile):
-        synthetic_subject = f"store-desktop-activation:{profile.id}"
+    async def _resolve_runtime_user_for_profile(self, *, profile, synthetic_subject: str, provider: str):
         existing_user = await self._identity_repo.get_user_by_email(profile.email)
         if existing_user is not None and existing_user.external_subject != synthetic_subject:
             raise HTTPException(
@@ -112,6 +115,7 @@ class WorkforceService:
             email=profile.email,
             full_name=profile.full_name,
             synthetic_subject=synthetic_subject,
+            provider=provider,
         )
         await self._membership_repo.activate_pending_memberships(email=profile.email, user_id=runtime_user.id)
         await self._workforce_repo.bind_profiles_for_user(
@@ -121,7 +125,7 @@ class WorkforceService:
         )
         return runtime_user
 
-    async def _assert_store_desktop_branch_membership(self, *, runtime_user_id: str, device) -> None:
+    async def _assert_runtime_branch_membership(self, *, runtime_user_id: str, device) -> None:
         active_branch_memberships = await self._membership_repo.list_active_branch_memberships(runtime_user_id)
         if not any(
             membership.tenant_id == device.tenant_id and membership.branch_id == device.branch_id
@@ -634,6 +638,82 @@ class WorkforceService:
             "expires_at": activation.expires_at.isoformat(),
         }
 
+    async def issue_runtime_activation(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        device_id: str,
+        actor_user_id: str,
+    ) -> dict[str, object]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+
+        device = await self._workforce_repo.get_device_registration(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_id=device_id,
+        )
+        if device is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+        if device.status != "ACTIVE" or device.session_surface == "store_desktop" or not device.installation_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Approved non-desktop runtime device required",
+            )
+        await self._commercial_access.assert_runtime_activation_allowed(tenant_id=device.tenant_id)
+        if not device.assigned_staff_profile_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Assigned staff profile required before issuing runtime activation",
+            )
+
+        profile = await self._workforce_repo.get_staff_profile_by_id(
+            tenant_id=tenant_id,
+            staff_profile_id=device.assigned_staff_profile_id,
+        )
+        if profile is None or profile.status != "ACTIVE":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff profile not found")
+
+        await self._workforce_repo.supersede_runtime_device_activations(device_id=device.id)
+        activation_version = await self._workforce_repo.get_next_runtime_device_activation_version(device_id=device.id)
+        activation_code = build_store_desktop_activation_code()
+        activation = await self._workforce_repo.create_runtime_device_activation(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_id=device.id,
+            staff_profile_id=profile.id,
+            activation_code_hash=hash_store_desktop_activation_code(activation_code),
+            activation_version=activation_version,
+            issued_by_user_id=actor_user_id,
+            expires_at=utc_now() + timedelta(minutes=STORE_DESKTOP_ACTIVATION_TTL_MINUTES),
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="device.runtime_activation.issued",
+            entity_type="runtime_activation",
+            entity_id=activation.id,
+            payload={
+                "device_id": device.id,
+                "staff_profile_id": profile.id,
+                "session_surface": device.session_surface,
+                "runtime_profile": device.runtime_profile,
+            },
+        )
+        await self._session.commit()
+        return {
+            "device_id": device.id,
+            "staff_profile_id": profile.id,
+            "activation_code": activation_code,
+            "status": activation.status,
+            "expires_at": activation.expires_at.isoformat(),
+            "runtime_profile": device.runtime_profile,
+            "session_surface": device.session_surface,
+        }
+
     async def redeem_store_desktop_activation(
         self,
         *,
@@ -661,8 +741,15 @@ class WorkforceService:
         )
         if profile is None or profile.status != "ACTIVE":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Desktop activation is invalid")
-        runtime_user = await self._resolve_runtime_user_for_profile(device=device, profile=profile)
-        await self._assert_store_desktop_branch_membership(runtime_user_id=runtime_user.id, device=device)
+        runtime_user = await self._resolve_runtime_user_for_profile(
+            profile=profile,
+            synthetic_subject=build_runtime_user_subject(
+                session_surface=device.session_surface,
+                staff_profile_id=profile.id,
+            ),
+            provider=f"{device.session_surface}_activation",
+        )
+        await self._assert_runtime_branch_membership(runtime_user_id=runtime_user.id, device=device)
 
         redeemed_at = utc_now()
         local_auth_token = build_store_desktop_local_auth_token()
@@ -702,6 +789,75 @@ class WorkforceService:
             "activation_version": activation.activation_version,
         }
 
+    async def redeem_runtime_activation(
+        self,
+        *,
+        installation_id: str,
+        activation_code: str,
+        session_ttl_minutes: int,
+    ) -> dict[str, object]:
+        device = await self._workforce_repo.get_device_registration_by_installation_id_global(
+            installation_id=installation_id,
+        )
+        if device is None or device.status != "ACTIVE" or device.session_surface == "store_desktop":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Runtime activation is invalid")
+        await self._commercial_access.assert_runtime_activation_allowed(tenant_id=device.tenant_id)
+
+        activation = await self._workforce_repo.get_runtime_device_activation(
+            device_id=device.id,
+            activation_code_hash=hash_store_desktop_activation_code(activation_code),
+        )
+        if activation is None or activation.expires_at < utc_now():
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Runtime activation is invalid")
+
+        profile = await self._workforce_repo.get_staff_profile_by_id(
+            tenant_id=device.tenant_id,
+            staff_profile_id=activation.staff_profile_id,
+        )
+        if profile is None or profile.status != "ACTIVE":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Runtime activation is invalid")
+        runtime_user = await self._resolve_runtime_user_for_profile(
+            profile=profile,
+            synthetic_subject=build_runtime_user_subject(
+                session_surface=device.session_surface,
+                staff_profile_id=profile.id,
+            ),
+            provider=f"{device.session_surface}_activation",
+        )
+        await self._assert_runtime_branch_membership(runtime_user_id=runtime_user.id, device=device)
+
+        redeemed_at = utc_now()
+        session_record = await self._identity_repo.create_session(
+            user_id=runtime_user.id,
+            ttl_minutes=session_ttl_minutes,
+        )
+        activation.status = "ACTIVE"
+        activation.redeemed_at = redeemed_at
+        await self._audit_repo.record(
+            tenant_id=device.tenant_id,
+            branch_id=device.branch_id,
+            actor_user_id=runtime_user.id,
+            action="device.runtime_activation.redeemed",
+            entity_type="runtime_activation",
+            entity_id=activation.id,
+            payload={
+                "device_id": device.id,
+                "staff_profile_id": profile.id,
+                "session_surface": device.session_surface,
+                "runtime_profile": device.runtime_profile,
+            },
+        )
+        await self._session.commit()
+        return {
+            "access_token": session_record.token,
+            "token_type": "Bearer",
+            "expires_at": session_record.expires_at.isoformat(),
+            "device_id": device.id,
+            "staff_profile_id": profile.id,
+            "runtime_profile": device.runtime_profile,
+            "session_surface": device.session_surface,
+        }
+
     async def unlock_store_desktop_runtime(
         self,
         *,
@@ -730,8 +886,15 @@ class WorkforceService:
         if profile is None or profile.status != "ACTIVE":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Store desktop unlock is invalid")
 
-        runtime_user = await self._resolve_runtime_user_for_profile(device=device, profile=profile)
-        await self._assert_store_desktop_branch_membership(runtime_user_id=runtime_user.id, device=device)
+        runtime_user = await self._resolve_runtime_user_for_profile(
+            profile=profile,
+            synthetic_subject=build_runtime_user_subject(
+                session_surface=device.session_surface,
+                staff_profile_id=profile.id,
+            ),
+            provider=f"{device.session_surface}_activation",
+        )
+        await self._assert_runtime_branch_membership(runtime_user_id=runtime_user.id, device=device)
 
         unlocked_at = utc_now()
         offline_hours = self._commercial_access.resolve_offline_runtime_hours(

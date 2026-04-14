@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_actor, get_session
-from ..schemas import DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse
+from ..schemas import DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, RuntimeActivationIssueResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse
 from ..services import ActorContext, WorkforceService, assert_branch_any_capability, assert_tenant_capability
 
 router = APIRouter(prefix="/v1/tenants", tags=["workforce"])
@@ -139,3 +139,22 @@ async def issue_store_desktop_activation(
         actor_user_id=actor.user_id,
     )
     return StoreDesktopActivationIssueResponse(**activation)
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/devices/{device_id}/runtime-activation", response_model=RuntimeActivationIssueResponse)
+async def issue_runtime_activation(
+    tenant_id: str,
+    branch_id: str,
+    device_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> RuntimeActivationIssueResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("branch.manage",))
+    service = WorkforceService(session)
+    activation = await service.issue_runtime_activation(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        device_id=device_id,
+        actor_user_id=actor.user_id,
+    )
+    return RuntimeActivationIssueResponse(**activation)
