@@ -5,6 +5,7 @@ from .batches_policy import build_batch_expiry_report, ensure_expiry_write_off_a
 from .barcode import BarcodeService
 from .barcode_policy import allocate_barcode, build_barcode_label_preview, normalize_barcode
 from .billing import BillingService
+from .offline_continuity import OfflineContinuityService
 from .catalog import CatalogService
 from .compliance import ComplianceService
 from .compliance_policy import build_hsn_sac_summary, ensure_gst_export_allowed, ensure_irn_attachment_allowed
@@ -34,6 +35,7 @@ __all__ = [
     "CustomerReportingService",
     "InventoryService",
     "OnboardingService",
+    "OfflineContinuityService",
     "ProcurementFinanceService",
     "PurchasingService",
     "RuntimeService",

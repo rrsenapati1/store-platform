@@ -33,6 +33,7 @@ class BranchRecord(BaseModel):
     tenant_id: str
     name: str
     code: str
+    gstin: str | None = None
     status: str
 
 

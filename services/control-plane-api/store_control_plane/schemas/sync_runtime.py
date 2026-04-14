@@ -95,6 +95,38 @@ class SyncSpokeActivationResponse(BaseModel):
     expires_at: str
 
 
+class SyncOfflineSaleReplayLineRequest(BaseModel):
+    product_id: str
+    quantity: float = Field(gt=0)
+
+
+class SyncOfflineSaleReplayRequest(BaseModel):
+    continuity_sale_id: str
+    continuity_invoice_number: str
+    idempotency_key: str
+    issued_offline_at: datetime
+    staff_actor_id: str
+    customer_name: str
+    customer_gstin: str | None = None
+    payment_method: str
+    subtotal: float
+    cgst_total: float
+    sgst_total: float
+    igst_total: float
+    grand_total: float
+    lines: list[SyncOfflineSaleReplayLineRequest] = Field(min_length=1)
+
+
+class SyncOfflineSaleReplayResponse(BaseModel):
+    result: str
+    duplicate: bool
+    continuity_sale_id: str
+    sale_id: str | None = None
+    invoice_number: str | None = None
+    conflict_id: str | None = None
+    message: str | None = None
+
+
 class SyncSpokeRecord(BaseModel):
     spoke_device_id: str
     hub_device_id: str

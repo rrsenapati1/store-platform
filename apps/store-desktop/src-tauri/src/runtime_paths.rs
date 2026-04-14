@@ -5,11 +5,16 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 pub(crate) const CACHE_DB_FILE_NAME: &str = "store-runtime-cache.sqlite3";
+pub(crate) const CONTINUITY_DB_FILE_NAME: &str = "store-runtime-continuity.sqlite3";
 const CACHE_RUNTIME_HOME_ENV: &str = "STORE_RUNTIME_HOME";
 const CACHE_RUNTIME_HOME_DIR: &str = "StoreRuntime";
 
 pub(crate) fn runtime_cache_db_path() -> PathBuf {
     runtime_home_dir().join(CACHE_DB_FILE_NAME)
+}
+
+pub(crate) fn runtime_continuity_db_path() -> PathBuf {
+    runtime_home_dir().join(CONTINUITY_DB_FILE_NAME)
 }
 
 pub(crate) fn runtime_home_dir() -> PathBuf {

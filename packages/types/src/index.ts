@@ -146,6 +146,7 @@ export interface ControlPlaneBranchRecord {
   tenant_id: string;
   name: string;
   code: string;
+  gstin?: string | null;
   status: string;
 }
 
@@ -269,6 +270,38 @@ export interface ControlPlaneStoreDesktopActivationSession {
   local_auth_token: string;
   offline_valid_until: string;
   activation_version: number;
+}
+
+export interface ControlPlaneOfflineSaleReplayLine {
+  product_id: string;
+  quantity: number;
+}
+
+export interface ControlPlaneOfflineSaleReplayRequest {
+  continuity_sale_id: string;
+  continuity_invoice_number: string;
+  idempotency_key: string;
+  issued_offline_at: string;
+  staff_actor_id: string;
+  customer_name: string;
+  customer_gstin?: string | null;
+  payment_method: string;
+  subtotal: number;
+  cgst_total: number;
+  sgst_total: number;
+  igst_total: number;
+  grand_total: number;
+  lines: ControlPlaneOfflineSaleReplayLine[];
+}
+
+export interface ControlPlaneOfflineSaleReplayResponse {
+  result: 'accepted' | 'conflict_review_required';
+  duplicate: boolean;
+  continuity_sale_id: string;
+  sale_id?: string | null;
+  invoice_number?: string | null;
+  conflict_id?: string | null;
+  message?: string | null;
 }
 
 export interface ControlPlaneRuntimeHeartbeat {

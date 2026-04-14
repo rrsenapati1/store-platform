@@ -13,6 +13,8 @@ from ..schemas import (
     SyncEnvelopeListResponse,
     SyncEnvelopeRecord,
     SyncHeartbeatResponse,
+    SyncOfflineSaleReplayRequest,
+    SyncOfflineSaleReplayResponse,
     SyncPullRecordResponse,
     SyncPullResponse,
     SyncPushRequest,
@@ -25,7 +27,7 @@ from ..schemas import (
     SyncSpokeRecord,
     SyncStatusResponse,
 )
-from ..services import ActorContext, SpokeRuntimeService, SyncDeviceContext, SyncRuntimeService, assert_branch_any_capability
+from ..services import ActorContext, OfflineContinuityService, SpokeRuntimeService, SyncDeviceContext, SyncRuntimeService, assert_branch_any_capability
 
 router = APIRouter(tags=["sync_runtime"])
 
@@ -88,6 +90,17 @@ async def issue_sync_spoke_activation(
         pairing_mode=payload.pairing_mode,
     )
     return SyncSpokeActivationResponse(**response)
+
+
+@router.post("/v1/sync/offline-sales/replay", response_model=SyncOfflineSaleReplayResponse)
+async def replay_offline_sale(
+    payload: SyncOfflineSaleReplayRequest,
+    device: SyncDeviceContext = Depends(get_current_sync_device),
+    session: AsyncSession = Depends(get_session),
+) -> SyncOfflineSaleReplayResponse:
+    service = OfflineContinuityService(session)
+    response = await service.replay_offline_sale(device=device, payload=payload.model_dump())
+    return SyncOfflineSaleReplayResponse(**response)
 
 
 @router.post("/v1/sync/push", response_model=SyncPushResponse)

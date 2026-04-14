@@ -13,7 +13,15 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
         <FormField id="runtime-payment-method" label="Payment method" value={workspace.paymentMethod} onChange={workspace.setPaymentMethod} />
         <ActionButton
           onClick={() => void workspace.createSalesInvoice()}
-          disabled={workspace.isBusy || !workspace.isSessionLive || !workspace.actor || !selectedItem || !workspace.customerName || !workspace.saleQuantity || !workspace.paymentMethod}
+          disabled={
+            workspace.isBusy
+            || (!workspace.isSessionLive && !workspace.offlineContinuityReady)
+            || !workspace.actor
+            || !selectedItem
+            || !workspace.customerName
+            || !workspace.saleQuantity
+            || !workspace.paymentMethod
+          }
         >
           Create sales invoice
         </ActionButton>

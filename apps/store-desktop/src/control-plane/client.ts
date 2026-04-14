@@ -11,6 +11,8 @@ import type {
   ControlPlaneDeviceRecord,
   ControlPlaneExchange,
   ControlPlaneInventorySnapshotRecord,
+  ControlPlaneOfflineSaleReplayRequest,
+  ControlPlaneOfflineSaleReplayResponse,
   ControlPlanePrintJob,
   ControlPlaneRuntimeDeviceClaimResolution,
   ControlPlaneRuntimeHubBootstrap,
@@ -67,6 +69,23 @@ async function request<T>(path: string, init?: RequestInit, accessToken?: string
   return (await response.json()) as T;
 }
 
+async function requestWithHeaders<T>(path: string, headers: Record<string, string>, init?: RequestInit): Promise<T> {
+  const response = await fetch(await resolveControlPlaneRequestUrl(path), {
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      ...headers,
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new ControlPlaneRequestError(response.status);
+  }
+
+  return (await response.json()) as T;
+}
+
 export const storeControlPlaneClient = {
   exchangeSession(token: string) {
     return request<ControlPlaneSession>('/v1/auth/oidc/exchange', {
@@ -91,6 +110,19 @@ export const storeControlPlaneClient = {
         local_auth_token: localAuthToken,
       }),
     });
+  },
+  replayOfflineSale(deviceId: string, deviceSecret: string, payload: ControlPlaneOfflineSaleReplayRequest) {
+    return requestWithHeaders<ControlPlaneOfflineSaleReplayResponse>(
+      '/v1/sync/offline-sales/replay',
+      {
+        'x-store-device-id': deviceId,
+        'x-store-device-secret': deviceSecret,
+      },
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
   },
   refreshSession(accessToken: string) {
     return request<ControlPlaneSession>(

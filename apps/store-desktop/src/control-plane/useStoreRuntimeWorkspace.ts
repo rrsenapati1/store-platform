@@ -67,6 +67,7 @@ import { isStoreRuntimeDeveloperBootstrapEnabled } from './storeRuntimeAuthMode'
 import { ensureStoreRuntimeHubIdentity } from './runtimeHubIdentity';
 import { loadStoreRuntimeShellStatus, useStoreRuntimeShellStatus } from './useStoreRuntimeShellStatus';
 import { ControlPlaneRequestError, storeControlPlaneClient } from './client';
+import { useStoreRuntimeOfflineContinuity } from './useStoreRuntimeOfflineContinuity';
 type CacheStatus = 'EMPTY' | 'HYDRATED' | 'SYNCED';
 
 export function useStoreRuntimeWorkspace() {
@@ -144,6 +145,28 @@ export function useStoreRuntimeWorkspace() {
 
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? actor?.branch_memberships[0]?.tenant_id ?? '';
   const branchId = actor?.branch_memberships[0]?.branch_id ?? branches[0]?.branch_id ?? '';
+  const offlineContinuity = useStoreRuntimeOfflineContinuity({
+    accessToken,
+    tenantId,
+    branchId,
+    actor,
+    branches,
+    branchCatalogItems,
+    inventorySnapshot,
+    runtimeDevices,
+    selectedRuntimeDeviceId,
+    hubIdentityRecord,
+    onInventorySnapshotChange(nextInventorySnapshot) {
+      startTransition(() => {
+        setInventorySnapshot(nextInventorySnapshot);
+      });
+    },
+    onSalesChange(nextSales) {
+      startTransition(() => {
+        setSales(nextSales);
+      });
+    },
+  });
 
   function queuePendingMutation(mutation: StoreRuntimePendingMutation, message: string) {
     startTransition(() => {
@@ -805,37 +828,83 @@ export function useStoreRuntimeWorkspace() {
 
   async function createSalesInvoice() {
     const catalogItem = branchCatalogItems[0];
-    if (!accessToken || !tenantId || !branchId || !catalogItem) {
+    if (!catalogItem || !actor) {
       return;
     }
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const sale = await storeControlPlaneClient.createSale(accessToken, tenantId, branchId, {
-        customer_name: customerName,
-        customer_gstin: customerGstin || null,
-        payment_method: paymentMethod,
-        lines: [{ product_id: catalogItem.product_id, quantity: Number(saleQuantity) }],
-      });
-      const [salesResponse, snapshotResponse] = await Promise.all([
-        storeControlPlaneClient.listSales(accessToken, tenantId, branchId),
-        storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId),
-      ]);
-      startTransition(() => {
-        setLatestSale(sale);
-        setSales(salesResponse.records);
-        setInventorySnapshot(snapshotResponse.records);
-        setLatestPrintJob(null);
-        setCustomerName('');
-        setCustomerGstin('');
-        setSaleQuantity('1');
-        setReturnQuantity('1');
-        setRefundAmount(String(sale.payment.amount));
-        setRefundMethod(sale.payment.payment_method);
-        setExchangeReturnQuantity('1');
-        setReplacementQuantity('1');
-        setExchangeSettlementMethod('Cash');
-      });
+      const draftPayload = {
+        customerName,
+        customerGstin: customerGstin || null,
+        paymentMethod,
+        lineInputs: [{ product_id: catalogItem.product_id, quantity: Number(saleQuantity) }],
+      };
+
+      if (!accessToken || !tenantId || !branchId) {
+        if (!offlineContinuity.isReady) {
+          return;
+        }
+        const offlineSale = await offlineContinuity.createOfflineSale(draftPayload);
+        startTransition(() => {
+          setLatestPrintJob(null);
+          setCustomerName('');
+          setCustomerGstin('');
+          setSaleQuantity('1');
+          setReturnQuantity('1');
+          setRefundAmount(String(offlineSale.grand_total));
+          setRefundMethod(offlineSale.payment_method);
+          setExchangeReturnQuantity('1');
+          setReplacementQuantity('1');
+          setExchangeSettlementMethod('Cash');
+        });
+        return;
+      }
+
+      try {
+        const sale = await storeControlPlaneClient.createSale(accessToken, tenantId, branchId, {
+          customer_name: customerName,
+          customer_gstin: customerGstin || null,
+          payment_method: paymentMethod,
+          lines: [{ product_id: catalogItem.product_id, quantity: Number(saleQuantity) }],
+        });
+        const [salesResponse, snapshotResponse] = await Promise.all([
+          storeControlPlaneClient.listSales(accessToken, tenantId, branchId),
+          storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId),
+        ]);
+        startTransition(() => {
+          setLatestSale(sale);
+          setSales(salesResponse.records);
+          setInventorySnapshot(snapshotResponse.records);
+          setLatestPrintJob(null);
+          setCustomerName('');
+          setCustomerGstin('');
+          setSaleQuantity('1');
+          setReturnQuantity('1');
+          setRefundAmount(String(sale.payment.amount));
+          setRefundMethod(sale.payment.payment_method);
+          setExchangeReturnQuantity('1');
+          setReplacementQuantity('1');
+          setExchangeSettlementMethod('Cash');
+        });
+      } catch (error) {
+        if (!offlineContinuity.isReady || !shouldQueueRuntimeOutboxMutation(error)) {
+          throw error;
+        }
+        const offlineSale = await offlineContinuity.createOfflineSale(draftPayload);
+        startTransition(() => {
+          setLatestPrintJob(null);
+          setCustomerName('');
+          setCustomerGstin('');
+          setSaleQuantity('1');
+          setReturnQuantity('1');
+          setRefundAmount(String(offlineSale.grand_total));
+          setRefundMethod(offlineSale.payment_method);
+          setExchangeReturnQuantity('1');
+          setReplacementQuantity('1');
+          setExchangeSettlementMethod('Cash');
+        });
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create sales invoice');
     } finally {
@@ -1158,9 +1227,11 @@ export function useStoreRuntimeWorkspace() {
     exchangeReturnQuantity,
     exchangeSettlementMethod,
     heartbeatRuntimeDevice,
+    hasLoadedOfflineContinuity: offlineContinuity.hasLoadedContinuity,
     inventorySnapshot,
     isSessionLive,
     isBusy,
+    isOfflineContinuityActive: offlineContinuity.isContinuityModeActive,
     hasLoadedLocalAuth,
     korsenexToken,
     lastCachedAt,
@@ -1171,13 +1242,22 @@ export function useStoreRuntimeWorkspace() {
     latestSale,
     latestSaleReturn,
     latestExchange,
+    offlineConflictCount: offlineContinuity.offlineConflictCount,
+    offlineConflicts: offlineContinuity.offlineConflicts,
+    offlineContinuityBackendLabel: offlineContinuity.continuityPersistence.backend_label,
+    offlineContinuityCachedAt: offlineContinuity.continuityPersistence.cached_at,
+    offlineContinuityMessage: offlineContinuity.statusMessage,
+    offlineContinuityReady: offlineContinuity.isReady,
+    offlineSales: offlineContinuity.offlineSales,
     paymentMethod,
+    pendingOfflineSaleCount: offlineContinuity.pendingOfflineSaleCount,
     pendingMutationCount,
     pendingRuntimeMutations: pendingMutations,
     printJobs,
     loadBatchExpiryReport,
     queueLatestCreditNotePrint,
     queueLatestInvoicePrint,
+    replayOfflineSales: offlineContinuity.replayOfflineSales,
     replayPendingRuntimeActions: replayPendingRuntimeActions,
     refreshPrintQueue,
     runtimeAppVersion: runtimeShellStatus?.app_version ?? null,

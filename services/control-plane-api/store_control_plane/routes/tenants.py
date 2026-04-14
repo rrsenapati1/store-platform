@@ -58,6 +58,7 @@ async def list_branches(
                 tenant_id=branch.tenant_id,
                 name=branch.name,
                 code=branch.code,
+                gstin=branch.gstin,
                 status=branch.status,
             )
             for branch in branches
