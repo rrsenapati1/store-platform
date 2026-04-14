@@ -29,6 +29,8 @@ pip install -r requirements.txt
 2. Copy `.env.example` to `.env` and fill in the real Korsenex values.
    - `STORE_CONTROL_PLANE_PLATFORM_ADMIN_EMAILS` accepts a comma-separated list such as `admin@store.local,ops@store.local`.
    - `STORE_CONTROL_PLANE_LEGACY_WRITE_MODE` defaults to `shadow` and should be switched to `cutover` only during an explicit legacy-authority cutover window.
+   - `STORE_CONTROL_PLANE_DEPLOYMENT_ENVIRONMENT`, `STORE_CONTROL_PLANE_PUBLIC_BASE_URL`, and `STORE_CONTROL_PLANE_RELEASE_VERSION` should stay `dev`-oriented locally.
+   - object-storage variables are optional for local development unless you are explicitly testing backup or release-artifact flows.
 
 3. Start Postgres:
 
@@ -113,6 +115,29 @@ The smoke portion is safe to rerun against the same Postgres database because it
 
 Detailed operator steps live in [docs/runbooks/control-plane-verification.md](../../docs/runbooks/control-plane-verification.md).
 Legacy cutover steps live in [docs/runbooks/legacy-authority-cutover.md](../../docs/runbooks/legacy-authority-cutover.md).
+
+## Staging And Production Environment Files
+
+`CP-024` introduces host-local, non-secret environment templates for self-managed staging and production VMs:
+
+- `ops/env/app.staging.env.example`
+- `ops/env/app.prod.env.example`
+- `ops/env/db.staging.env.example`
+- `ops/env/db.prod.env.example`
+
+These files are templates only. Real secrets must be injected from operator-managed files or systemd environment files on the target hosts and must never be committed back into the repo.
+
+## Self-Managed Deployment Scripts
+
+`CP-024` adds operator-facing scripts for staged deployments and recovery:
+
+- `python scripts/backup_postgres.py --help`
+- `python scripts/restore_postgres.py --help`
+- `python scripts/deploy_control_plane_release.py --help`
+- `python scripts/verify_deployed_control_plane.py --help`
+
+Production deployment guidance lives in [docs/runbooks/control-plane-production-deployment.md](../../docs/runbooks/control-plane-production-deployment.md).
+Backup and restore guidance lives in [docs/runbooks/control-plane-backup-restore.md](../../docs/runbooks/control-plane-backup-restore.md).
 
 ## Development Fallback
 

@@ -31,6 +31,9 @@ def create_app(
     *,
     database_url: str | None = None,
     bootstrap_database: bool = False,
+    deployment_environment: str | None = None,
+    public_base_url: str | None = None,
+    release_version: str | None = None,
     korsenex_idp_mode: str | None = None,
     korsenex_idp_jwks_url: str | None = None,
     korsenex_idp_issuer: str | None = None,
@@ -42,6 +45,9 @@ def create_app(
 ) -> FastAPI:
     settings = build_settings(
         database_url=database_url,
+        deployment_environment=deployment_environment,
+        public_base_url=public_base_url,
+        release_version=release_version,
         korsenex_idp_mode=korsenex_idp_mode,
         korsenex_idp_jwks_url=korsenex_idp_jwks_url,
         korsenex_idp_issuer=korsenex_idp_issuer,

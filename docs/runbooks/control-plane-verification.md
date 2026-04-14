@@ -58,6 +58,21 @@ What the verifier does:
 The script stores pytest temp state under `%LOCALAPPDATA%\\store-control-plane-verification` so Windows temp cleanup does not depend on the repo mount.
 The live smoke path uses a unique tenant slug on each run, so rerunning the verifier does not require an empty Postgres database.
 
+## Verify A Deployed Environment
+
+For staging or production after rollout:
+
+```powershell
+python services/control-plane-api/scripts/verify_deployed_control_plane.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.14
+```
+
+Optional:
+
+- pass `--bearer-token <token>` if you also want the script to verify `/v1/auth/me`
+
 ## Expected Success Signal
 
 The script exits `0` and prints a JSON summary with:

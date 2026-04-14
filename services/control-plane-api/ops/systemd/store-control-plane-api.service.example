@@ -1,0 +1,18 @@
+[Unit]
+Description=Store Control Plane API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=store
+Group=store
+WorkingDirectory=/srv/store-control-plane/current/services/control-plane-api
+EnvironmentFile=/etc/store-control-plane/app.env
+ExecStart=/srv/store-control-plane/venv/bin/uvicorn store_control_plane.main:create_app --factory --host 127.0.0.1 --port 8000 --app-dir .
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

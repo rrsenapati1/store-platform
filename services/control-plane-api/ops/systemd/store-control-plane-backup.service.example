@@ -1,0 +1,12 @@
+[Unit]
+Description=Store Control Plane Postgres Backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=store
+Group=store
+WorkingDirectory=/srv/store-control-plane/current/services/control-plane-api
+EnvironmentFile=/etc/store-control-plane/app.env
+ExecStart=/srv/store-control-plane/venv/bin/python scripts/backup_postgres.py --output-dir /var/backups/store-control-plane/postgres

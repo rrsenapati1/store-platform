@@ -76,15 +76,25 @@ node scripts/generate-store-desktop-update-manifest.mjs `
 
 Publish `latest.json` to the same channel origin configured in the release profile.
 
+For `CP-024`, keep staging and prod artifacts separated in managed object storage. A safe starting contract is:
+
+- `staging`
+  - bucket or prefix: `store-platform-staging/desktop/staging/`
+- `prod`
+  - bucket or prefix: `store-platform-prod/desktop/prod/`
+
+Do not publish both channels into the same prefix.
+
 ## Operator Validation
 
 Before publishing a channel update:
 
 1. Install the previous packaged version.
 2. Confirm the packaged shell shows the expected release environment and control-plane origin.
-3. Use the `Release channel` section to check for updates.
-4. Confirm the runtime reports the pending version from the target channel.
-5. Install the update and verify the app restarts on the new version.
+3. Confirm the matching deployed control plane passes `verify_deployed_control_plane.py`.
+4. Use the `Release channel` section to check for updates.
+5. Confirm the runtime reports the pending version from the target channel.
+6. Install the update and verify the app restarts on the new version.
 
 ## Rollback Posture
 

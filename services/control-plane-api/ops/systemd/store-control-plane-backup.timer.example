@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Store Control Plane Postgres backup daily
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+Unit=store-control-plane-backup.service
+
+[Install]
+WantedBy=timers.target

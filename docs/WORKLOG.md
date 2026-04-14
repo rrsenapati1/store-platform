@@ -2,6 +2,26 @@
 
 ## 2026-04-14
 
+- Completed CP-024 on production infrastructure:
+  - expanded the control-plane settings contract with deployment environment, public origin, release version, object-storage, and retention metadata instead of leaving staging and prod behavior implicit
+  - added repo-owned Postgres backup, restore, release-deployment, and deployed-verification scripts so the self-managed two-VM topology has executable operator tooling instead of ad hoc shell notes
+  - added a production-safe `/v1/system/health` route that reports environment, release version, database posture, and worker configuration for staging and prod verification
+  - added non-secret staging and prod app or DB environment templates plus nginx and systemd examples for API, worker, and scheduled backup services
+  - added dedicated production deployment and backup or restore runbooks and aligned the existing control-plane verification and desktop packaging runbooks with managed object storage and environment-separated release channels
+- Added regression coverage for:
+  - deployment and object-storage settings normalization
+  - Postgres backup plan creation and upload invocation
+  - Postgres restore artifact validation and environment mismatch guardrails
+  - release deployment command ordering and migration-failure stop behavior
+  - system health route posture
+  - deployed verification helper checks for health, authority boundary, and optional auth
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_settings.py services/control-plane-api/tests/test_postgres_backup_ops.py services/control-plane-api/tests/test_postgres_restore_ops.py services/control-plane-api/tests/test_deployment_ops.py services/control-plane-api/tests/test_system_routes.py services/control-plane-api/tests/test_verify_deployed_control_plane.py -q`
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python services/control-plane-api/scripts/backup_postgres.py --help`
+  - `python services/control-plane-api/scripts/restore_postgres.py --help`
+  - `python services/control-plane-api/scripts/deploy_control_plane_release.py --help`
+  - `python services/control-plane-api/scripts/verify_deployed_control_plane.py --help`
 - Completed CP-023 on SaaS commerce and tenant lifecycle:
   - added canonical billing plan, tenant subscription, entitlement, billing override, and webhook-event persistence for the control plane instead of leaving SaaS lifecycle outside the product authority boundary
   - added Cashfree and Razorpay recurring-subscription adapters, tenant trial issuance, canonical entitlement rebuilding, and webhook normalization so provider state flows into one commercial contract per tenant

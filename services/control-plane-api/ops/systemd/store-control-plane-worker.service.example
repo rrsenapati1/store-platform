@@ -1,0 +1,18 @@
+[Unit]
+Description=Store Control Plane Operations Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=store
+Group=store
+WorkingDirectory=/srv/store-control-plane/current/services/control-plane-api
+EnvironmentFile=/etc/store-control-plane/app.env
+ExecStart=/srv/store-control-plane/venv/bin/python scripts/run_operations_worker.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
