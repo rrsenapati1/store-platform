@@ -1,6 +1,6 @@
 # Store Docs Index
 
-Updated: 2026-04-13
+Updated: 2026-04-15
 
 ## Start Here
 
@@ -26,6 +26,13 @@ Read the smallest useful set.
   - `HANDOFF_TEMPLATE.md`
 - Local setup and verification:
   - `runbooks/dev-workflow.md`
+- Tenant-facing release docs:
+  - `public/tenant-onboarding-guide.md`
+  - `public/store-desktop-installation-guide.md`
+  - `public/troubleshooting-guide.md`
+- Support/admin playbooks:
+  - `support/support-triage-playbook.md`
+  - `support/escalation-matrix.md`
 - Approved reset design:
   - `superpowers/specs/2026-04-13-control-plane-reset-m1-design.md`
 
@@ -47,6 +54,10 @@ Root `docs/` contains canonical docs only:
   - codebase module map and ownership boundaries
 - `runbooks/`
   - local workflow and operational commands
+- `public/`
+  - release-consumer onboarding, install, upgrade, recovery, and troubleshooting guides
+- `support/`
+  - internal support/admin playbooks and escalation guides
 - `superpowers/specs/`
   - approved architecture and milestone design specs
 

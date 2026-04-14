@@ -2,6 +2,14 @@
 
 ## 2026-04-15
 
+- Completed CP-027 on public docs and support readiness:
+  - added a new `docs/public/` release-consumer documentation pack covering product orientation, tenant onboarding, owner-web usage, Store Desktop installation, update/recovery, backup posture, and troubleshooting
+  - added a new `docs/support/` playbook set covering support triage, escalation ownership, tenant lifecycle support, desktop/runtime support, and first-release known-issue posture
+  - updated the repo docs entrypoints so release consumers and support operators can find the right starting documents without reading the architecture specs first
+- Verified:
+  - `git diff --check`
+  - docs-integrity check confirming all new public/support docs exist and are referenced from the docs index or README
+
 - Completed CP-026 on CI/CD and release automation:
   - added repo-owned release packaging scripts for the control-plane backend, owner-web, platform-admin, and staged Store Desktop installer artifacts instead of leaving GitHub workflows to hardcode archive behavior inline
   - added GitHub Actions workflows for pull-request verification and tag-based release artifact builds, with backend, web, desktop, and release-automation checks split into explicit jobs
