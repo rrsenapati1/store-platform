@@ -16,12 +16,18 @@ function normalizeHostname(value: string | null | undefined): string | null {
   return normalized ? normalized : null;
 }
 
+function normalizeOrigin(value: string | null | undefined): string | null {
+  const normalized = `${value ?? ''}`.trim().replace(/\/+$/, '');
+  return normalized ? normalized : null;
+}
+
 export function createBrowserStoreRuntimeShell(
   resolveWindow: () => BrowserRuntimeShellWindow | null | undefined = resolveBrowserRuntimeWindow,
 ): StoreRuntimeShellAdapter {
   return {
     async getStatus(): Promise<StoreRuntimeShellStatus> {
       const hostname = normalizeHostname(resolveWindow()?.location?.hostname);
+      const controlPlaneBaseUrl = normalizeOrigin(resolveWindow()?.location?.origin);
       return {
         runtime_kind: 'browser_web',
         runtime_label: 'Browser web runtime',
@@ -34,6 +40,7 @@ export function createBrowserStoreRuntimeShell(
         claim_code: null,
         runtime_home: null,
         cache_db_path: null,
+        control_plane_base_url: controlPlaneBaseUrl,
         hub_service_state: null,
         hub_service_url: null,
         hub_manifest_url: null,

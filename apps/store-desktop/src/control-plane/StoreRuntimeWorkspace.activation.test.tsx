@@ -379,7 +379,7 @@ describe('store desktop packaged activation flow', () => {
     expect(await screen.findByText('Unlock with PIN')).toBeInTheDocument();
     expect(mockInvoke).toHaveBeenCalledWith('cmd_clear_store_runtime_session');
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/v1/auth/sign-out',
+      'http://127.0.0.1:8000/v1/auth/sign-out',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
@@ -395,7 +395,7 @@ describe('store desktop packaged activation flow', () => {
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/v1/auth/store-desktop/unlock',
+      'http://127.0.0.1:8000/v1/auth/store-desktop/unlock',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
@@ -474,7 +474,7 @@ describe('store desktop packaged activation flow', () => {
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
     expect(screen.getByText('Control plane unavailable. Cached runtime unlocked locally.')).toBeInTheDocument();
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/v1/auth/store-desktop/unlock',
+      'http://127.0.0.1:8000/v1/auth/store-desktop/unlock',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({

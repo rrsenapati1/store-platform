@@ -38,6 +38,7 @@ import type {
   ControlPlaneVendorDisputeBoard,
 } from '@store/types';
 import { normalizeScannedBarcode } from '@store/barcode';
+import { resolveControlPlaneRequestUrl } from './controlPlaneOrigin';
 
 export class ControlPlaneRequestError extends Error {
   readonly status: number;
@@ -50,7 +51,7 @@ export class ControlPlaneRequestError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(await resolveControlPlaneRequestUrl(path), {
     ...init,
     headers: {
       'content-type': 'application/json',

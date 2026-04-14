@@ -17,6 +17,7 @@ describe('resolved store runtime shell adapter', () => {
           claim_code: 'STORE-NSTALL23',
           runtime_home: 'C:/StoreRuntime',
           cache_db_path: 'C:/StoreRuntime/store-runtime-cache.sqlite3',
+          control_plane_base_url: 'https://control.acme.local',
           hub_service_state: 'ready',
           hub_service_url: 'http://127.0.0.1:45123',
           hub_manifest_url: 'http://127.0.0.1:45123/v1/spoke-manifest',
@@ -42,6 +43,7 @@ describe('resolved store runtime shell adapter', () => {
       claim_code: 'STORE-NSTALL23',
       runtime_home: 'C:/StoreRuntime',
       cache_db_path: 'C:/StoreRuntime/store-runtime-cache.sqlite3',
+      control_plane_base_url: 'https://control.acme.local',
       hub_service_state: 'ready',
       hub_service_url: 'http://127.0.0.1:45123',
       hub_manifest_url: 'http://127.0.0.1:45123/v1/spoke-manifest',
@@ -53,7 +55,7 @@ describe('resolved store runtime shell adapter', () => {
     const adapter = createResolvedStoreRuntimeShell({
       browserWindow: () =>
         ({
-          location: { hostname: 'localhost' },
+          location: { hostname: 'localhost', origin: 'http://localhost:1420' },
         }) as Window,
       isNativeRuntime: () => false,
     });
@@ -70,6 +72,7 @@ describe('resolved store runtime shell adapter', () => {
       claim_code: null,
       runtime_home: null,
       cache_db_path: null,
+      control_plane_base_url: 'http://localhost:1420',
       hub_service_state: null,
       hub_service_url: null,
       hub_manifest_url: null,

@@ -1,3 +1,4 @@
+use crate::runtime_control_plane_origin::resolve_control_plane_base_url;
 use crate::runtime_hub_identity::{load_hub_identity, runtime_hub_identity_path_for};
 use crate::runtime_hub_service::{clear_runtime_hub_service, ensure_runtime_hub_service};
 use crate::runtime_paths::{resolve_hostname, runtime_cache_db_path, runtime_home_dir};
@@ -21,6 +22,7 @@ pub struct StoreRuntimeShellStatus {
     pub claim_code: Option<String>,
     pub runtime_home: Option<String>,
     pub cache_db_path: Option<String>,
+    pub control_plane_base_url: Option<String>,
     pub hub_service_state: Option<String>,
     pub hub_service_url: Option<String>,
     pub hub_manifest_url: Option<String>,
@@ -59,6 +61,7 @@ fn resolve_runtime_shell_status(
         installation_id: Some(installation_id),
         runtime_home: Some(runtime_home.display().to_string()),
         cache_db_path: Some(cache_db_path.display().to_string()),
+        control_plane_base_url: Some(resolve_control_plane_base_url()),
         hub_service_state: hub_service_status.as_ref().map(|status| status.state.clone()),
         hub_service_url: hub_service_status.as_ref().map(|status| status.base_url.clone()),
         hub_manifest_url: hub_service_status.map(|status| status.manifest_url),
@@ -138,6 +141,7 @@ mod tests {
         assert!(first.installation_id.as_deref().is_some_and(|value| value.starts_with("store-runtime-")));
         assert_eq!(first.runtime_home.as_deref(), Some(runtime_home.display().to_string().as_str()));
         assert!(first.cache_db_path.as_deref().is_some_and(|value| value.ends_with("store-runtime-cache.sqlite3")));
+        assert_eq!(first.control_plane_base_url.as_deref(), Some("http://127.0.0.1:8000"));
         assert_eq!(first.hub_service_state, None);
         assert_eq!(first.hub_service_url, None);
         assert_eq!(first.hub_manifest_url, None);

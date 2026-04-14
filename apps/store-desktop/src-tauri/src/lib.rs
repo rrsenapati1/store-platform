@@ -1,5 +1,6 @@
 mod runtime_paths;
 mod runtime_cache;
+mod runtime_control_plane_origin;
 mod runtime_hub_identity;
 mod runtime_hub_service;
 mod runtime_local_auth;

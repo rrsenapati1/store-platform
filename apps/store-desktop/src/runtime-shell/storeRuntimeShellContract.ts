@@ -1,5 +1,6 @@
 export type StoreRuntimeShellKind = 'browser_web' | 'packaged_desktop';
 export type StoreRuntimeShellBridgeState = 'browser_fallback' | 'ready' | 'unavailable';
+export const DEFAULT_PACKAGED_CONTROL_PLANE_BASE_URL = 'http://127.0.0.1:8000';
 
 export interface StoreRuntimeShellStatus {
   runtime_kind: StoreRuntimeShellKind;
@@ -13,6 +14,7 @@ export interface StoreRuntimeShellStatus {
   claim_code: string | null;
   runtime_home: string | null;
   cache_db_path: string | null;
+  control_plane_base_url: string | null;
   hub_service_state: string | null;
   hub_service_url: string | null;
   hub_manifest_url: string | null;
@@ -21,6 +23,7 @@ export interface StoreRuntimeShellStatus {
 export interface BrowserRuntimeShellWindow {
   location?: {
     hostname?: string | null;
+    origin?: string | null;
   } | null;
 }
 
@@ -50,6 +53,7 @@ export function isStoreRuntimeShellStatus(value: unknown): value is StoreRuntime
     && (typeof value.claim_code === 'string' || value.claim_code === null)
     && (typeof value.runtime_home === 'string' || value.runtime_home === null)
     && (typeof value.cache_db_path === 'string' || value.cache_db_path === null)
+    && (typeof value.control_plane_base_url === 'string' || value.control_plane_base_url === null || typeof value.control_plane_base_url === 'undefined')
     && (typeof value.hub_service_state === 'string' || value.hub_service_state === null || typeof value.hub_service_state === 'undefined')
     && (typeof value.hub_service_url === 'string' || value.hub_service_url === null || typeof value.hub_service_url === 'undefined')
     && (typeof value.hub_manifest_url === 'string' || value.hub_manifest_url === null || typeof value.hub_manifest_url === 'undefined');

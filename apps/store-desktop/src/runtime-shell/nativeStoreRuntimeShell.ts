@@ -1,10 +1,13 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import {
+  DEFAULT_PACKAGED_CONTROL_PLANE_BASE_URL,
+  isStoreRuntimeShellStatus,
+} from './storeRuntimeShellContract';
 import type {
   StoreRuntimeShellAdapter,
   StoreRuntimeShellInvoke,
   StoreRuntimeShellStatus,
 } from './storeRuntimeShellContract';
-import { isStoreRuntimeShellStatus } from './storeRuntimeShellContract';
 
 export interface NativeStoreRuntimeShellOptions {
   invoke?: StoreRuntimeShellInvoke;
@@ -18,6 +21,7 @@ function toRuntimeShellStatus(value: unknown): StoreRuntimeShellStatus {
   if (isStoreRuntimeShellStatus(value)) {
     return {
       ...value,
+      control_plane_base_url: value.control_plane_base_url ?? DEFAULT_PACKAGED_CONTROL_PLANE_BASE_URL,
       hub_service_state: value.hub_service_state ?? null,
       hub_service_url: value.hub_service_url ?? null,
       hub_manifest_url: value.hub_manifest_url ?? null,
