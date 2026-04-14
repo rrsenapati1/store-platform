@@ -1,10 +1,27 @@
 # Store Canonical Blueprint
 
-Updated: 2026-04-14
+Updated: 2026-04-15
 
 ## North Star
 
-Store must look and behave like an enterprise retail suite, not a single-service prototype. The architecture should preserve clean service boundaries, durable data ownership, and explicit identity authority from the start.
+Store must look and behave like an enterprise retail suite, not a single-service prototype. The active `V2 launch` target is a broad physical-retail suite with desktop/mobile/tablet/customer-display runtime surfaces, richer retail hardware, strong commercial controls, and modular vertical extensions. The architecture must preserve clean service boundaries, durable data ownership, and explicit identity authority from the start.
+
+## V2 Launch Target
+
+The repo's active endgame is no longer the smaller desktop-first public release. The canonical target is now the `V2 launch` program.
+
+The V2 launch scope includes:
+
+- mobile store app
+- inventory tablet workflows
+- customer display
+- camera barcode scanning and richer scanner/device-input support
+- advanced hardware such as cash drawer, weighing scale, and payment terminal integrations
+- CRM, loyalty, promotions, gift/store credit, and multi-price controls
+- stronger staff/branch controls, reporting, analytics, and operator dashboards
+- modular vertical extensions such as pharmacy/prescription controls and serial-number/IMEI tracking
+
+The V2 launch scope does not include `omnichannel` commerce. E-commerce, marketplace sync, online ordering, customer app flows, and delivery orchestration are explicitly deferred until after V2.
 
 ## Architectural Principles
 
@@ -26,6 +43,26 @@ Store must look and behave like an enterprise retail suite, not a single-service
 7. Postgres is the backend system of record.
    - SQLite is acceptable only for branch-local runtime caches, never for backend authority.
    - The web shell may use browser storage fallback, and the packaged desktop shell may use native SQLite, but both must preserve the same non-authoritative cache contract.
+
+## Program Shape
+
+The canonical program now has two layers:
+
+- completed CP foundations that established the control plane, packaged runtime, security, release tooling, and first launch-grade retail baseline
+- active V2 launch tracks that expand the suite into a broader enterprise physical-retail platform
+
+Those V2 tracks are:
+
+- runtime surfaces
+- barcode/device input
+- advanced hardware
+- store operations depth
+- customer/commercial features
+- staff/branch controls
+- reporting/decision support
+- vertical extensions
+- hardening/scale
+- final V2 launch readiness and cutover
 
 ## Milestone 1 System Boundary
 
@@ -127,6 +164,8 @@ The remaining runtime rule is explicit:
 - packaged desktop device binding must use an approved claim-and-bind flow from the control plane, not blind self-registration or first-device auto-selection
 - replay-safe local outboxes are allowed only for non-authoritative runtime actions such as heartbeats and print requests; business writes like sales, returns, exchanges, stock movement, and invoice authority remain control-plane-only
 
+The broadened V2 launch scope does not change those authority rules. Mobile/tablet/customer-display surfaces, richer hardware, and vertical modules must still fit the same control-plane/system-of-record model.
+
 ## Data Ownership
 
 - Korsenex IDP:
@@ -165,3 +204,13 @@ No new mixed-responsibility `main.py` files are acceptable.
 - The legacy retail API must reject migrated-domain writes while in `cutover` mode.
 - The operational authority list is fully migrated; no legacy-only operational domains remain on the retail API.
 - Barcode foundation, barcode label-print runtime, batch tracking, compliance export, customer reporting, supplier reporting, and hub sync-runtime orchestration are all migrated onto the control plane.
+
+## Post-V2 Future Work
+
+After the V2 launch target is complete, future work may expand into omnichannel and cross-channel commerce such as:
+
+- e-commerce storefronts
+- online ordering
+- marketplace sync
+- customer app flows
+- delivery/logistics orchestration

@@ -1,10 +1,10 @@
 # Store Project Context
 
-Updated: 2026-04-14
+Updated: 2026-04-15
 
 ## Product Intent
 
-Store is a multi-tenant retail platform for public-market deployment. It is intended to serve independent and chain store owners with India-first operational depth, GST-compliant billing, branch-aware inventory, and offline-capable runtime surfaces.
+Store is a multi-tenant retail platform for public-market deployment. The active target is now a broader `V2 launch` for an enterprise physical-retail suite: India-first operational depth, GST-compliant billing, branch-aware inventory, offline-capable runtime surfaces, richer retail hardware, and modern in-store commercial/management capabilities.
 
 ## Current Repo Reality
 
@@ -31,6 +31,25 @@ Milestone 1 introduces a new control plane in parallel to the legacy retail API:
 
 The legacy retail API remains temporarily in place until later milestones migrate business domains onto the new foundation.
 
+## Active Launch Target
+
+The repo no longer targets the smaller desktop-first public-release endgame as the final product boundary. The active launch target is now the `V2 launch` program for a broader physical-retail suite.
+
+V2 launch includes:
+
+- packaged Store Desktop as branch hub and desktop spoke foundation
+- mobile store app
+- inventory tablet workflows
+- customer display
+- camera barcode scanning and richer device-input support
+- advanced hardware such as cash drawer, weighing scale, and payment terminal integration
+- CRM/loyalty/promotions/gift/store credit and multi-price retail controls
+- staff/shift/cashier governance and richer operator controls
+- advanced reporting, dashboards, and decision-support capabilities
+- regulated/vertical retail extensions such as pharmacy/prescription and serial-number/IMEI tracking
+
+`Omnichannel` scope is explicitly deferred until after V2 launch. That means no e-commerce storefronts, online ordering, marketplace sync, customer app, or delivery orchestration on the current launch critical path.
+
 ## Authentication Authority
 
 Store will not become its own long-term identity provider.
@@ -42,13 +61,25 @@ Store will not become its own long-term identity provider.
 
 ## Delivery Program
 
-The reset is intentionally decomposed:
+The reset remains the foundation, but the active program endgame has changed.
+
+Completed foundation program:
 
 1. Milestone 1: control plane, onboarding, Postgres, migrations, auth integration
 2. Milestone 2: catalog, staff, devices, and assignment foundations
 3. Milestone 3: purchasing and inventory ledger migration
 4. Milestone 4: billing, GST, print, sync, runtime migration
 5. Milestone 5: reporting, compliance jobs, enterprise hardening
+
+Active expansion program:
+
+- V2 runtime/device expansion
+- V2 store operations depth
+- V2 customer/commercial features
+- V2 staff/branch controls
+- V2 reporting/decision support
+- V2 vertical extensions
+- V2 hardening/scale and final launch readiness
 
 Milestone 2 now includes:
 
@@ -109,7 +140,14 @@ The runtime continuity boundary is now explicit:
   - queued runtime actions stay inside the runtime cache boundary
   - replay happens only against a live control-plane session and never grants local business authority
 
-After CP-015, the remaining deferred runtime work is deeper branch-local business behavior beyond runtime outbox continuity, plus packaged distribution and hardware hardening; legacy operational ownership has already been removed from the retail API.
+After the completed CP foundation and public-release tasks, the remaining runtime work now belongs to the V2 launch program:
+
+- mobile store app runtime
+- inventory tablet runtime
+- customer display runtime
+- richer scanner/camera input
+- broader retail hardware integration
+- deeper branch/operator workflow polish and resilience
 
 The current cutover contract is now explicit:
 
@@ -133,3 +171,14 @@ The current cutover contract is now explicit:
   - branch customer report reads
 - the control plane is now also authoritative for barcode print runtime flows:
   - barcode label queueing onto active runtime devices
+
+## Post-V2 Future Work
+
+The following are intentionally outside the active V2 launch boundary:
+
+- omnichannel commerce
+- e-commerce storefronts
+- online ordering
+- marketplace sync
+- customer app/mobile commerce
+- delivery orchestration
