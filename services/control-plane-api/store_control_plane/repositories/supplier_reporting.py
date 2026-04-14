@@ -13,6 +13,21 @@ class SupplierReportingRepository:
     def __init__(self, session: AsyncSession):
         self._session = session
 
+    async def list_branch_snapshots(self, *, tenant_id: str, branch_id: str) -> list[SupplierReportSnapshot]:
+        statement = (
+            select(SupplierReportSnapshot)
+            .where(
+                SupplierReportSnapshot.tenant_id == tenant_id,
+                SupplierReportSnapshot.branch_id == branch_id,
+            )
+            .order_by(
+                SupplierReportSnapshot.report_type.asc(),
+                SupplierReportSnapshot.report_date.asc().nullsfirst(),
+                SupplierReportSnapshot.id.asc(),
+            )
+        )
+        return list((await self._session.scalars(statement)).all())
+
     async def list_vendor_disputes(self, *, tenant_id: str, branch_id: str) -> list[VendorDispute]:
         statement = (
             select(VendorDispute)

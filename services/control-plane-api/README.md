@@ -51,6 +51,20 @@ alembic upgrade head
 uvicorn store_control_plane.main:create_app --factory --reload --app-dir .
 ```
 
+6. Start the operations worker:
+
+```powershell
+.venv\Scripts\Activate.ps1
+python scripts/run_operations_worker.py
+```
+
+For a single batch run during local debugging:
+
+```powershell
+.venv\Scripts\Activate.ps1
+python scripts/run_operations_worker.py --once
+```
+
 ## Runbook-Grade Verification
 
 From `services/control-plane-api/` after Postgres is up and `.env` is configured:

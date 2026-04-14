@@ -9,6 +9,7 @@ from .compliance import AttachIrnRequest, GstExportCreateRequest, GstExportJobLi
 from .customers import BranchCustomerReportResponse, BranchCustomerReturnRecord, BranchCustomerTopRecord, CustomerDirectoryRecord, CustomerDirectoryResponse, CustomerExchangeHistoryRecord, CustomerHistoryCustomer, CustomerHistoryResponse, CustomerHistorySummary, CustomerReturnHistoryRecord, CustomerSaleHistoryRecord
 from .inventory import GoodsReceiptCreateRequest, GoodsReceiptLineResponse, GoodsReceiptListResponse, GoodsReceiptRecord, GoodsReceiptResponse, InventoryLedgerListResponse, InventoryLedgerRecord, InventorySnapshotListResponse, InventorySnapshotRecord, ReceivingBoardRecord, ReceivingBoardResponse, StockAdjustmentCreateRequest, StockAdjustmentResponse, StockCountCreateRequest, StockCountResponse, TransferBoardRecord, TransferBoardResponse, TransferCreateRequest, TransferResponse
 from .memberships import BranchMembershipCreateRequest, MembershipResponse, TenantMembershipCreateRequest
+from .operations import OperationsJobListResponse, OperationsJobResponse
 from .platform import OwnerInviteCreateRequest, OwnerInviteResponse, PlatformTenantListResponse, PlatformTenantRecord, TenantCreateRequest, TenantCreatedResponse
 from .procurement_finance import PurchaseInvoiceCreateRequest, PurchaseInvoiceLineResponse, PurchaseInvoiceListResponse, PurchaseInvoiceRecord, PurchaseInvoiceResponse, SupplierPayablesReportRecord, SupplierPayablesReportResponse, SupplierPaymentCreateRequest, SupplierPaymentResponse, SupplierReturnCreateRequest, SupplierReturnLineCreateRequest, SupplierReturnLineResponse, SupplierReturnResponse
 from .purchasing import PurchaseApprovalReportRecord, PurchaseApprovalReportResponse, PurchaseOrderApprovalRequest, PurchaseOrderCreateRequest, PurchaseOrderLineCreateRequest, PurchaseOrderLineResponse, PurchaseOrderListResponse, PurchaseOrderRecord, PurchaseOrderResponse, SupplierCreateRequest, SupplierListResponse, SupplierRecord, SupplierResponse
@@ -106,6 +107,8 @@ __all__ = [
     "StockCountResponse",
     "MembershipResponse",
     "OIDCExchangeRequest",
+    "OperationsJobListResponse",
+    "OperationsJobResponse",
     "OwnerInviteCreateRequest",
     "OwnerInviteResponse",
     "PaymentResponse",

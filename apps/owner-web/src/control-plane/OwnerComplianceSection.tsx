@@ -14,6 +14,10 @@ function firstPendingB2BSale(records: ControlPlaneSaleRecord[]): ControlPlaneSal
   return records.find((record) => record.invoice_kind === 'B2B' && record.irn_status === 'IRN_PENDING');
 }
 
+function firstAttachableExport(records: ControlPlaneGstExportJob[]): ControlPlaneGstExportJob | undefined {
+  return records.find((record) => record.status === 'IRN_PENDING');
+}
+
 export function OwnerComplianceSection({ accessToken, tenantId, branchId }: OwnerComplianceSectionProps) {
   const [sales, setSales] = useState<ControlPlaneSaleRecord[]>([]);
   const [report, setReport] = useState<ControlPlaneGstExportReport | null>(null);
@@ -43,7 +47,7 @@ export function OwnerComplianceSection({ accessToken, tenantId, branchId }: Owne
         setSales(salesResponse.records);
         setReport(reportResponse);
         setSelectedSaleId(pendingSale?.sale_id ?? salesResponse.records[0]?.sale_id ?? '');
-        setSelectedJobId(reportResponse.records[0]?.id ?? '');
+        setSelectedJobId(firstAttachableExport(reportResponse.records)?.id ?? '');
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load compliance queue');
@@ -68,7 +72,7 @@ export function OwnerComplianceSection({ accessToken, tenantId, branchId }: Owne
       startTransition(() => {
         setLatestJob(job);
         setReport(refreshedReport);
-        setSelectedJobId(job.id);
+        setSelectedJobId(firstAttachableExport(refreshedReport.records)?.id ?? '');
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create GST export');
@@ -166,6 +170,9 @@ export function OwnerComplianceSection({ accessToken, tenantId, branchId }: Owne
               { label: 'Status', value: <StatusBadge label={latestJob.status} tone="warning" /> },
             ]}
           />
+          {latestJob.status === 'QUEUED' ? (
+            <p style={{ color: '#4e5871', marginBottom: 0, marginTop: '12px' }}>Queued for worker preparation</p>
+          ) : null}
         </div>
       ) : null}
 

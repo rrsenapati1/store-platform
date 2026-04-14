@@ -5,6 +5,7 @@ from .catalog import BranchCatalogItem, CatalogProduct
 from .compliance import GstExportJob, IrnAttachment
 from .customers import CustomerExchangeSnapshot, CustomerSaleReturnSnapshot, CustomerSaleSnapshot
 from .identity import AppSession, PlatformAdminAccount, User
+from .operations import OperationsJob
 from .inventory import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, StockAdjustment, StockCountSession, TransferOrder
 from .membership import BranchMembership, TenantMembership
 from .procurement_finance import PurchaseInvoice, PurchaseInvoiceLine, SupplierPayment, SupplierReturn, SupplierReturnLine
@@ -41,6 +42,7 @@ __all__ = [
     "HubSpokeObservation",
     "InventoryLedgerEntry",
     "OwnerInvite",
+    "OperationsJob",
     "Payment",
     "PlatformAdminAccount",
     "PrintJob",

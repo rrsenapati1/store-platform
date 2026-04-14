@@ -8,6 +8,7 @@ from .customers import CustomerReportingRepository
 from .identity import IdentityRepository
 from .inventory import InventoryRepository
 from .memberships import MembershipRepository
+from .operations import OperationsRepository
 from .procurement_finance import ProcurementFinanceRepository
 from .purchasing import PurchasingRepository
 from .runtime import RuntimeRepository
@@ -27,6 +28,7 @@ __all__ = [
     "IdentityRepository",
     "InventoryRepository",
     "MembershipRepository",
+    "OperationsRepository",
     "ProcurementFinanceRepository",
     "PurchasingRepository",
     "RuntimeRepository",

@@ -621,6 +621,12 @@ export interface ControlPlaneSupplierPayment {
   reference?: string | null;
 }
 
+export interface ControlPlaneSnapshotMetadata {
+  snapshot_status?: 'CURRENT' | 'STALE_REFRESH_QUEUED';
+  snapshot_job_id?: string | null;
+  snapshot_refreshed_at?: string | null;
+}
+
 export interface ControlPlaneSupplierPayablesReportRecord {
   purchase_invoice_id: string;
   purchase_invoice_number: string;
@@ -632,7 +638,7 @@ export interface ControlPlaneSupplierPayablesReportRecord {
   settlement_status: string;
 }
 
-export interface ControlPlaneSupplierPayablesReport {
+export interface ControlPlaneSupplierPayablesReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   invoiced_total: number;
   credit_note_total: number;
@@ -654,7 +660,7 @@ export interface ControlPlaneSupplierAgingRecord {
   aging_bucket: string;
 }
 
-export interface ControlPlaneSupplierAgingReport {
+export interface ControlPlaneSupplierAgingReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   open_invoice_count: number;
@@ -677,7 +683,7 @@ export interface ControlPlaneSupplierStatementRecord {
   outstanding_total: number;
 }
 
-export interface ControlPlaneSupplierStatementReport {
+export interface ControlPlaneSupplierStatementReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   supplier_count: number;
@@ -696,7 +702,7 @@ export interface ControlPlaneSupplierDueScheduleRecord {
   due_status: string;
 }
 
-export interface ControlPlaneSupplierDueScheduleReport {
+export interface ControlPlaneSupplierDueScheduleReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   overdue_invoice_count: number;
@@ -722,7 +728,7 @@ export interface ControlPlaneVendorDisputeRecord {
   overdue: boolean;
 }
 
-export interface ControlPlaneVendorDisputeBoard {
+export interface ControlPlaneVendorDisputeBoard extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   open_count: number;
@@ -745,7 +751,7 @@ export interface ControlPlaneSupplierExceptionRecord {
   status: string;
 }
 
-export interface ControlPlaneSupplierExceptionReport {
+export interface ControlPlaneSupplierExceptionReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   supplier_count: number;
@@ -763,7 +769,7 @@ export interface ControlPlaneSupplierSettlementRecord {
   risk_status: string;
 }
 
-export interface ControlPlaneSupplierSettlementReport {
+export interface ControlPlaneSupplierSettlementReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   supplier_count: number;
@@ -784,7 +790,7 @@ export interface ControlPlaneSupplierSettlementBlockerRecord {
   release_this_week_total: number;
 }
 
-export interface ControlPlaneSupplierSettlementBlockerReport {
+export interface ControlPlaneSupplierSettlementBlockerReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   supplier_count: number;
@@ -807,7 +813,7 @@ export interface ControlPlaneSupplierEscalationRecord {
   age_days: number;
 }
 
-export interface ControlPlaneSupplierEscalationReport {
+export interface ControlPlaneSupplierEscalationReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   open_case_count: number;
@@ -833,7 +839,7 @@ export interface ControlPlaneSupplierPerformanceRecord {
   performance_status: string;
 }
 
-export interface ControlPlaneSupplierPerformanceReport {
+export interface ControlPlaneSupplierPerformanceReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   supplier_count: number;
   at_risk_count: number;
@@ -855,7 +861,7 @@ export interface ControlPlaneSupplierPaymentActivityRecord {
   last_payment_amount?: number | null;
 }
 
-export interface ControlPlaneSupplierPaymentActivityReport {
+export interface ControlPlaneSupplierPaymentActivityReport extends ControlPlaneSnapshotMetadata {
   branch_id: string;
   as_of_date: string;
   supplier_count: number;

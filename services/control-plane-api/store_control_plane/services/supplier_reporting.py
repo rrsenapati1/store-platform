@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import AuditRepository, InventoryRepository, ProcurementFinanceRepository, PurchasingRepository, SupplierReportingRepository, TenantRepository
 from ..utils import utc_now
+from .operations_queue import OperationsQueueService
 from .supplier_reporting_finance_policy import build_supplier_aging_report, build_supplier_due_schedule, build_supplier_payment_activity_report, build_supplier_payables_report, build_supplier_settlement_report, build_supplier_statement_report
 from .supplier_reporting_ops_policy import build_supplier_escalation_report, build_supplier_exception_report, build_supplier_performance_report, build_supplier_settlement_blocker_report, build_vendor_dispute_board
 
@@ -20,6 +21,7 @@ class SupplierReportingService:
         self._finance_repo = ProcurementFinanceRepository(session)
         self._reporting_repo = SupplierReportingRepository(session)
         self._audit_repo = AuditRepository(session)
+        self._operations_queue = OperationsQueueService(session)
 
     async def create_vendor_dispute(
         self,
@@ -70,6 +72,7 @@ class SupplierReportingService:
             opened_on=utc_now().date(),
         )
         await self._reporting_repo.mark_branch_snapshots_dirty(tenant_id=tenant_id, branch_id=branch_id)
+        await self._enqueue_existing_snapshot_refreshes(tenant_id=tenant_id, branch_id=branch_id)
         await self._audit_repo.record(
             tenant_id=tenant_id,
             branch_id=branch_id,
@@ -108,6 +111,7 @@ class SupplierReportingService:
             resolution_note=resolution_note,
         )
         await self._reporting_repo.mark_branch_snapshots_dirty(tenant_id=tenant_id, branch_id=branch_id)
+        await self._enqueue_existing_snapshot_refreshes(tenant_id=tenant_id, branch_id=branch_id)
         await self._audit_repo.record(
             tenant_id=tenant_id,
             branch_id=branch_id,
@@ -126,13 +130,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-payables-report",
             report_date=None,
-            builder=lambda source, _as_of_date: build_supplier_payables_report(
-                branch_id=branch_id,
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                supplier_payments=source["supplier_payments"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_aging_report(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -142,14 +139,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-aging-report",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_supplier_aging_report(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                supplier_payments=source["supplier_payments"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_statements(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -159,14 +148,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-statements",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_supplier_statement_report(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                supplier_payments=source["supplier_payments"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_due_schedule(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -176,14 +157,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-due-schedule",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_supplier_due_schedule(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                supplier_payments=source["supplier_payments"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_settlement_report(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -193,14 +166,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-settlement-report",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_supplier_settlement_report(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                supplier_payments=source["supplier_payments"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_settlement_blockers(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -210,16 +175,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-settlement-blockers",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_supplier_settlement_blocker_report(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                supplier_payments=source["supplier_payments"],
-                vendor_disputes=source["vendor_disputes"],
-                goods_receipts=source["goods_receipts"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_exception_report(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -229,14 +184,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-exception-report",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_supplier_exception_report(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                vendor_disputes=source["vendor_disputes"],
-                goods_receipts=source["goods_receipts"],
-                purchase_invoices=source["purchase_invoices"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_escalation_report(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -246,16 +193,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-escalation-report",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_supplier_escalation_report(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                supplier_payments=source["supplier_payments"],
-                vendor_disputes=source["vendor_disputes"],
-                goods_receipts=source["goods_receipts"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_performance_report(self, *, tenant_id: str, branch_id: str) -> dict[str, object]:
@@ -264,15 +201,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-performance-report",
             report_date=None,
-            builder=lambda source, _as_of_date: build_supplier_performance_report(
-                branch_id=branch_id,
-                purchase_orders=source["purchase_orders"],
-                goods_receipts=source["goods_receipts"],
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                vendor_disputes=source["vendor_disputes"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def supplier_payment_activity(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -282,14 +210,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="supplier-payment-activity",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_supplier_payment_activity_report(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                supplier_payments=source["supplier_payments"],
-                purchase_invoices=source["purchase_invoices"],
-                supplier_returns=source["supplier_returns"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def vendor_dispute_board(self, *, tenant_id: str, branch_id: str, as_of_date: date | None) -> dict[str, object]:
@@ -299,14 +219,6 @@ class SupplierReportingService:
             branch_id=branch_id,
             report_type="vendor-dispute-board",
             report_date=resolved_date,
-            builder=lambda source, report_date: build_vendor_dispute_board(
-                branch_id=branch_id,
-                as_of_date=report_date,
-                vendor_disputes=source["vendor_disputes"],
-                goods_receipts=source["goods_receipts"],
-                purchase_invoices=source["purchase_invoices"],
-                suppliers_by_id=source["suppliers_by_id"],
-            ),
         )
 
     async def _branch_snapshot(
@@ -316,7 +228,6 @@ class SupplierReportingService:
         branch_id: str,
         report_type: str,
         report_date: date | None,
-        builder,
     ) -> dict[str, object]:
         await self._assert_branch_exists(tenant_id=tenant_id, branch_id=branch_id)
         snapshot = await self._reporting_repo.get_snapshot(
@@ -326,11 +237,48 @@ class SupplierReportingService:
             report_date=report_date,
         )
         if snapshot is not None and not snapshot.is_dirty:
-            return dict(snapshot.payload)
+            return self._serialize_snapshot_payload(snapshot.payload, snapshot_status="CURRENT", snapshot=snapshot)
 
+        if snapshot is not None and snapshot.is_dirty:
+            queued_job = await self._queue_snapshot_refresh(
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                report_type=report_type,
+                report_date=report_date,
+            )
+            await self._session.commit()
+            return self._serialize_snapshot_payload(
+                snapshot.payload,
+                snapshot_status="STALE_REFRESH_QUEUED",
+                snapshot=snapshot,
+                snapshot_job_id=str(queued_job["id"]),
+            )
+
+        snapshot = await self.refresh_snapshot(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            report_type=report_type,
+            report_date=report_date,
+        )
+        return self._serialize_snapshot_payload(snapshot.payload, snapshot_status="CURRENT", snapshot=snapshot)
+
+    async def refresh_snapshot(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        report_type: str,
+        report_date: date | None,
+    ):
+        await self._assert_branch_exists(tenant_id=tenant_id, branch_id=branch_id)
         source = await self._load_source_data(tenant_id=tenant_id, branch_id=branch_id)
-        payload = builder(source, report_date)
-        await self._reporting_repo.upsert_snapshot(
+        payload = self._build_snapshot_payload(
+            branch_id=branch_id,
+            report_type=report_type,
+            report_date=report_date,
+            source=source,
+        )
+        snapshot = await self._reporting_repo.upsert_snapshot(
             tenant_id=tenant_id,
             branch_id=branch_id,
             report_type=report_type,
@@ -339,7 +287,181 @@ class SupplierReportingService:
             source_watermark=self._source_watermark(source),
         )
         await self._session.commit()
-        return payload
+        return snapshot
+
+    async def _queue_snapshot_refresh(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        report_type: str,
+        report_date: date | None,
+    ) -> dict[str, object]:
+        return await self._operations_queue.enqueue_branch_job(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            created_by_user_id=None,
+            job_type="SUPPLIER_REPORT_REFRESH",
+            queue_key=self._snapshot_queue_key(
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                report_type=report_type,
+                report_date=report_date,
+            ),
+            payload={
+                "report_type": report_type,
+                "report_date": report_date.isoformat() if report_date is not None else None,
+            },
+        )
+
+    async def _enqueue_existing_snapshot_refreshes(self, *, tenant_id: str, branch_id: str) -> None:
+        snapshots = await self._reporting_repo.list_branch_snapshots(tenant_id=tenant_id, branch_id=branch_id)
+        for snapshot in snapshots:
+            if not snapshot.is_dirty:
+                continue
+            await self._queue_snapshot_refresh(
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                report_type=snapshot.report_type,
+                report_date=snapshot.report_date,
+            )
+
+    def _build_snapshot_payload(
+        self,
+        *,
+        branch_id: str,
+        report_type: str,
+        report_date: date | None,
+        source: dict[str, object],
+    ) -> dict[str, object]:
+        if report_type == "supplier-payables-report":
+            return build_supplier_payables_report(
+                branch_id=branch_id,
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                supplier_payments=source["supplier_payments"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-aging-report":
+            return build_supplier_aging_report(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                supplier_payments=source["supplier_payments"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-statements":
+            return build_supplier_statement_report(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                supplier_payments=source["supplier_payments"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-due-schedule":
+            return build_supplier_due_schedule(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                supplier_payments=source["supplier_payments"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-settlement-report":
+            return build_supplier_settlement_report(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                supplier_payments=source["supplier_payments"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-settlement-blockers":
+            return build_supplier_settlement_blocker_report(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                supplier_payments=source["supplier_payments"],
+                vendor_disputes=source["vendor_disputes"],
+                goods_receipts=source["goods_receipts"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-exception-report":
+            return build_supplier_exception_report(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                vendor_disputes=source["vendor_disputes"],
+                goods_receipts=source["goods_receipts"],
+                purchase_invoices=source["purchase_invoices"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-escalation-report":
+            return build_supplier_escalation_report(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                supplier_payments=source["supplier_payments"],
+                vendor_disputes=source["vendor_disputes"],
+                goods_receipts=source["goods_receipts"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-performance-report":
+            return build_supplier_performance_report(
+                branch_id=branch_id,
+                purchase_orders=source["purchase_orders"],
+                goods_receipts=source["goods_receipts"],
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                vendor_disputes=source["vendor_disputes"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "supplier-payment-activity":
+            return build_supplier_payment_activity_report(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                supplier_payments=source["supplier_payments"],
+                purchase_invoices=source["purchase_invoices"],
+                supplier_returns=source["supplier_returns"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        if report_type == "vendor-dispute-board":
+            return build_vendor_dispute_board(
+                branch_id=branch_id,
+                as_of_date=report_date,
+                vendor_disputes=source["vendor_disputes"],
+                goods_receipts=source["goods_receipts"],
+                purchase_invoices=source["purchase_invoices"],
+                suppliers_by_id=source["suppliers_by_id"],
+            )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported supplier report type: {report_type}")
+
+    @staticmethod
+    def _snapshot_queue_key(
+        *,
+        tenant_id: str,
+        branch_id: str,
+        report_type: str,
+        report_date: date | None,
+    ) -> str:
+        return f"supplier-report:{tenant_id}:{branch_id}:{report_type}:{report_date.isoformat() if report_date is not None else 'none'}"
+
+    @staticmethod
+    def _serialize_snapshot_payload(
+        payload: dict[str, object],
+        *,
+        snapshot_status: str,
+        snapshot,
+        snapshot_job_id: str | None = None,
+    ) -> dict[str, object]:
+        response = dict(payload)
+        response["snapshot_status"] = snapshot_status
+        response["snapshot_job_id"] = snapshot_job_id
+        response["snapshot_refreshed_at"] = snapshot.refreshed_at.isoformat() if snapshot.refreshed_at is not None else None
+        return response
 
     async def _load_source_data(self, *, tenant_id: str, branch_id: str) -> dict[str, object]:
         suppliers = await self._purchasing_repo.list_suppliers(tenant_id=tenant_id)

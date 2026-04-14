@@ -35,10 +35,20 @@ type SupplierReportingSnapshot = {
   paymentActivity: ControlPlaneSupplierPaymentActivityReport;
 };
 
+function snapshotHealth(snapshot: SupplierReportingSnapshot): { label: string; staleCount: number } {
+  const statuses = Object.values(snapshot).map((report) => report.snapshot_status ?? 'CURRENT');
+  const staleCount = statuses.filter((status) => status === 'STALE_REFRESH_QUEUED').length;
+  return {
+    label: staleCount > 0 ? `${staleCount} refresh queued` : 'Current',
+    staleCount,
+  };
+}
+
 export function OwnerSupplierReportingSection({ accessToken, tenantId, branchId }: OwnerSupplierReportingSectionProps) {
   const [snapshot, setSnapshot] = useState<SupplierReportingSnapshot | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+  const health = snapshot ? snapshotHealth(snapshot) : null;
 
   async function loadSupplierReporting() {
     if (!accessToken || !tenantId || !branchId) {
@@ -104,6 +114,7 @@ export function OwnerSupplierReportingSection({ accessToken, tenantId, branchId 
         <div style={{ marginTop: '16px' }}>
           <DetailList
             items={[
+              { label: 'Snapshot health', value: health?.label ?? 'Current' },
               { label: 'Outstanding payables', value: String(snapshot.payables.outstanding_total) },
               { label: 'Open invoices', value: String(snapshot.aging.open_invoice_count) },
               { label: 'Suppliers on statement', value: String(snapshot.statements.supplier_count) },
@@ -116,6 +127,12 @@ export function OwnerSupplierReportingSection({ accessToken, tenantId, branchId 
               { label: 'Recent paid total', value: String(snapshot.paymentActivity.recent_30_days_paid_total) },
             ]}
           />
+
+          {health && health.staleCount > 0 ? (
+            <p style={{ color: '#4e5871', marginBottom: '16px', marginTop: '12px' }}>
+              Some supplier snapshots are serving stale data while the worker refreshes them.
+            </p>
+          ) : null}
 
           <ul style={{ marginBottom: '16px', marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
             {snapshot.payables.records.slice(0, 3).map((record, index) => (

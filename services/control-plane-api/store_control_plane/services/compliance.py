@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import AuditRepository, BillingRepository, CatalogRepository, ComplianceRepository, TenantRepository
+from .operations_queue import OperationsQueueService
 from .compliance_policy import build_hsn_sac_summary, ensure_gst_export_allowed, ensure_irn_attachment_allowed
 
 
@@ -15,6 +16,7 @@ class ComplianceService:
         self._catalog_repo = CatalogRepository(session)
         self._compliance_repo = ComplianceRepository(session)
         self._audit_repo = AuditRepository(session)
+        self._operations_queue = OperationsQueueService(session)
 
     async def create_gst_export_job(
         self,
@@ -31,14 +33,6 @@ class ComplianceService:
         sale_bundle = await self._billing_repo.get_sale_bundle(tenant_id=tenant_id, branch_id=branch_id, sale_id=sale_id)
         if sale_bundle is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
-
-        existing_job = await self._compliance_repo.get_export_job_by_sale(
-            tenant_id=tenant_id,
-            branch_id=branch_id,
-            sale_id=sale_id,
-        )
-        if existing_job is not None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GST export already exists for this sale invoice")
 
         try:
             ensure_gst_export_allowed(
@@ -57,6 +51,22 @@ class ComplianceService:
         except ValueError as error:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
+        existing_job = await self._compliance_repo.get_export_job_by_sale(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            sale_id=sale_id,
+        )
+        if existing_job is not None:
+            existing_bundle = await self._compliance_repo.get_export_bundle(
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                job_id=existing_job.id,
+            )
+            return self._serialize_job(
+                job=existing_job if existing_bundle is None else existing_bundle.job,
+                attachment=None if existing_bundle is None else existing_bundle.attachment,
+            )
+
         job = await self._compliance_repo.create_export_job(
             tenant_id=tenant_id,
             branch_id=branch_id,
@@ -68,19 +78,25 @@ class ComplianceService:
             buyer_gstin=sale_bundle.sale.customer_gstin,
             hsn_sac_summary=hsn_sac_summary,
             grand_total=sale_bundle.sale.grand_total,
-            status="IRN_PENDING",
+            status="QUEUED",
         )
-        await self._compliance_repo.set_sale_irn_status(
+        await self._operations_queue.enqueue_branch_job(
             tenant_id=tenant_id,
             branch_id=branch_id,
-            sale_id=sale_bundle.sale.id,
-            irn_status="IRN_PENDING",
+            created_by_user_id=actor_user_id,
+            job_type="GST_EXPORT_PREPARE",
+            queue_key=f"gst-export:{tenant_id}:{branch_id}:{sale_bundle.sale.id}",
+            payload={
+                "gst_export_job_id": job.id,
+                "sale_id": sale_bundle.sale.id,
+                "sales_invoice_id": sale_bundle.invoice.id,
+            },
         )
         await self._audit_repo.record(
             tenant_id=tenant_id,
             branch_id=branch_id,
             actor_user_id=actor_user_id,
-            action="gst_export.created",
+            action="gst_export.queued",
             entity_type="gst_export_job",
             entity_id=job.id,
             payload={"sale_id": sale_bundle.sale.id, "invoice_number": sale_bundle.invoice.invoice_number},
@@ -102,7 +118,7 @@ class ComplianceService:
         records = [self._serialize_job(job=bundle.job, attachment=bundle.attachment) for bundle in bundles]
         return {
             "branch_id": branch_id,
-            "pending_count": sum(1 for record in records if record["status"] == "IRN_PENDING"),
+            "pending_count": sum(1 for record in records if record["status"] in {"QUEUED", "IRN_PENDING"}),
             "attached_count": sum(1 for record in records if record["status"] == "IRN_ATTACHED"),
             "records": records,
         }

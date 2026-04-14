@@ -29,6 +29,7 @@ describe('owner supplier reporting section', () => {
         credit_note_total: 28,
         paid_total: 100,
         outstanding_total: 322,
+        snapshot_status: 'CURRENT',
         records: [{ supplier_name: 'Paper Supply Co', purchase_invoice_number: 'PINV-001', outstanding_total: 195 }],
       }),
       jsonResponse({
@@ -67,6 +68,8 @@ describe('owner supplier reporting section', () => {
         open_count: 1,
         resolved_count: 1,
         overdue_open_count: 1,
+        snapshot_status: 'STALE_REFRESH_QUEUED',
+        snapshot_job_id: 'job-supplier-refresh-1',
         records: [{ dispute_id: 'dispute-1', supplier_id: 'supplier-1', supplier_name: 'Paper Supply Co', reference_type: 'goods_receipt', reference_number: 'GRN-001', dispute_type: 'SHORT_SUPPLY', status: 'OPEN', age_days: 10, overdue: true }],
       }),
       jsonResponse({
@@ -149,6 +152,8 @@ describe('owner supplier reporting section', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load supplier reporting' }));
 
     expect(await screen.findByText('Outstanding payables')).toBeInTheDocument();
+    expect(screen.getByText('Snapshot health')).toBeInTheDocument();
+    expect(screen.getByText('1 refresh queued')).toBeInTheDocument();
     expect(screen.getByText('322')).toBeInTheDocument();
     expect(screen.getByText(/Paper Supply Co :: PINV-001 :: 195/)).toBeInTheDocument();
     expect(screen.getByText(/Paper Supply Co :: HARD_HOLD :: 195/)).toBeInTheDocument();

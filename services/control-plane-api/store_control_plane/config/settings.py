@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     session_ttl_minutes: int = 720
     legacy_write_mode: str = "shadow"
     platform_admin_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    operations_worker_poll_seconds: int = 5
+    operations_worker_batch_size: int = 25
+    operations_worker_lease_seconds: int = 60
+    operations_job_retry_delay_seconds: int = 60
+    operations_job_retention_hours: int = 168
 
     model_config = SettingsConfigDict(
         env_prefix="STORE_CONTROL_PLANE_",

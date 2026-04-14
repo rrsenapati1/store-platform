@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { OwnerComplianceSection } from './OwnerComplianceSection';
 
@@ -53,7 +53,7 @@ describe('owner compliance section', () => {
         buyer_gstin: '29AAEPM0111C1Z3',
         hsn_sac_summary: '0902',
         grand_total: 388.5,
-        status: 'IRN_PENDING',
+        status: 'QUEUED',
         irn: null,
         ack_no: null,
         signed_qr_payload: null,
@@ -74,49 +74,10 @@ describe('owner compliance section', () => {
             buyer_gstin: '29AAEPM0111C1Z3',
             hsn_sac_summary: '0902',
             grand_total: 388.5,
-            status: 'IRN_PENDING',
+            status: 'QUEUED',
             irn: null,
             ack_no: null,
             signed_qr_payload: null,
-            created_at: '2026-04-14T08:00:00',
-          },
-        ],
-      }),
-      jsonResponse({
-        id: 'gst-export-1',
-        sale_id: 'sale-1',
-        invoice_id: 'invoice-1',
-        invoice_number: 'SINV-BLRFLAGSHIP-0001',
-        customer_name: 'Acme Traders',
-        seller_gstin: '29ABCDE1234F1Z5',
-        buyer_gstin: '29AAEPM0111C1Z3',
-        hsn_sac_summary: '0902',
-        grand_total: 388.5,
-        status: 'IRN_ATTACHED',
-        irn: 'IRN-001',
-        ack_no: 'ACK-001',
-        signed_qr_payload: 'signed-qr-001',
-        created_at: '2026-04-14T08:00:00',
-      }),
-      jsonResponse({
-        branch_id: 'branch-1',
-        pending_count: 0,
-        attached_count: 1,
-        records: [
-          {
-            id: 'gst-export-1',
-            sale_id: 'sale-1',
-            invoice_id: 'invoice-1',
-            invoice_number: 'SINV-BLRFLAGSHIP-0001',
-            customer_name: 'Acme Traders',
-            seller_gstin: '29ABCDE1234F1Z5',
-            buyer_gstin: '29AAEPM0111C1Z3',
-            hsn_sac_summary: '0902',
-            grand_total: 388.5,
-            status: 'IRN_ATTACHED',
-            irn: 'IRN-001',
-            ack_no: 'ACK-001',
-            signed_qr_payload: 'signed-qr-001',
             created_at: '2026-04-14T08:00:00',
           },
         ],
@@ -137,7 +98,7 @@ describe('owner compliance section', () => {
     vi.restoreAllMocks();
   });
 
-  test('loads compliance jobs, creates gst export, and attaches irn', async () => {
+  test('shows queued gst export posture and blocks irn attachment until preparation completes', async () => {
     render(
       <OwnerComplianceSection
         accessToken="session-owner"
@@ -152,16 +113,12 @@ describe('owner compliance section', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create export for first pending invoice' }));
     await screen.findByText('Latest GST export job');
+    expect(screen.getByText('QUEUED')).toBeInTheDocument();
+    expect(screen.getByText('Queued for worker preparation')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('IRN'), { target: { value: 'IRN-001' } });
     fireEvent.change(screen.getByLabelText('Ack number'), { target: { value: 'ACK-001' } });
     fireEvent.change(screen.getByLabelText('Signed QR payload'), { target: { value: 'signed-qr-001' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Attach IRN to selected export' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Latest IRN attachment')).toBeInTheDocument();
-      expect(screen.getByText('IRN_ATTACHED')).toBeInTheDocument();
-      expect(screen.getByText('IRN-001')).toBeInTheDocument();
-    });
+    expect(screen.getByRole('button', { name: 'Attach IRN to selected export' })).toBeDisabled();
   });
 });

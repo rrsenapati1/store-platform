@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict, dataclass
 from datetime import timedelta
 from typing import Any
@@ -8,6 +9,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from .main import create_app
+from .services.operations_worker import OperationsWorkerService
 from .utils import utc_now
 
 
@@ -65,6 +67,12 @@ def _get_json(client: TestClient, path: str, *, headers: dict[str, str]) -> dict
     response = client.get(path, headers=headers)
     response.raise_for_status()
     return response.json()
+
+
+async def _run_worker_once(client: TestClient) -> dict[str, int]:
+    async with client.app.state.session_factory() as session:
+        worker_service = OperationsWorkerService(session)
+        return await worker_service.process_due_jobs(limit=10, now=utc_now())
 
 
 def run_control_plane_smoke(*, database_url: str, platform_admin_email: str = "admin@store.local") -> ControlPlaneSmokeResult:
@@ -264,6 +272,7 @@ def run_control_plane_smoke(*, database_url: str, platform_admin_email: str = "a
             headers=owner_headers,
             payload={"sale_id": sale_id},
         )
+        asyncio.run(_run_worker_once(client))
         irn_attachment = _post_json(
             client,
             f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports/{gst_export['id']}/attach-irn",

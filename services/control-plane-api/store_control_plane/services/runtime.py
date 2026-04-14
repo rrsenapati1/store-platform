@@ -92,6 +92,7 @@ class RuntimeService:
                 "device_name": device.device_name,
                 "device_code": device.device_code,
                 "session_surface": device.session_surface,
+                "runtime_profile": device.runtime_profile,
                 "is_branch_hub": device.is_branch_hub,
                 "status": device.status,
                 "assigned_staff_profile_id": device.assigned_staff_profile_id,

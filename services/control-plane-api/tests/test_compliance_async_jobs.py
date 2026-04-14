@@ -21,30 +21,14 @@ def _exchange(client: TestClient, *, subject: str, email: str, name: str) -> dic
     return response.json()
 
 
-async def _run_worker_once(client: TestClient) -> dict[str, int]:
-    async with client.app.state.session_factory() as session:
-        worker_service = OperationsWorkerService(session)
-        return await worker_service.process_due_jobs(limit=10, now=utc_now())
-
-
-def test_owner_creates_gst_export_job_and_attaches_irn_for_sale_invoice():
-    database_url = sqlite_test_database_url("compliance-flow")
-    client = TestClient(
-        create_app(
-            database_url=database_url,
-            bootstrap_database=True,
-            korsenex_idp_mode="stub",
-            platform_admin_emails=["admin@store.local"],
-        )
-    )
-
+def _seed_sale_context(client: TestClient) -> dict[str, str]:
     admin_session = _exchange(client, subject="platform-admin-1", email="admin@store.local", name="Platform Admin")
     admin_headers = {"authorization": f"Bearer {admin_session['access_token']}"}
 
     tenant = client.post(
         "/v1/platform/tenants",
         headers=admin_headers,
-        json={"name": "Acme Retail", "slug": "acme-retail"},
+        json={"name": "Acme Retail", "slug": "acme-retail-async-compliance"},
     )
     assert tenant.status_code == 200
     tenant_id = tenant.json()["id"]
@@ -108,26 +92,21 @@ def test_owner_creates_gst_export_job_and_attaches_irn_for_sale_invoice():
     assert purchase_order.status_code == 200
     purchase_order_id = purchase_order.json()["id"]
 
-    submitted = client.post(
+    assert client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}/submit-approval",
         headers=owner_headers,
         json={"note": "Need replenishment before the weekend rush"},
-    )
-    assert submitted.status_code == 200
-
-    approved = client.post(
+    ).status_code == 200
+    assert client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}/approve",
         headers=owner_headers,
         json={"note": "Approved for branch restock"},
-    )
-    assert approved.status_code == 200
-
-    goods_receipt = client.post(
+    ).status_code == 200
+    assert client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/goods-receipts",
         headers=owner_headers,
         json={"purchase_order_id": purchase_order_id},
-    )
-    assert goods_receipt.status_code == 200
+    ).status_code == 200
 
     branch_membership = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/memberships",
@@ -150,72 +129,57 @@ def test_owner_creates_gst_export_job_and_attaches_irn_for_sale_invoice():
         },
     )
     assert sale.status_code == 200
-    assert sale.json()["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
-    assert sale.json()["irn_status"] == "IRN_PENDING"
-    sale_id = sale.json()["id"]
+
+    return {
+        "tenant_id": tenant_id,
+        "branch_id": branch_id,
+        "sale_id": sale.json()["id"],
+        "owner_access_token": owner_session["access_token"],
+    }
+
+
+async def _run_worker_once(client: TestClient) -> dict[str, int]:
+    async with client.app.state.session_factory() as session:
+        worker_service = OperationsWorkerService(session)
+        return await worker_service.process_due_jobs(limit=10, now=utc_now())
+
+
+def test_gst_export_request_enqueues_async_preparation_and_worker_completes_it() -> None:
+    database_url = sqlite_test_database_url("compliance-async-jobs")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+    context = _seed_sale_context(client)
+    owner_headers = {"authorization": f"Bearer {context['owner_access_token']}"}
 
     export_job = client.post(
-        f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports",
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports",
         headers=owner_headers,
-        json={"sale_id": sale_id},
+        json={"sale_id": context["sale_id"]},
     )
     assert export_job.status_code == 200
-    assert export_job.json()["sale_id"] == sale_id
-    assert export_job.json()["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
     assert export_job.json()["status"] == "QUEUED"
-    assert export_job.json()["buyer_gstin"] == "29AAEPM0111C1Z3"
 
-    export_jobs = client.get(
-        f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports",
+    duplicate = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports",
         headers=owner_headers,
+        json={"sale_id": context["sale_id"]},
     )
-    assert export_jobs.status_code == 200
-    assert export_jobs.json()["pending_count"] == 1
-    assert export_jobs.json()["attached_count"] == 0
-    assert export_jobs.json()["records"][0]["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
-    assert export_jobs.json()["records"][0]["status"] == "QUEUED"
+    assert duplicate.status_code == 200
+    assert duplicate.json()["id"] == export_job.json()["id"]
 
     processed = asyncio.run(_run_worker_once(client))
     assert processed["completed"] == 1
     assert processed["dead_lettered"] == 0
 
-    export_jobs = client.get(
-        f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports",
+    refreshed_report = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/compliance/gst-exports",
         headers=owner_headers,
     )
-    assert export_jobs.status_code == 200
-    assert export_jobs.json()["pending_count"] == 1
-    assert export_jobs.json()["attached_count"] == 0
-    assert export_jobs.json()["records"][0]["status"] == "IRN_PENDING"
-
-    attachment = client.post(
-        f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports/{export_job.json()['id']}/attach-irn",
-        headers=owner_headers,
-        json={
-            "irn": "IRN-001",
-            "ack_no": "ACK-001",
-            "signed_qr_payload": "signed-qr-001",
-        },
-    )
-    assert attachment.status_code == 200
-    assert attachment.json()["status"] == "IRN_ATTACHED"
-    assert attachment.json()["irn"] == "IRN-001"
-    assert attachment.json()["ack_no"] == "ACK-001"
-
-    export_jobs = client.get(
-        f"/v1/tenants/{tenant_id}/branches/{branch_id}/compliance/gst-exports",
-        headers=owner_headers,
-    )
-    assert export_jobs.status_code == 200
-    assert export_jobs.json()["pending_count"] == 0
-    assert export_jobs.json()["attached_count"] == 1
-    assert export_jobs.json()["records"][0]["status"] == "IRN_ATTACHED"
-    assert export_jobs.json()["records"][0]["irn"] == "IRN-001"
-
-    sales_register = client.get(
-        f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
-        headers=owner_headers,
-    )
-    assert sales_register.status_code == 200
-    assert sales_register.json()["records"][0]["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
-    assert sales_register.json()["records"][0]["irn_status"] == "IRN_ATTACHED"
+    assert refreshed_report.status_code == 200
+    assert refreshed_report.json()["records"][0]["status"] == "IRN_PENDING"

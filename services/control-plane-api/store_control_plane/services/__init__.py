@@ -13,6 +13,8 @@ from .customer_reporting import CustomerReportingService
 from .idp import build_identity_provider
 from .inventory import InventoryService
 from .onboarding import OnboardingService
+from .operations_queue import OperationsQueueService
+from .operations_worker import OperationsWorkerService
 from .procurement_finance import ProcurementFinanceService
 from .purchasing import PurchasingService
 from .procurement_finance_policy import build_supplier_payables_report
@@ -38,6 +40,8 @@ __all__ = [
     "OfflineContinuityService",
     "ProcurementFinanceService",
     "PurchasingService",
+    "OperationsQueueService",
+    "OperationsWorkerService",
     "RuntimeService",
     "SpokeRuntimeService",
     "SyncRuntimeService",

@@ -7,6 +7,7 @@ from .compliance import router as compliance_router
 from .customers import router as customers_router
 from .exchanges import router as exchange_router
 from .inventory import router as inventory_router
+from .operations import router as operations_router
 from .platform import router as platform_router
 from .procurement_finance import router as procurement_finance_router
 from .purchasing import router as purchasing_router
@@ -27,6 +28,7 @@ __all__ = [
     "customers_router",
     "exchange_router",
     "inventory_router",
+    "operations_router",
     "platform_router",
     "procurement_finance_router",
     "purchasing_router",

@@ -21,6 +21,8 @@ def ensure_gst_export_allowed(
 def ensure_irn_attachment_allowed(*, current_status: str, has_attachment: bool) -> None:
     if current_status == "IRN_ATTACHED" or has_attachment:
         raise ValueError("IRN is already attached for this export job")
+    if current_status != "IRN_PENDING":
+        raise ValueError("IRN can only be attached after GST export preparation is complete")
 
 
 def build_hsn_sac_summary(hsn_sac_codes: list[str]) -> str:
