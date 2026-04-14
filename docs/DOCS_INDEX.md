@@ -26,6 +26,9 @@ Read the smallest useful set.
   - `HANDOFF_TEMPLATE.md`
 - Local setup and verification:
   - `runbooks/dev-workflow.md`
+- Launch/cutover readiness:
+  - `launch/launch-readiness-checklist.md`
+  - `launch/go-live-runbook.md`
 - Tenant-facing release docs:
   - `public/tenant-onboarding-guide.md`
   - `public/store-desktop-installation-guide.md`
@@ -54,6 +57,8 @@ Root `docs/` contains canonical docs only:
   - codebase module map and ownership boundaries
 - `runbooks/`
   - local workflow and operational commands
+- `launch/`
+  - release-candidate certification, beta exit, cutover acceptance, and go-live checklists
 - `public/`
   - release-consumer onboarding, install, upgrade, recovery, and troubleshooting guides
 - `support/`
