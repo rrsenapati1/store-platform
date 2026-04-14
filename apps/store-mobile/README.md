@@ -6,10 +6,13 @@ Current slice:
 
 - Android app scaffold
 - Jetpack Compose shell
-- unit-testable mobile bootstrap contract
+- manual activation and pairing flow for `mobile_store_spoke`
+- scan and lookup workflow through the shared barcode path
+- receiving, stock count, and expiry operation screens
+- branch-runtime status screen for paired handhelds
 
 Planned next:
 
-- mobile spoke pairing and session flow
-- camera barcode scan and lookup
-- receiving, stock count, and expiry workflows
+- live camera preview wiring for barcode capture
+- real control-plane and branch-hub data sources
+- inventory-tablet and customer-display follow-on slices

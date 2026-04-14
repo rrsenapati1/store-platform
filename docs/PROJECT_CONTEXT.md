@@ -38,7 +38,7 @@ The repo no longer targets the smaller desktop-first public-release endgame as t
 V2 launch includes:
 
 - packaged Store Desktop as branch hub and desktop spoke foundation
-- mobile store app
+- mobile store app, starting with an Android-first Kotlin cashier-assist and store-operations spoke slice
 - inventory tablet workflows
 - customer display
 - camera barcode scanning and richer device-input support
@@ -143,6 +143,7 @@ The runtime continuity boundary is now explicit:
 After the completed CP foundation and public-release tasks, the remaining runtime work now belongs to the V2 launch program:
 
 - mobile store app runtime
+  - Android/Kotlin first slice now exists with pairing, scan/lookup, receiving, stock count, expiry, and runtime-status foundations
 - inventory tablet runtime
 - customer display runtime
 - richer scanner/camera input

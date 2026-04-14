@@ -12,7 +12,7 @@ The repo's active endgame is no longer the smaller desktop-first public release.
 
 The V2 launch scope includes:
 
-- mobile store app
+- mobile store app, starting with an Android-first Kotlin spoke runtime for pairing, scan/lookup, and store-operations workflows
 - inventory tablet workflows
 - customer display
 - camera barcode scanning and richer scanner/device-input support

@@ -1,0 +1,30 @@
+package com.store.mobile.ui.pairing
+
+import com.store.mobile.runtime.FakeStoreMobileHubClient
+import com.store.mobile.runtime.InMemoryStoreMobilePairingRepository
+import com.store.mobile.runtime.InMemoryStoreMobileSessionRepository
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class PairingViewModelTest {
+    @Test
+    fun exposesManualActivationReadyState() {
+        val viewModel = PairingViewModel(
+            pairingRepository = InMemoryStoreMobilePairingRepository(),
+            sessionRepository = InMemoryStoreMobileSessionRepository(),
+            hubClient = FakeStoreMobileHubClient(),
+        )
+
+        viewModel.updateManualActivation(
+            hubBaseUrl = "http://127.0.0.1:9400",
+            activationCode = "ABCD-1234-EFGH",
+        )
+
+        assertEquals("http://127.0.0.1:9400", viewModel.state.hubBaseUrl)
+        assertEquals("ABCD-1234-EFGH", viewModel.state.activationCode)
+        assertTrue(viewModel.state.canRedeemActivation)
+        assertNull(viewModel.state.pairedDevice)
+    }
+}

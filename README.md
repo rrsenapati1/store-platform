@@ -6,7 +6,7 @@ This repository currently contains the Wave 1 foundation:
 - shared retail domain packages for RBAC, barcode, printing, and sync
 - FastAPI backend core for tenant, catalog, inventory, GST billing, and IRP-ready export/import
 - initial React shells for platform admin, owner web, and store desktop
-- the first Android `store-mobile` runtime scaffold for handheld store operations
+- the first Android `store-mobile` runtime slice for handheld spoke pairing, scan/lookup, store operations, and branch-runtime posture
 
 ## Release Docs
 
@@ -31,6 +31,5 @@ python -m pytest services/api/tests -q
 Mobile runtime scaffold:
 
 ```bash
-cd apps/store-mobile
-./gradlew testDebugUnitTest
+npm run ci:store-mobile
 ```

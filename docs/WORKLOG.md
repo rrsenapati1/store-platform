@@ -2,6 +2,18 @@
 
 ## 2026-04-15
 
+- Started V2-001 on runtime surfaces:
+  - scaffolded the first Android-native `store-mobile` app as a `mobile_store_spoke` instead of bolting handheld work into the desktop runtime
+  - added generic runtime activation support on the control plane so non-desktop runtime surfaces can redeem approved device activations without reusing the desktop-only contract
+  - added mobile pairing/session, scan-and-lookup, receiving, stock count, expiry, and branch-runtime status modules behind small Kotlin repositories and screen models
+  - added a repo-level `ci:store-mobile` Gradle wrapper path plus a dedicated mobile verification job in GitHub Actions so the Android slice participates in normal CI instead of living outside the release automation boundary
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_store_mobile_activation_flow.py -q`
+  - `python -m pytest services/control-plane-api/tests/test_store_desktop_activation_flow.py -q`
+  - `npm run test --workspace @store/barcode`
+  - `cd apps/store-mobile && .\\gradlew.bat testDebugUnitTest`
+  - `node --test scripts/github-workflows.test.mjs`
+
 - Completed CP-028 as the V2 program transition:
   - rewrote the task ledger so the repo now targets a broader V2 launch program instead of the smaller desktop-first public-release endgame
   - kept `CP-*` history intact while adding a new `V2-*` task family for runtime surfaces, device input, advanced hardware, store operations depth, customer/commercial features, staff/branch controls, reporting, vertical extensions, hardening, and final V2 launch readiness

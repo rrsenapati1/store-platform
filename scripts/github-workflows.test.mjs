@@ -9,17 +9,19 @@ async function readWorkflow(fileName) {
   return fs.readFile(path.join(repoRoot, '.github', 'workflows', fileName), 'utf8');
 }
 
-test('ci workflow runs pull-request verification for backend, web, desktop, and automation jobs', async () => {
+test('ci workflow runs pull-request verification for backend, web, desktop, mobile, and automation jobs', async () => {
   const workflow = await readWorkflow('ci.yml');
 
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /backend:/);
   assert.match(workflow, /web:/);
   assert.match(workflow, /desktop:/);
+  assert.match(workflow, /mobile:/);
   assert.match(workflow, /release-automation:/);
   assert.match(workflow, /npm run ci:platform-admin/);
   assert.match(workflow, /npm run ci:owner-web/);
   assert.match(workflow, /npm run ci:store-desktop/);
+  assert.match(workflow, /npm run ci:store-mobile/);
   assert.match(workflow, /npm run ci:release-automation/);
   assert.match(workflow, /python -m pytest services\/control-plane-api\/tests -q/);
 });
