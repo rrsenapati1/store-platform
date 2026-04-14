@@ -1,0 +1,8 @@
+{
+  "environment": "staging",
+  "control_plane_base_url": "https://staging-control.store.korsenex.local",
+  "updater_endpoint": "https://updates.staging.store.korsenex.local/latest.json",
+  "updater_pubkey": null,
+  "allow_local_control_plane_override": false,
+  "allow_downgrade_updates": false
+}

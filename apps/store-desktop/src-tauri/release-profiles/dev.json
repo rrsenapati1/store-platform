@@ -1,0 +1,8 @@
+{
+  "environment": "dev",
+  "control_plane_base_url": "http://127.0.0.1:8000",
+  "updater_endpoint": null,
+  "updater_pubkey": null,
+  "allow_local_control_plane_override": true,
+  "allow_downgrade_updates": true
+}

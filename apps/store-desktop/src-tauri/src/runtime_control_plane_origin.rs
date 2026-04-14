@@ -1,43 +1,37 @@
-use std::env;
-
-pub(crate) const CONTROL_PLANE_BASE_URL_ENV: &str = "STORE_CONTROL_PLANE_BASE_URL";
-pub(crate) const DEFAULT_CONTROL_PLANE_BASE_URL: &str = "http://127.0.0.1:8000";
-
-fn normalize_base_url(value: &str) -> Option<String> {
-    let normalized = value.trim().trim_end_matches('/');
-    if normalized.is_empty() {
-        return None;
-    }
-    Some(normalized.to_string())
-}
+use crate::runtime_release::{resolve_release_profile, CONTROL_PLANE_BASE_URL_ENV};
 
 pub(crate) fn resolve_control_plane_base_url() -> String {
-    if let Ok(value) = env::var(CONTROL_PLANE_BASE_URL_ENV) {
-        if let Some(normalized) = normalize_base_url(&value) {
-            return normalized;
-        }
-    }
-
-    DEFAULT_CONTROL_PLANE_BASE_URL.to_string()
+    resolve_release_profile()
+        .map(|resolved| resolved.profile.control_plane_base_url)
+        .unwrap_or_else(|_| "http://127.0.0.1:8000".to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime_release::{load_bundled_release_profile, runtime_release_env_test_guard};
+    use std::env;
 
     #[test]
-    fn uses_default_control_plane_base_url_when_env_is_missing() {
+    fn uses_bundled_release_profile_when_env_is_missing() {
+        let _guard = runtime_release_env_test_guard()
+            .lock()
+            .expect("lock release env test guard");
         unsafe {
             env::remove_var(CONTROL_PLANE_BASE_URL_ENV);
         }
+        let bundled = load_bundled_release_profile().expect("load bundled release profile");
         assert_eq!(
             resolve_control_plane_base_url(),
-            DEFAULT_CONTROL_PLANE_BASE_URL.to_string()
+            bundled.control_plane_base_url
         );
     }
 
     #[test]
-    fn trims_whitespace_and_trailing_slash_from_env_override() {
+    fn trims_whitespace_and_trailing_slash_from_local_override() {
+        let _guard = runtime_release_env_test_guard()
+            .lock()
+            .expect("lock release env test guard");
         unsafe {
             env::set_var(CONTROL_PLANE_BASE_URL_ENV, " https://control.acme.local/ ");
         }

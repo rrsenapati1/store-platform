@@ -1,0 +1,8 @@
+{
+  "environment": "prod",
+  "control_plane_base_url": "https://control.store.korsenex.com",
+  "updater_endpoint": "https://updates.store.korsenex.com/latest.json",
+  "updater_pubkey": null,
+  "allow_local_control_plane_override": false,
+  "allow_downgrade_updates": false
+}

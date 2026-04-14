@@ -10,6 +10,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
+    "tauri:build:release": "node ../../scripts/build-store-desktop-release.mjs",
+    "tauri:manifest": "node ../../scripts/generate-store-desktop-update-manifest.mjs",
     "tauri:check": "cargo check --manifest-path src-tauri/Cargo.toml",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

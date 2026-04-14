@@ -2,6 +2,7 @@ use crate::runtime_control_plane_origin::resolve_control_plane_base_url;
 use crate::runtime_hub_identity::{load_hub_identity, runtime_hub_identity_path_for};
 use crate::runtime_hub_service::{clear_runtime_hub_service, ensure_runtime_hub_service};
 use crate::runtime_paths::{resolve_hostname, runtime_cache_db_path, runtime_home_dir};
+use crate::runtime_release::resolve_release_profile;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -23,6 +24,10 @@ pub struct StoreRuntimeShellStatus {
     pub runtime_home: Option<String>,
     pub cache_db_path: Option<String>,
     pub control_plane_base_url: Option<String>,
+    pub release_environment: Option<String>,
+    pub release_profile_source: Option<String>,
+    pub updater_endpoint: Option<String>,
+    pub updater_pubkey_configured: Option<bool>,
     pub hub_service_state: Option<String>,
     pub hub_service_url: Option<String>,
     pub hub_manifest_url: Option<String>,
@@ -39,6 +44,7 @@ fn resolve_runtime_shell_status(
     runtime_home: PathBuf,
     cache_db_path: PathBuf,
 ) -> Result<StoreRuntimeShellStatus, String> {
+    let release_profile = resolve_release_profile()?;
     let installation_id = load_or_create_installation_id(&runtime_home)?;
     let hub_identity = load_hub_identity(&runtime_hub_identity_path_for(&runtime_home))?;
     let hub_service_status = hub_identity
@@ -62,6 +68,10 @@ fn resolve_runtime_shell_status(
         runtime_home: Some(runtime_home.display().to_string()),
         cache_db_path: Some(cache_db_path.display().to_string()),
         control_plane_base_url: Some(resolve_control_plane_base_url()),
+        release_environment: Some(release_profile.profile.environment.clone()),
+        release_profile_source: Some(release_profile.source.as_str().to_string()),
+        updater_endpoint: release_profile.profile.updater_endpoint.clone(),
+        updater_pubkey_configured: Some(release_profile.profile.updater_pubkey.is_some()),
         hub_service_state: hub_service_status.as_ref().map(|status| status.state.clone()),
         hub_service_url: hub_service_status.as_ref().map(|status| status.base_url.clone()),
         hub_manifest_url: hub_service_status.map(|status| status.manifest_url),
@@ -144,7 +154,10 @@ mod tests {
         assert!(first.installation_id.as_deref().is_some_and(|value| value.starts_with("store-runtime-")));
         assert_eq!(first.runtime_home.as_deref(), Some(runtime_home.display().to_string().as_str()));
         assert!(first.cache_db_path.as_deref().is_some_and(|value| value.ends_with("store-runtime-cache.sqlite3")));
-        assert_eq!(first.control_plane_base_url.as_deref(), Some("http://127.0.0.1:8000"));
+        assert!(first.control_plane_base_url.as_deref().is_some());
+        assert!(first.release_environment.as_deref().is_some());
+        assert_eq!(first.release_profile_source.as_deref(), Some("bundled"));
+        assert_eq!(first.updater_pubkey_configured, Some(false));
         assert_eq!(first.hub_service_state, None);
         assert_eq!(first.hub_service_url, None);
         assert_eq!(first.hub_manifest_url, None);

@@ -9,6 +9,7 @@ import { StoreRuntimeCacheSection } from './StoreRuntimeCacheSection';
 import { StoreRuntimeOutboxSection } from './StoreRuntimeOutboxSection';
 import { StoreExchangeSection } from './StoreExchangeSection';
 import { StorePrintQueueSection } from './StorePrintQueueSection';
+import { StoreRuntimeReleaseSection } from './StoreRuntimeReleaseSection';
 import { StoreReturnsSection } from './StoreReturnsSection';
 import { StoreRuntimeShellSection } from './StoreRuntimeShellSection';
 import { StoreSupplierReportingSection } from './StoreSupplierReportingSection';
@@ -52,6 +53,7 @@ export function StoreRuntimeWorkspace() {
       <MetricGrid metrics={metrics} />
 
       <StoreRuntimeShellSection workspace={workspace} />
+      <StoreRuntimeReleaseSection />
       {!isLocalAuthGateActive ? <StoreRuntimeCacheSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreRuntimeOutboxSection workspace={workspace} /> : null}
 

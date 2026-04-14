@@ -15,6 +15,10 @@ export interface StoreRuntimeShellStatus {
   runtime_home: string | null;
   cache_db_path: string | null;
   control_plane_base_url: string | null;
+  release_environment: string | null;
+  release_profile_source: string | null;
+  updater_endpoint: string | null;
+  updater_pubkey_configured: boolean | null;
   hub_service_state: string | null;
   hub_service_url: string | null;
   hub_manifest_url: string | null;
@@ -54,6 +58,10 @@ export function isStoreRuntimeShellStatus(value: unknown): value is StoreRuntime
     && (typeof value.runtime_home === 'string' || value.runtime_home === null)
     && (typeof value.cache_db_path === 'string' || value.cache_db_path === null)
     && (typeof value.control_plane_base_url === 'string' || value.control_plane_base_url === null || typeof value.control_plane_base_url === 'undefined')
+    && (typeof value.release_environment === 'string' || value.release_environment === null || typeof value.release_environment === 'undefined')
+    && (typeof value.release_profile_source === 'string' || value.release_profile_source === null || typeof value.release_profile_source === 'undefined')
+    && (typeof value.updater_endpoint === 'string' || value.updater_endpoint === null || typeof value.updater_endpoint === 'undefined')
+    && (typeof value.updater_pubkey_configured === 'boolean' || value.updater_pubkey_configured === null || typeof value.updater_pubkey_configured === 'undefined')
     && (typeof value.hub_service_state === 'string' || value.hub_service_state === null || typeof value.hub_service_state === 'undefined')
     && (typeof value.hub_service_url === 'string' || value.hub_service_url === null || typeof value.hub_service_url === 'undefined')
     && (typeof value.hub_manifest_url === 'string' || value.hub_manifest_url === null || typeof value.hub_manifest_url === 'undefined');

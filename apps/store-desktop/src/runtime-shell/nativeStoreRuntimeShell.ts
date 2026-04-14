@@ -22,6 +22,10 @@ function toRuntimeShellStatus(value: unknown): StoreRuntimeShellStatus {
     return {
       ...value,
       control_plane_base_url: value.control_plane_base_url ?? DEFAULT_PACKAGED_CONTROL_PLANE_BASE_URL,
+      release_environment: value.release_environment ?? null,
+      release_profile_source: value.release_profile_source ?? null,
+      updater_endpoint: value.updater_endpoint ?? null,
+      updater_pubkey_configured: value.updater_pubkey_configured ?? null,
       hub_service_state: value.hub_service_state ?? null,
       hub_service_url: value.hub_service_url ?? null,
       hub_manifest_url: value.hub_manifest_url ?? null,

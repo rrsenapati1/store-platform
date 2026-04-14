@@ -2,6 +2,24 @@
 
 ## 2026-04-14
 
+- Completed CP-022 on Store Desktop packaging and distribution:
+  - added build-time release profiles for `dev`, `staging`, and `prod` so packaged Store Desktop no longer depends on ad hoc localhost defaults after installation
+  - enabled Windows-first NSIS bundle output plus signed updater artifacts in the Tauri shell configuration
+  - added native updater commands and a dedicated release-channel section in the desktop UI so packaged runtimes can expose release environment, update feed posture, and pending update actions
+  - added release tooling for signed desktop builds and static updater-manifest generation instead of leaving channel publication as a manual one-off process
+  - documented the Windows packaging, publication, and rollback flow in a dedicated runbook
+- Added regression coverage for:
+  - packaged shell release-profile parsing and updater configuration guards in the native shell
+  - desktop release-section updater posture rendering
+  - static updater-manifest generation
+- Verified:
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml --lib`
+  - `node --test scripts/generate-store-desktop-update-manifest.test.mjs`
+  - `node scripts/build-store-desktop-release.mjs --help`
+  - `node scripts/generate-store-desktop-update-manifest.mjs --help`
 - Completed CP-021 on packaged runtime hardware integration:
   - added a dedicated runtime-hardware contract with native and browser adapters instead of hardcoding printer or scanner behavior into the workspace hook
   - added native packaged-runtime persistence and commands for hardware profile, diagnostics, printer discovery, and print dispatch through the Tauri shell
