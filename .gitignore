@@ -79,6 +79,16 @@ dist-ssr/
 *.local
 
 # -----------------------------
+# Android / Gradle
+# -----------------------------
+.gradle/
+*/.gradle/
+local.properties
+*.iml
+.cxx/
+captures/
+
+# -----------------------------
 # Rust / Tauri outputs
 # -----------------------------
 target/
