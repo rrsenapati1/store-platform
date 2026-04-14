@@ -1,0 +1,404 @@
+import type {
+  ControlPlaneActor,
+  ControlPlaneBatchExpiryReport,
+  ControlPlaneBatchExpiryWriteOff,
+  ControlPlaneBarcodeScanLookup,
+  ControlPlaneBranchCatalogItem,
+  ControlPlaneBranchRecord,
+  ControlPlaneBranchCustomerReport,
+  ControlPlaneCustomerDirectoryRecord,
+  ControlPlaneCustomerHistoryResponse,
+  ControlPlaneDeviceRecord,
+  ControlPlaneExchange,
+  ControlPlaneInventorySnapshotRecord,
+  ControlPlanePrintJob,
+  ControlPlaneRuntimeDeviceClaimResolution,
+  ControlPlaneRuntimeHeartbeat,
+  ControlPlaneSale,
+  ControlPlaneSaleRecord,
+  ControlPlaneSaleReturn,
+  ControlPlaneSession,
+  ControlPlaneSupplierAgingReport,
+  ControlPlaneSupplierDueScheduleReport,
+  ControlPlaneSupplierEscalationReport,
+  ControlPlaneSupplierExceptionReport,
+  ControlPlaneSupplierPaymentActivityReport,
+  ControlPlaneSupplierPayablesReport,
+  ControlPlaneSupplierPerformanceReport,
+  ControlPlaneSupplierSettlementBlockerReport,
+  ControlPlaneSupplierSettlementReport,
+  ControlPlaneSupplierStatementReport,
+  ControlPlaneSyncConflictRecord,
+  ControlPlaneSyncEnvelopeRecord,
+  ControlPlaneSyncStatus,
+  ControlPlaneTenant,
+  ControlPlaneVendorDisputeBoard,
+} from '@store/types';
+import { normalizeScannedBarcode } from '@store/barcode';
+
+export class ControlPlaneRequestError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`Control-plane request failed with status ${status}`);
+    this.name = 'ControlPlaneRequestError';
+    this.status = status;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new ControlPlaneRequestError(response.status);
+  }
+
+  return (await response.json()) as T;
+}
+
+export const storeControlPlaneClient = {
+  exchangeSession(token: string) {
+    return request<ControlPlaneSession>('/v1/auth/oidc/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+  getActor(accessToken: string) {
+    return request<ControlPlaneActor>('/v1/auth/me', undefined, accessToken);
+  },
+  getTenantSummary(accessToken: string, tenantId: string) {
+    return request<ControlPlaneTenant>(`/v1/tenants/${tenantId}`, undefined, accessToken);
+  },
+  listBranches(accessToken: string, tenantId: string) {
+    return request<{ records: ControlPlaneBranchRecord[] }>(`/v1/tenants/${tenantId}/branches`, undefined, accessToken);
+  },
+  listBranchCatalogItems(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneBranchCatalogItem[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/catalog-items`,
+      undefined,
+      accessToken,
+    );
+  },
+  lookupCatalogScan(accessToken: string, tenantId: string, branchId: string, barcode: string) {
+    const normalizedBarcode = normalizeScannedBarcode(barcode);
+    return request<ControlPlaneBarcodeScanLookup>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/catalog-scan/${encodeURIComponent(normalizedBarcode)}`,
+      undefined,
+      accessToken,
+    );
+  },
+  listInventorySnapshot(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneInventorySnapshotRecord[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/inventory-snapshot`,
+      undefined,
+      accessToken,
+    );
+  },
+  getBatchExpiryReport(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneBatchExpiryReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierPayablesReport(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierPayablesReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-payables-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierAgingReport(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierAgingReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-aging-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierStatements(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierStatementReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-statements`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierDueSchedule(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierDueScheduleReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-due-schedule`,
+      undefined,
+      accessToken,
+    );
+  },
+  getVendorDisputeBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneVendorDisputeBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/vendor-dispute-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierExceptionReport(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierExceptionReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-exception-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierSettlementReport(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierSettlementReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-settlement-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierSettlementBlockers(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierSettlementBlockerReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-settlement-blockers`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierEscalationReport(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierEscalationReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-escalation-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierPerformanceReport(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierPerformanceReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-performance-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getSupplierPaymentActivity(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSupplierPaymentActivityReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/supplier-payment-activity`,
+      undefined,
+      accessToken,
+    );
+  },
+  createBatchExpiryWriteOff(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    batchLotId: string,
+    payload: { quantity: number; reason: string },
+  ) {
+    return request<ControlPlaneBatchExpiryWriteOff>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-lots/${batchLotId}/expiry-write-offs`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  listSales(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneSaleRecord[] }>(`/v1/tenants/${tenantId}/branches/${branchId}/sales`, undefined, accessToken);
+  },
+  listCustomers(accessToken: string, tenantId: string, query?: string) {
+    const queryParam = query ? `?query=${encodeURIComponent(query)}` : '';
+    return request<{ records: ControlPlaneCustomerDirectoryRecord[] }>(
+      `/v1/tenants/${tenantId}/customers${queryParam}`,
+      undefined,
+      accessToken,
+    );
+  },
+  getCustomerHistory(accessToken: string, tenantId: string, customerId: string) {
+    return request<ControlPlaneCustomerHistoryResponse>(
+      `/v1/tenants/${tenantId}/customers/${customerId}/history`,
+      undefined,
+      accessToken,
+    );
+  },
+  getBranchCustomerReport(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneBranchCustomerReport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/customer-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getRuntimeSyncStatus(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneSyncStatus>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/sync-status`,
+      undefined,
+      accessToken,
+    );
+  },
+  listRuntimeSyncConflicts(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneSyncConflictRecord[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/sync-conflicts`,
+      undefined,
+      accessToken,
+    );
+  },
+  listRuntimeSyncEnvelopes(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneSyncEnvelopeRecord[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/sync-envelopes`,
+      undefined,
+      accessToken,
+    );
+  },
+  listRuntimeDevices(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneDeviceRecord[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/devices`,
+      undefined,
+      accessToken,
+    );
+  },
+  resolveRuntimeDeviceClaim(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      installation_id: string;
+      runtime_kind: string;
+      hostname?: string | null;
+      operating_system?: string | null;
+      architecture?: string | null;
+      app_version?: string | null;
+    },
+  ) {
+    return request<ControlPlaneRuntimeDeviceClaimResolution>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/device-claim`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  createSale(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      customer_name: string;
+      customer_gstin?: string | null;
+      payment_method: string;
+      lines: Array<{ product_id: string; quantity: number }>;
+    },
+  ) {
+    return request<ControlPlaneSale>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/sales`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  queueSaleInvoicePrintJob(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    saleId: string,
+    payload: { device_id: string; copies: number },
+  ) {
+    return request<ControlPlanePrintJob>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/print-jobs/sales/${saleId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  createSaleReturn(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    saleId: string,
+    payload: {
+      refund_amount: number;
+      refund_method: string;
+      lines: Array<{ product_id: string; quantity: number }>;
+    },
+  ) {
+    return request<ControlPlaneSaleReturn>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/sales/${saleId}/returns`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  queueSaleReturnPrintJob(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    saleReturnId: string,
+    payload: { device_id: string; copies: number },
+  ) {
+    return request<ControlPlanePrintJob>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/print-jobs/sale-returns/${saleReturnId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  createExchange(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    saleId: string,
+    payload: {
+      settlement_method: string;
+      return_lines: Array<{ product_id: string; quantity: number }>;
+      replacement_lines: Array<{ product_id: string; quantity: number }>;
+    },
+  ) {
+    return request<ControlPlaneExchange>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/sales/${saleId}/exchanges`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  heartbeatRuntimeDevice(accessToken: string, tenantId: string, branchId: string, deviceId: string) {
+    return request<ControlPlaneRuntimeHeartbeat>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/devices/${deviceId}/heartbeat`,
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  listRuntimePrintJobs(accessToken: string, tenantId: string, branchId: string, deviceId: string) {
+    return request<{ records: ControlPlanePrintJob[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/devices/${deviceId}/print-jobs`,
+      undefined,
+      accessToken,
+    );
+  },
+  completeRuntimePrintJob(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    deviceId: string,
+    printJobId: string,
+    payload: { status: string; failure_reason?: string | null },
+  ) {
+    return request<ControlPlanePrintJob>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime/devices/${deviceId}/print-jobs/${printJobId}/complete`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+};

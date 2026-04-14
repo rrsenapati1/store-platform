@@ -1,0 +1,174 @@
+# -----------------------------
+# OS / Editor
+# -----------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# -----------------------------
+# Environment files
+# -----------------------------
+.env
+.env.*
+!.env.example
+!apps/**/.env.example
+!services/**/.env.example
+
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+pyvenv.cfg
+.python-version
+.pytest_cache/
+.pytest_tmp/
+**/.pytest_tmp/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+build/
+dist/
+site/
+
+# -----------------------------
+# Node / JavaScript / TypeScript
+# -----------------------------
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.tsbuildinfo
+.vite/
+.parcel-cache/
+.turbo/
+.nx/
+.eslintcache
+coverage/
+dist/
+dist-ssr/
+*.local
+
+# -----------------------------
+# Rust / Tauri outputs
+# -----------------------------
+target/
+/target-codex*/
+**/src-tauri/target/
+**/src-tauri/target-*/
+**/target-tests/
+**/src-tauri/target-tests/
+
+# -----------------------------
+# Databases and local runtime data
+# -----------------------------
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.duckdb
+*.wal
+*.shm
+
+# -----------------------------
+# Logs / temp / runtime artifacts
+# -----------------------------
+*.log
+logs/
+*.out
+*.err
+*.pid
+*.pid.lock
+*.seed
+*.stackdump
+*.tmp
+*.temp
+*.bak
+*.orig
+*.orig.*
+.tmp/
+**/.tmp/
+tmp/
+.verification-tmp/
+**/.verification-tmp/
+.tmp-tests/
+**/.tmp-tests/
+.codex-artifacts/
+
+# -----------------------------
+# Docker / Terraform
+# -----------------------------
+.docker/
+docker-data/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+!*.tfvars.example
+
+# -----------------------------
+# Secrets / certificates
+# -----------------------------
+.secrets/
+secrets/
+**/secrets/
+**/*secret*.json
+**/*credentials*.json
+**/*service-account*.json
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+*.p8
+
+# -----------------------------
+# Extra private/local artifacts
+# -----------------------------
+*.secret
+*.private
+*.local.json
+*.local.yaml
+*.local.yml
+*.local.toml
+*.local.ini
+*.local.env
+.codex/
+.worktrees/

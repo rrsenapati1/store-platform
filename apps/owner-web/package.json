@@ -1,0 +1,20 @@
+{
+  "name": "@store/owner-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@store/auth": "*",
+    "@store/barcode": "*",
+    "@store/printing": "*",
+    "@store/types": "*",
+    "@store/ui": "*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}

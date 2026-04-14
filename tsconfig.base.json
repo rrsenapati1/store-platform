@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "declaration": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@store/auth": ["packages/auth/src/index.ts"],
+      "@store/barcode": ["packages/barcode/src/index.ts"],
+      "@store/printing": ["packages/printing/src/index.ts"],
+      "@store/sync": ["packages/sync/src/index.ts"],
+      "@store/types": ["packages/types/src/index.ts"],
+      "@store/ui": ["packages/ui/src/index.tsx"]
+    }
+  }
+}

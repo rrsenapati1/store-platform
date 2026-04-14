@@ -1,0 +1,466 @@
+# Store Worklog
+
+## 2026-04-14
+
+- Completed CP-015 on local runtime outbox continuity:
+  - added a dedicated `runtimeOutbox` module in `apps/store-desktop` so non-authoritative runtime actions can be queued and replayed without inflating the main workspace hook
+  - kept the boundary narrow to degraded runtime heartbeats and invoice or credit-note print requests instead of pretending offline business writes are authoritative
+  - surfaced a dedicated runtime outbox section for branch staff so queued replay posture is visible and manually replayable from a live session
+  - persisted queued runtime actions inside the existing runtime-cache contract so browser and packaged shells share the same non-authoritative continuity rule
+- Added regression coverage for:
+  - queueing a degraded runtime heartbeat into the local outbox and replaying it on recovery
+  - queueing a degraded invoice-print request into the local outbox and replaying it back into the control-plane print queue
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.outbox.test.tsx`
+- Completed CP-014 on packaged runtime approved claim-and-bind:
+  - added a control-plane `device_claims` ledger plus installation binding on branch device registrations so packaged shells can stay unbound until approval
+  - added a packaged runtime claim resolve route for branch staff and owner approval routes for branch-scoped claim review and approval
+  - added a dedicated owner-web packaged device-claim section instead of pushing more device-approval state into the existing owner workspace hook
+  - updated store-desktop to resolve packaged-shell claims from its installation fingerprint and only auto-select a runtime device after approval
+  - surfaced claim code and binding posture in the packaged shell identity section so pending vs approved packaged terminals are visible before runtime actions
+- Added regression coverage for:
+  - backend packaged runtime claim-to-approval flow
+  - owner-web packaged claim approval workflow
+  - store-desktop pending-claim binding guardrail
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_device_claim_binding_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerDeviceClaimSection.test.tsx`
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.binding.test.tsx`
+- Completed CP-013 on packaged runtime shell identity and host-health visibility:
+  - added a dedicated `runtime-shell` TypeScript boundary for packaged-vs-browser shell status instead of folding native-shell facts into the runtime-cache adapter or workspace hook
+  - added native Tauri shell-status commands for packaged runtime identity, stable installation fingerprint, host metadata, runtime home, and cache-db path visibility
+  - surfaced a read-only shell identity section in store-desktop so operators can distinguish browser fallback from packaged runtime posture before any session or device action
+  - kept the authority rule explicit by exposing packaged-shell facts only; no local device registration, branch mutation, or backend authority moved into the native shell
+- Added regression coverage for:
+  - browser-vs-native shell adapter resolution
+  - browser shell identity rendering in the store runtime workspace
+  - Rust packaged-shell installation fingerprint stability
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- src/runtime-shell/storeRuntimeShellAdapter.test.ts`
+  - `npm run test --workspace @store/store-desktop -- src/control-plane/StoreRuntimeWorkspace.shell.test.tsx`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml runtime_shell -- --nocapture`
+- Completed CP-012 on the packaged store-desktop runtime shell foundation:
+  - split the runtime-cache boundary into dedicated contract, browser adapter, native adapter, and resolver modules instead of keeping browser storage hardcoded in the runtime hook
+  - added `apps/store-desktop/src-tauri/` with a first Tauri shell, a SQLite-backed runtime-cache store, and explicit cache load/save/clear/status commands
+  - kept the authority rule explicit by validating `CONTROL_PLANE_ONLY` snapshots on both TypeScript and Rust sides and deleting malformed cached payloads instead of trusting them
+  - surfaced active cache backend and persistence location in the store runtime UI so packaged vs web-shell posture is visible to operators and reviewers
+  - added a shell-local README and reused the RMS baseline icon set so the new native shell has an explicit run path and passes Windows Tauri resource generation
+- Added regression coverage for:
+  - browser runtime-cache round-trip and persistence metadata
+  - native-vs-browser adapter resolution
+  - cached-runtime hydration after the adapter boundary became async
+  - Rust SQLite runtime-cache persistence and malformed-snapshot cleanup
+- Verified:
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml runtime_cache -- --nocapture`
+  - `cargo check --manifest-path apps/store-desktop/src-tauri/Cargo.toml`
+- Completed CP-011F on the control-plane barcode print runtime boundary:
+  - extended the control-plane runtime print domain to queue branch-priced barcode label jobs onto active runtime devices
+  - kept the owner surface modular with a dedicated barcode print runtime section instead of expanding the onboarding workspace hook again
+  - updated store-desktop print queue rendering so barcode label jobs render meaningful payload summaries instead of assuming invoice-only fields
+  - removed the final `barcode_print_runtime` legacy authority entry and updated the legacy cutover matcher so old barcode print writes are blocked in cutover mode
+  - extended the control-plane smoke verifier to enqueue barcode label jobs through the new runtime route
+- Added regression coverage for:
+  - backend barcode print runtime flow on the new control plane
+  - owner-web barcode label queue workflow
+  - store-desktop barcode print queue rendering
+  - control-plane authority-boundary publication with no remaining legacy operational domains
+  - legacy cutover blocking for old barcode print writes
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_barcode_foundation_flow.py services/control-plane-api/tests/test_barcode_print_runtime_flow.py services/control-plane-api/tests/test_authority_boundary.py -q`
+  - `python -m pytest services/api/tests/test_authority_cutover.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.barcode.test.tsx OwnerBarcodePrintRuntimeSection.test.tsx`
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.print.test.tsx StorePrintQueueSection.barcode.test.tsx`
+  - `npm run typecheck`
+- Completed CP-011E on the control-plane supplier reporting and hub sync-runtime boundary:
+  - added dedicated control-plane sync-runtime auth, models, repository, service, schema, and route modules for hub heartbeat, push, pull, conflict capture, and monitoring reads
+  - moved supplier reporting authority to the control plane for aging, statements, due schedule, dispute board, exception, settlement, blocker, escalation, performance, and payment-activity reporting
+  - extended owner-web with dedicated supplier reporting and sync-monitoring sections instead of expanding the owner workspace hook again
+  - extended store-desktop with read-only supplier reporting and sync-monitoring sections for branch staff posture visibility
+  - updated the authority contract and legacy cutover matcher so migrated supplier reporting and sync runtime writes are blocked on the legacy API
+- Added regression coverage for:
+  - backend hub sync flow, monitoring endpoints, and non-hub rejection
+  - control-plane authority-boundary publication for migrated supplier reporting and sync runtime domains
+  - legacy cutover blocking for migrated supplier reporting and sync runtime writes
+  - owner-web supplier reporting and sync monitoring workflows
+  - store-desktop read-only supplier reporting and sync monitoring workflows
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_sync_runtime_flow.py services/control-plane-api/tests/test_staff_device_foundation_flow.py services/control-plane-api/tests/test_authority_boundary.py -q`
+  - `python -m pytest services/api/tests/test_authority_cutover.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerSyncRuntimeSection.test.tsx OwnerSupplierReportingSection.test.tsx`
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.sync-runtime.test.tsx StoreSupplierReportingSection.test.tsx`
+  - `npm run typecheck`
+- Completed CP-011D on the control-plane customer reporting boundary:
+  - added dedicated customer reporting repository, service, schema, and routes for tenant directory, customer history, and branch customer report reads
+  - kept reporting data read-only by deriving it from control-plane sales, returns, and exchange orders without adding new persistence
+  - extended owner-web with a customer insights section and store-desktop with a read-only customer insights section
+  - updated authority cutover classification so legacy customer reporting writes are blocked in cutover mode
+  - extended the control-plane smoke verifier to read customer directory, history, and branch report posture
+- Added regression coverage for:
+  - backend customer reporting flow on the new control plane
+  - owner-web customer insights workflow
+  - store-desktop customer insights workflow
+  - legacy cutover blocking for customer-reporting writes
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_customer_reporting_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerCustomerInsightsSection.test.tsx App.test.tsx`
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.customers.test.tsx`
+- Completed CP-011C on the control-plane compliance boundary:
+  - added modular compliance models, repository, policy, service, schema, and route modules instead of burying export logic inside billing or the legacy API
+  - moved sales-invoice GST export job creation, GST export queue reads, and IRN attachment posting onto the new control plane
+  - kept owner-web modular by adding a dedicated compliance section with local state instead of growing the existing workspace hook again
+  - updated the authority contract so migrated legacy compliance writes are classified explicitly and no longer remain in the legacy-only list
+- Added regression coverage for:
+  - backend compliance export and IRN attachment flow on the new control plane
+  - owner-web compliance export workflow
+  - control-plane authority-boundary publication for migrated compliance exports
+  - legacy cutover blocking for migrated legacy compliance writes
+  - control-plane smoke verification now exercising GST export creation and IRN attachment before runtime print queueing
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests/test_authority_cutover.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerComplianceSection.test.tsx App.test.tsx`
+  - `python services/control-plane-api/scripts/verify_control_plane.py`
+    - smoke summary now includes compliance posture `IRN_ATTACHED`, `IRN-SMOKE-001`, `ACMETEACLASSIC`, `Rs. 92.50`, `Classic Tea`, `GRN-BLRFLAGSHIP-0001`, `SINV-BLRFLAGSHIP-0001`, queued print jobs `1`, heartbeat jobs `1`, stock `19.0`, ledger `PURCHASE_RECEIPT,EXPIRY_WRITE_OFF,SALE,CUSTOMER_RETURN`
+    - verifier completed successfully with the pre-existing non-fatal `--localstorage-file` Node warnings and Windows asyncpg shutdown warning still present after success
+- Completed CP-011B on the control-plane batch and expiry boundary:
+  - added modular batch repository, policy, service, schema, and route modules instead of burying expiry logic inside inventory or billing
+  - moved goods-receipt batch-lot intake, branch batch-expiry reporting, and expiry write-off posting onto the new control plane
+  - extended owner-web with a dedicated batch expiry section and kept `useOwnerWorkspace.ts` under the large-file governance threshold by extracting inventory and batch action helpers
+  - extended store-desktop with a dedicated branch batch-expiry section on the new control plane
+  - updated the authority contract so migrated legacy batch writes are classified explicitly and no longer remain in the legacy-only list
+- Added regression coverage for:
+  - batch intake and expiry policy helpers
+  - backend batch and expiry flow on the new control plane
+  - owner-web batch-lot intake and expiry write-off workflow
+  - store-desktop batch expiry visibility and write-off workflow
+  - control-plane authority-boundary publication for migrated batch tracking
+  - legacy cutover headers for migrated legacy batch-tracking writes
+  - control-plane smoke verification now exercising batch-lot intake and expiry write-off
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests/test_authority_cutover.py -q`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+  - `docker compose -f services/control-plane-api/compose.yaml up -d postgres`
+  - `python services/control-plane-api/scripts/verify_control_plane.py`
+    - smoke summary `ACMETEACLASSIC`, `Rs. 92.50`, `Classic Tea`, `GRN-BLRFLAGSHIP-0001`, tracked lots `2`, expiring lots `1`, `SINV-BLRFLAGSHIP-0001`, queued print jobs `1`, heartbeat jobs `1`, stock `19.0`, ledger `PURCHASE_RECEIPT,EXPIRY_WRITE_OFF,SALE,CUSTOMER_RETURN`
+    - verifier completed successfully with the pre-existing non-fatal `--localstorage-file` Node warnings and Windows asyncpg shutdown warning still present after success
+- Completed CP-011A on the control-plane barcode boundary:
+  - added modular barcode repository, policy, service, schema, and route modules instead of burying barcode behavior inside catalog or billing
+  - moved catalog barcode allocation, branch scan lookup, and branch label preview onto the new control plane
+  - extended owner-web with a dedicated barcode operations section and kept `useOwnerWorkspace.ts` under the large-file governance threshold by extracting catalog, onboarding, membership, and procurement action helpers
+  - extended store-desktop with a dedicated counter scan-lookup section on the new control plane
+  - updated the authority contract so migrated legacy barcode foundation writes are classified explicitly instead of being left as tribal knowledge
+- Added regression coverage for:
+  - backend barcode foundation flow on the new control plane
+  - owner-web barcode allocation and label-preview workflow
+  - store-desktop barcode scan lookup workflow
+  - control-plane authority-boundary publication for the barcode foundation
+  - legacy cutover headers for migrated legacy barcode foundation writes
+  - control-plane smoke verification now exercising barcode allocation, label preview, and branch scan lookup
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_barcode_foundation_flow.py -q`
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests/test_authority_cutover.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.barcode.test.tsx`
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.barcode.test.tsx`
+  - `python services/control-plane-api/scripts/verify_control_plane.py`
+    - smoke summary `ACMETEACLASSIC`, `Rs. 92.50`, `Classic Tea`, `GRN-BLRFLAGSHIP-0001`, `SINV-BLRFLAGSHIP-0001`, queued print jobs `1`, heartbeat jobs `1`, stock `21.0`, ledger `PURCHASE_RECEIPT,SALE,CUSTOMER_RETURN`
+    - verifier completed successfully with the pre-existing non-fatal `--localstorage-file` Node warnings and Windows asyncpg shutdown warning still present after success
+- Completed CP-008D on the control-plane procurement-finance boundary:
+  - `purchase_invoices`, `purchase_invoice_lines`, `supplier_returns`, `supplier_return_lines`, and `supplier_payments` models
+  - dedicated procurement-finance repository, policy, service, schema, and router modules instead of growing `purchasing.py` or `inventory.py`
+  - goods-receipt to purchase-invoice conversion with duplicate-invoice blocking
+  - supplier return credit-note posting with `SUPPLIER_RETURN` inventory-ledger entries
+  - supplier payment posting with outstanding-balance guardrails
+  - supplier payables report on the new control plane
+- Extended the owner workspace to manage:
+  - purchase-invoice creation from the latest goods receipt
+  - supplier return creation from the latest purchase invoice
+  - supplier payment recording from the same purchase-invoice context
+  - supplier payables visibility from the new control-plane report
+- Extracted procurement-finance owner actions into a dedicated helper module so `useOwnerWorkspace.ts` stays under the large-file governance threshold instead of turning into another mixed-responsibility file.
+- Added regression coverage for:
+  - backend procurement-finance flow on the new control plane
+  - owner-web procurement-finance workflow
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_procurement_finance_flow.py -q`
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.procurement-finance.test.tsx`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+  - `docker compose -f services/control-plane-api/compose.yaml up -d postgres`
+  - `alembic upgrade head`
+  - live Postgres + HTTP smoke:
+    - auth exchange
+    - tenant and branch setup
+    - catalog, supplier, purchase order, approval, and goods receipt
+    - purchase invoice creation
+    - supplier return creation
+    - supplier payment recording
+    - supplier payables report verification
+    - inventory snapshot and ledger verification
+    - smoke summary `POSTGRES_CP008D_SMOKE_OK SPINV-2627-000001 SRCN-2627-000001 SPAY-2627-000001 95.0 5.0 PURCHASE_RECEIPT,SUPPLIER_RETURN`
+  - `python -m pytest services/api/tests -q`
+    - `100 passed, 5 failed`
+    - failures remain in legacy-only tests outside the new control-plane procurement-finance slice:
+      - `test_suspended_tenant_blocks_store_operations_until_reactivated`
+      - `test_supplier_due_schedule_reports_overdue_and_upcoming_vendor_dues`
+      - `test_supplier_escalation_report_prioritizes_finance_owner_stale_and_branch_follow_up`
+      - `test_supplier_payment_run_reports_vendor_release_priority`
+      - `test_supplier_settlement_blockers_report_flags_disputed_suppliers_with_due_exposure`
+
+## 2026-04-13
+
+- Established the canonical docs spine for the repo so architecture, contracts, and reset work are tracked in-repo instead of only in chat.
+- Approved the side-by-side enterprise reset strategy instead of an in-place rewrite.
+- Approved Milestone 1 boundary:
+  - onboarding and branch setup only
+  - Postgres and Alembic foundation
+  - Korsenex IDP as authentication authority
+  - platform-admin and owner-web onboarding flows
+  - no purchasing, billing, GST, or runtime migration in this milestone
+- Recorded the reset program and immediate tasks in `docs/TASK_LEDGER.md`.
+- Implemented the new side-by-side `services/control-plane-api/` package with:
+  - async SQLAlchemy session factory
+  - modular repositories, services, schemas, dependencies, and route packages
+  - stub Korsenex exchange boundary for development and test
+  - durable tenant, branch, membership, role, audit, and app-session models
+- Added an Alembic baseline for the control-plane schema so the Postgres path is explicit instead of being implied by `create_all`.
+- Replaced the static `apps/platform-admin/` shell with an API-driven onboarding workspace for:
+  - session exchange
+  - tenant listing
+  - tenant creation
+  - owner invite dispatch
+- Replaced the static `apps/owner-web/` shell with an API-driven onboarding workspace for:
+  - owner session bootstrap
+  - tenant summary and onboarding state
+  - first-branch creation
+  - tenant and branch membership assignment
+  - audit feed visibility
+- Added regression tests for:
+  - control-plane auth exchange
+  - Milestone 1 onboarding backend flow
+  - platform-admin onboarding UI flow
+  - owner onboarding UI flow
+- Replaced the stub-only Korsenex boundary with a JWKS-backed validation path:
+  - configurable issuer, audience, algorithms, cache TTL, and request timeout
+  - stub mode retained only for tests and isolated local fallback
+- Added control-plane local operations scaffolding:
+  - `.env.example`
+  - `compose.yaml` for Postgres
+  - service-local `README.md`
+- Corrected Alembic to use async SQLAlchemy engine wiring so `asyncpg` migrations run cleanly instead of depending on a synchronous placeholder setup.
+- Fixed a package import cycle that blocked real migration execution by trimming `store_control_plane.db.__init__` back to a single responsibility.
+- Started Milestone 2 with the first control-plane domain slice beyond onboarding:
+  - `staff_profiles` model and repository
+  - membership-linked staff directory reads
+  - branch `device_registrations` model and repository
+  - dedicated `workforce` service and router instead of expanding `routes/tenants.py`
+- Extended the owner workspace to manage:
+  - staff profile bootstrap
+  - branch device registration
+  - live staff/device read models from the control plane
+- Added regression coverage for the new staff/device control-plane flow.
+- Added the next Milestone 2 catalog slice to the control plane:
+  - `catalog_products` model and repository
+  - `branch_catalog_items` model and repository
+  - dedicated `catalog` service and router instead of expanding `routes/tenants.py`
+- Extended the owner workspace to manage:
+  - central catalog product creation
+  - branch catalog assignment with optional price override
+  - live central and branch catalog read models from the control plane
+- Expanded the control-plane role map so `tenant_owner` behaves like real tenant authority and `catalog_admin` has actual catalog capabilities.
+- Added regression coverage for the new catalog control-plane flow in both backend and owner-web UI tests.
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests -q`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+- Completed CP-009D on the runtime orchestration boundary:
+  - `print_jobs` model and migration
+  - dedicated runtime repository, service, schemas, and routes instead of pushing print orchestration into billing modules
+  - runtime device heartbeat, queued print-job list, and print-job completion routes
+  - invoice and credit-note print-job queueing owned by the new control plane
+- Extended the runtime surface to manage:
+  - branch runtime device selection
+  - runtime device heartbeat
+  - invoice print queueing after checkout
+  - credit-note print queueing after sale return
+  - queued-print-job refresh and completion posture
+- Fixed store runtime UI regression fixtures to account for the new runtime-device bootstrap fetch before queue actions run.
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests -q`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+  - `docker compose -f services/control-plane-api/compose.yaml up -d postgres`
+  - `alembic upgrade head`
+  - live Postgres + HTTP smoke:
+    - auth exchange
+    - tenant and branch setup
+    - catalog, supplier, PO, approval, and receipt
+    - branch device registration and heartbeat
+    - cashier sale creation
+    - invoice print-job queue
+    - cashier sale return creation
+    - credit-note print-job queue
+    - device print queue polling and completion
+  - `docker compose -f services/control-plane-api/compose.yaml down -v`
+- Completed CP-009E on the runtime continuity boundary:
+  - dedicated `apps/store-desktop/src/runtime-cache/` module instead of burying cache rules inside the runtime workspace
+  - cache snapshot contract with explicit `CONTROL_PLANE_ONLY` authority semantics
+  - cache hydration before live session bootstrap and authoritative rewrite after control-plane refresh
+  - action guards so cached state alone cannot create sales, returns, exchanges, print jobs, or heartbeat completions
+  - dedicated runtime cache section in the store runtime UI so the local-authority rule is visible
+- Added regression coverage for:
+  - cache adapter round-trip and malformed-payload rejection
+  - cached-runtime hydration and authoritative rewrite in the store runtime workspace
+- Verified:
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+  - `python -m pytest services/api/tests -q`
+    - surfaced unrelated pre-existing legacy supplier-flow failures outside the CP-009E frontend-only change set
+- Started Task 4 hardening on the control-plane verification boundary:
+  - added `store_control_plane.verification` as a testable smoke module instead of leaving integration checks as ad hoc terminal history
+  - added `scripts/verify_control_plane.py` to orchestrate Alembic, backend tests, app-flow tests, workspace typecheck/build, and the live control-plane smoke
+  - added a dedicated `docs/runbooks/control-plane-verification.md` runbook and linked the service README/dev workflow to it
+- Added regression coverage for:
+  - the control-plane smoke path across platform-admin, owner, cashier, runtime device, print queue, and inventory ledger boundaries
+- Verified:
+  - `python services/control-plane-api/scripts/verify_control_plane.py --database-url sqlite+aiosqlite:///... --skip-alembic --skip-frontend-tests --skip-typecheck --skip-build`
+    - `31 passed`
+    - smoke summary returned `GRN-BLRFLAGSHIP-0001`, `SINV-BLRFLAGSHIP-0001`, queued job count `1`, heartbeat job count `1`, and ledger `PURCHASE_RECEIPT,SALE,CUSTOMER_RETURN`
+  - `npm run test --workspace @store/platform-admin`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck`
+  - `npm run build`
+- Completed CP-010B on the authority boundary:
+  - added `GET /v1/system/authority-boundary` on the control plane so migrated and legacy-only domains are published from one explicit contract
+  - added legacy retail API authority middleware instead of leaving cutover behavior as tribal knowledge in docs only
+  - legacy migrated-domain writes now emit deprecation headers in `shadow` mode and return `410` in `cutover` mode
+  - added a dedicated `docs/runbooks/legacy-authority-cutover.md` operator runbook
+- Added regression coverage for:
+  - control-plane authority-boundary contract publication
+  - legacy deprecation headers and cutover blocking for migrated writes
+- Hardened the control-plane verifier path so Task 4 can close cleanly:
+  - replaced control-plane pytest `tmp_path` database usage with a repo-local SQLite test-db helper to avoid Windows temp cleanup failures
+  - made the live Postgres smoke use a unique tenant slug per run so `verify_control_plane.py` is rerunnable against the same database
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests/test_authority_cutover.py -q`
+  - `python services/control-plane-api/scripts/verify_control_plane.py`
+  - `docker compose -f services/control-plane-api/compose.yaml down -v`
+- Added the first procurement slice to the control plane:
+  - `suppliers`, `purchase_orders`, and `purchase_order_lines` models
+  - dedicated `purchasing` repository, service, schema, and router modules
+  - branch-scoped purchase approval reporting under the new control plane
+- Extended the owner workspace to manage:
+  - supplier master creation
+  - purchase-order creation from control-plane supplier and catalog records
+  - purchase-order approval submission and approval feedback
+- Added regression coverage for:
+  - backend procurement foundation flow
+  - owner-web procurement foundation flow
+- Added the first inventory slice to the control plane:
+  - `goods_receipts`, `goods_receipt_lines`, and `inventory_ledger_entries` models
+  - dedicated `inventory` repository, policy, service, schema, and router modules
+  - approved purchase-order receipt creation with duplicate-GRN protection
+  - receiving board, goods-receipt list, inventory ledger, and inventory snapshot read models
+- Extended the owner workspace to manage:
+  - goods-receipt creation from approved purchase orders
+  - receiving-board visibility
+  - inventory ledger and inventory snapshot visibility
+- Added regression coverage for:
+  - inventory policy helper behavior
+  - backend receiving foundation flow
+  - owner-web receiving foundation flow
+- Extended the control-plane inventory slice with:
+  - stock adjustment posting
+  - stock count posting
+  - branch transfer creation
+  - transfer-board read models
+  - append-only `ADJUSTMENT`, `COUNT_VARIANCE`, `TRANSFER_OUT`, and `TRANSFER_IN` ledger posting
+- Extended the owner workspace to manage:
+  - branch stock adjustments
+  - branch stock counts
+  - branch-to-branch transfers
+  - transfer-board visibility
+- Added regression coverage for:
+  - inventory control policy helpers
+  - backend adjustment/count/transfer flow
+  - owner-web inventory control flow
+- Started CP-009 with the first billing slice on the new control plane:
+  - `sales`, `sale_lines`, `sales_invoices`, `invoice_tax_lines`, and `payments` models
+  - dedicated `billing` repository, policy, service, schema, and router modules
+  - GST invoice numbering and intra/inter-state tax-line derivation
+  - cashier branch-capability guards for checkout and runtime reads
+- Replaced the static `apps/store-desktop/` placeholder with an API-driven runtime workspace for:
+  - cashier session bootstrap
+  - branch catalog-backed checkout
+  - GST invoice creation
+  - sales register visibility
+  - live inventory snapshot refresh after sale
+- Added regression coverage for:
+  - billing policy helpers
+  - backend billing foundation flow
+  - store-desktop billing runtime flow
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests -q`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+- Completed CP-009B on the new billing boundary:
+  - `sale_returns`, `sale_return_lines`, `credit_notes`, and `credit_note_tax_lines` models
+  - dedicated sale-return policy helpers for refund guardrails and credit-note numbering
+  - cashier-facing sale-return creation and owner-facing refund approval routes
+  - append-only `CUSTOMER_RETURN` inventory ledger posting on refund creation
+- Extended the runtime and owner surfaces to manage:
+  - store-desktop customer return creation after checkout
+  - owner-web refund approval and latest approved refund visibility
+- Fixed the control-plane bootstrap path so temporary database bootstrap work does not reuse the long-lived async engine across event loops.
+- Fixed runtime and owner UI tests to use contract-safe queries after invoice and credit-note identifiers began appearing in more than one rendered location.
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests -q`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+  - `docker compose -f services/control-plane-api/compose.yaml up -d postgres`
+  - `alembic upgrade head`
+  - live Postgres + HTTP smoke:
+    - auth exchange
+    - tenant and branch setup
+    - catalog, supplier, PO, approval, and receipt
+  - cashier sale creation
+  - cashier sale return creation
+  - owner refund approval
+  - inventory snapshot and ledger verification
+- Completed CP-009C on the new billing boundary:
+  - `exchange_orders` model and migration
+  - dedicated exchange-settlement policy helpers for exchange-credit allocation and balance-direction derivation
+  - cashier-facing exchange creation route that composes sale return, replacement sale, and settlement allocations
+  - replacement `SALE` ledger posting alongside `CUSTOMER_RETURN` ledger posting for the same exchange flow
+- Extended the runtime surface to manage:
+  - customer exchange creation after checkout
+  - replacement invoice visibility
+  - exchange credit-note visibility
+  - latest exchange settlement posture
+- Fixed store runtime UI tests to stop depending on brittle exact invoice-occurrence counts once exchange surfaces rendered the same invoice identifiers in more than one valid location.
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `python -m pytest services/api/tests -q`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`

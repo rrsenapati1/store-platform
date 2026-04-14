@@ -1,0 +1,50 @@
+export type StoreRuntimeShellKind = 'browser_web' | 'packaged_desktop';
+export type StoreRuntimeShellBridgeState = 'browser_fallback' | 'ready' | 'unavailable';
+
+export interface StoreRuntimeShellStatus {
+  runtime_kind: StoreRuntimeShellKind;
+  runtime_label: string;
+  bridge_state: StoreRuntimeShellBridgeState;
+  app_version: string | null;
+  hostname: string | null;
+  operating_system: string | null;
+  architecture: string | null;
+  installation_id: string | null;
+  claim_code: string | null;
+  runtime_home: string | null;
+  cache_db_path: string | null;
+}
+
+export interface BrowserRuntimeShellWindow {
+  location?: {
+    hostname?: string | null;
+  } | null;
+}
+
+export interface StoreRuntimeShellAdapter {
+  getStatus(): Promise<StoreRuntimeShellStatus>;
+}
+
+export type StoreRuntimeShellInvoke = (command: string, payload?: Record<string, unknown>) => Promise<unknown>;
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+export function isStoreRuntimeShellStatus(value: unknown): value is StoreRuntimeShellStatus {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (value.runtime_kind === 'browser_web' || value.runtime_kind === 'packaged_desktop')
+    && typeof value.runtime_label === 'string'
+    && (value.bridge_state === 'browser_fallback' || value.bridge_state === 'ready' || value.bridge_state === 'unavailable')
+    && (typeof value.app_version === 'string' || value.app_version === null)
+    && (typeof value.hostname === 'string' || value.hostname === null)
+    && (typeof value.operating_system === 'string' || value.operating_system === null)
+    && (typeof value.architecture === 'string' || value.architecture === null)
+    && (typeof value.installation_id === 'string' || value.installation_id === null)
+    && (typeof value.claim_code === 'string' || value.claim_code === null)
+    && (typeof value.runtime_home === 'string' || value.runtime_home === null)
+    && (typeof value.cache_db_path === 'string' || value.cache_db_path === null);
+}

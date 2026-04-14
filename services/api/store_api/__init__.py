@@ -1,0 +1,1 @@
+"""Store platform API package."""
