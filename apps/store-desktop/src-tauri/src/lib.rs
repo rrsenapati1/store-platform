@@ -5,6 +5,7 @@ mod runtime_control_plane_origin;
 mod runtime_hardware;
 mod runtime_hub_identity;
 mod runtime_hub_service;
+mod runtime_printer;
 mod runtime_spoke_registry;
 mod runtime_local_auth;
 mod runtime_session;
@@ -19,8 +20,8 @@ use runtime_continuity::{
     cmd_load_store_runtime_continuity, cmd_save_store_runtime_continuity,
 };
 use runtime_hardware::{
-    cmd_clear_store_runtime_hardware_profile, cmd_get_store_runtime_hardware_status,
-    cmd_save_store_runtime_hardware_profile,
+    cmd_clear_store_runtime_hardware_profile, cmd_dispatch_store_runtime_print_job,
+    cmd_get_store_runtime_hardware_status, cmd_save_store_runtime_hardware_profile,
 };
 use runtime_hub_identity::{
     cmd_clear_store_runtime_hub_identity, cmd_load_store_runtime_hub_identity,
@@ -53,6 +54,7 @@ pub fn run() {
             cmd_get_store_runtime_hardware_status,
             cmd_save_store_runtime_hardware_profile,
             cmd_clear_store_runtime_hardware_profile,
+            cmd_dispatch_store_runtime_print_job,
             cmd_load_store_runtime_hub_identity,
             cmd_save_store_runtime_hub_identity,
             cmd_clear_store_runtime_hub_identity,
