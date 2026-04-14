@@ -257,7 +257,15 @@ export function StoreRuntimeWorkspace() {
       {!isLocalAuthGateActive ? <StorePrintQueueSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreReturnsSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreSupplierReportingSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} /> : null}
-      {!isLocalAuthGateActive ? <StoreSyncRuntimeSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} /> : null}
+      {!isLocalAuthGateActive ? (
+        <StoreSyncRuntimeSection
+          accessToken={workspace.accessToken}
+          tenantId={workspace.tenantId}
+          branchId={workspace.branchId}
+          runtimeHubServiceUrl={workspace.runtimeHubServiceUrl}
+          runtimeHubManifestUrl={workspace.runtimeHubManifestUrl}
+        />
+      ) : null}
       {!isLocalAuthGateActive ? <StoreCustomerInsightsSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} /> : null}
       {!isLocalAuthGateActive ? <StoreExchangeSection workspace={workspace} /> : null}
     </AppShell>

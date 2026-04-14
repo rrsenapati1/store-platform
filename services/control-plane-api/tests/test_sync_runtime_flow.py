@@ -112,6 +112,7 @@ def test_branch_hub_sync_transport_and_monitoring_routes() -> None:
                 {
                     "spoke_device_id": "spoke-counter-01",
                     "runtime_kind": "packaged_desktop",
+                    "runtime_profile": "desktop_spoke",
                     "hostname": "COUNTER-02",
                     "operating_system": "windows",
                     "app_version": "0.1.0",
@@ -121,6 +122,7 @@ def test_branch_hub_sync_transport_and_monitoring_routes() -> None:
                 {
                     "spoke_device_id": "spoke-counter-02",
                     "runtime_kind": "browser_preview",
+                    "runtime_profile": "desktop_spoke",
                     "hostname": "OWNER-LAPTOP",
                     "operating_system": "windows",
                     "app_version": "0.1.0",
@@ -238,8 +240,10 @@ def test_branch_hub_sync_transport_and_monitoring_routes() -> None:
     assert sync_spokes.status_code == 200
     assert len(sync_spokes.json()["records"]) == 2
     assert sync_spokes.json()["records"][0]["spoke_device_id"] == "spoke-counter-01"
+    assert sync_spokes.json()["records"][0]["runtime_profile"] == "desktop_spoke"
     assert sync_spokes.json()["records"][0]["connection_state"] == "CONNECTED"
     assert sync_spokes.json()["records"][1]["spoke_device_id"] == "spoke-counter-02"
+    assert sync_spokes.json()["records"][1]["runtime_profile"] == "desktop_spoke"
     assert sync_spokes.json()["records"][1]["connection_state"] == "DISCOVERED"
 
     sync_conflicts = client.get(

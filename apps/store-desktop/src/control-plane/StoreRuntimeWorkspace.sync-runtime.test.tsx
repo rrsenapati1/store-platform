@@ -1,8 +1,9 @@
 /* @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { StoreSyncRuntimeSection } from './StoreSyncRuntimeSection';
 
 type MockResponse = {
   ok: boolean;
@@ -89,6 +90,7 @@ describe('store runtime sync monitoring', () => {
             spoke_device_id: 'spoke-counter-01',
             hub_device_id: 'device-hub-1',
             runtime_kind: 'packaged_desktop',
+            runtime_profile: 'desktop_spoke',
             hostname: 'COUNTER-02',
             operating_system: 'windows',
             app_version: '0.1.0',
@@ -100,6 +102,7 @@ describe('store runtime sync monitoring', () => {
             spoke_device_id: 'spoke-counter-02',
             hub_device_id: 'device-hub-1',
             runtime_kind: 'browser_preview',
+            runtime_profile: 'desktop_spoke',
             hostname: 'OWNER-LAPTOP',
             operating_system: 'windows',
             app_version: '0.1.0',
@@ -138,6 +141,7 @@ describe('store runtime sync monitoring', () => {
   });
 
   afterEach(() => {
+    cleanup();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -155,10 +159,108 @@ describe('store runtime sync monitoring', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load sync monitoring' }));
 
     expect(await screen.findByText('DEGRADED')).toBeInTheDocument();
-    expect(screen.getByText(/spoke-counter-01 :: CONNECTED :: COUNTER-02/)).toBeInTheDocument();
-    expect(screen.getByText(/spoke-counter-02 :: DISCOVERED :: OWNER-LAPTOP/)).toBeInTheDocument();
+    expect(screen.getByText(/desktop_spoke :: CONNECTED :: COUNTER-02/)).toBeInTheDocument();
+    expect(screen.getByText(/desktop_spoke :: DISCOVERED :: OWNER-LAPTOP/)).toBeInTheDocument();
     expect(screen.getByText(/sales :: sale-1 :: VERSION_MISMATCH/)).toBeInTheDocument();
     expect(screen.getByText(/sync_push :: CONFLICT/)).toBeInTheDocument();
     expect(screen.getByText('Read-only branch runtime posture for staff sessions.')).toBeInTheDocument();
+  });
+
+  test('prepares spoke activation through the local hub surface and shows relay posture', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.endsWith('/v1/spoke-manifest')) {
+        return jsonResponse({
+          installation_id: 'store-runtime-abcd1234efgh5678',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          hub_device_id: 'device-hub-1',
+          hub_device_code: 'BLR-HUB-01',
+          auth_mode: 'spoke_runtime_token_pending',
+          issued_at: '2026-04-14T08:00:00.000Z',
+          supported_runtime_profiles: ['desktop_spoke'],
+          pairing_modes: ['qr', 'approval_code'],
+          register_url: 'http://127.0.0.1:45123/v1/spokes/register',
+          relay_base_url: 'http://127.0.0.1:45123/v1/relay',
+          manifest_version: 1,
+        }) as never;
+      }
+      if (url.endsWith('/v1/spokes/activate')) {
+        return jsonResponse({
+          activation_code: 'ACTV-ABCD-1234',
+          pairing_mode: 'qr',
+          runtime_profile: 'desktop_spoke',
+          hub_device_id: 'device-hub-1',
+          expires_at: '2099-01-01T00:00:00Z',
+        }) as never;
+      }
+      if (url.endsWith('/runtime/sync-status')) {
+        return jsonResponse({
+          hub_device_id: 'device-hub-1',
+          source_device_id: 'BLR-HUB-01',
+          branch_cursor: 7,
+          last_pull_cursor: 7,
+          last_heartbeat_at: '2026-04-14T10:02:00',
+          last_successful_push_at: '2026-04-14T10:01:00',
+          last_successful_pull_at: '2026-04-14T10:02:30',
+          last_successful_push_mutations: 2,
+          last_idempotency_key: 'push-2',
+          open_conflict_count: 1,
+          failed_push_count: 1,
+          connected_spoke_count: 1,
+          local_outbox_depth: 3,
+          pending_mutation_count: 3,
+          oldest_unsynced_mutation_age_seconds: 180,
+          runtime_state: 'DEGRADED',
+          last_local_spoke_sync_at: '2026-04-14T10:00:00',
+        }) as never;
+      }
+      if (url.endsWith('/runtime/sync-conflicts')) {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/runtime/sync-spokes')) {
+        return jsonResponse({
+          records: [
+            {
+              spoke_device_id: 'spoke-counter-01',
+              hub_device_id: 'device-hub-1',
+              runtime_kind: 'packaged_desktop',
+              runtime_profile: 'desktop_spoke',
+              hostname: 'COUNTER-02',
+              operating_system: 'windows',
+              app_version: '0.1.0',
+              connection_state: 'REGISTERED',
+              last_seen_at: '2026-04-14T10:01:30',
+              last_local_sync_at: null,
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/runtime/sync-envelopes')) {
+        return jsonResponse({ records: [] }) as never;
+      }
+      throw new Error(`Unexpected fetch call: ${url}`);
+    }) as typeof fetch;
+
+    render(
+      <StoreSyncRuntimeSection
+        accessToken="session-cashier"
+        tenantId="tenant-acme"
+        branchId="branch-1"
+        runtimeHubServiceUrl="http://127.0.0.1:45123"
+        runtimeHubManifestUrl="http://127.0.0.1:45123/v1/spoke-manifest"
+      />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Prepare spoke activation' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare spoke activation' }));
+    expect(await screen.findByText('ACTV-ABCD-1234')).toBeInTheDocument();
+    expect(screen.getByText(/runtime.print_jobs.submit :: allowed/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load sync monitoring' }));
+    expect(await screen.findByText(/desktop_spoke :: REGISTERED :: COUNTER-02/)).toBeInTheDocument();
   });
 });

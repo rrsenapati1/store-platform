@@ -3,6 +3,7 @@ mod runtime_cache;
 mod runtime_control_plane_origin;
 mod runtime_hub_identity;
 mod runtime_hub_service;
+mod runtime_spoke_registry;
 mod runtime_local_auth;
 mod runtime_session;
 mod runtime_shell;

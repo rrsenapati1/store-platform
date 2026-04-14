@@ -105,13 +105,16 @@ mod tests {
     use crate::runtime_hub_identity::{
         runtime_hub_identity_path_for, save_hub_identity, StoreRuntimeHubIdentityRecord,
     };
-    use crate::runtime_hub_service::clear_runtime_hub_service;
+    use crate::runtime_hub_service::{clear_runtime_hub_service, runtime_hub_service_test_guard};
     use tempfile::tempdir;
     use std::io::{Read, Write};
     use std::net::TcpStream;
 
     #[test]
     fn runtime_shell_status_persists_a_stable_installation_identity() {
+        let _guard = runtime_hub_service_test_guard()
+            .lock()
+            .expect("lock hub service test guard");
         let temp = tempdir().expect("create temp dir");
         let runtime_home = temp.path().to_path_buf();
         let cache_db_path = runtime_home.join("store-runtime-cache.sqlite3");
@@ -149,6 +152,9 @@ mod tests {
 
     #[test]
     fn runtime_shell_status_exposes_loopback_hub_service_for_hub_identities() {
+        let _guard = runtime_hub_service_test_guard()
+            .lock()
+            .expect("lock hub service test guard");
         let temp = tempdir().expect("create temp dir");
         let runtime_home = temp.path().to_path_buf();
         let cache_db_path = runtime_home.join("store-runtime-cache.sqlite3");

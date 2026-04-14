@@ -1,83 +1,106 @@
-import { startTransition, useState } from 'react';
 import { ActionButton, DetailList, SectionCard } from '@store/ui';
-import type {
-  ControlPlaneSyncConflictRecord,
-  ControlPlaneSyncEnvelopeRecord,
-  ControlPlaneSyncSpokeRecord,
-  ControlPlaneSyncStatus,
-} from '@store/types';
-import { storeControlPlaneClient } from './client';
+import { useStoreRuntimeSpokePairing } from './useStoreRuntimeSpokePairing';
+import { useStoreRuntimeSyncMonitoring } from './useStoreRuntimeSyncMonitoring';
 
 type StoreSyncRuntimeSectionProps = {
   accessToken: string;
   tenantId: string;
   branchId: string;
+  runtimeHubServiceUrl: string | null;
+  runtimeHubManifestUrl: string | null;
 };
 
-export function StoreSyncRuntimeSection({ accessToken, tenantId, branchId }: StoreSyncRuntimeSectionProps) {
-  const [syncStatus, setSyncStatus] = useState<ControlPlaneSyncStatus | null>(null);
-  const [conflicts, setConflicts] = useState<ControlPlaneSyncConflictRecord[]>([]);
-  const [spokes, setSpokes] = useState<ControlPlaneSyncSpokeRecord[]>([]);
-  const [envelopes, setEnvelopes] = useState<ControlPlaneSyncEnvelopeRecord[]>([]);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isBusy, setIsBusy] = useState(false);
-
-  async function loadSyncMonitoring() {
-    if (!accessToken || !tenantId || !branchId) {
-      return;
-    }
-    setIsBusy(true);
-    setErrorMessage('');
-    try {
-      const [statusResponse, conflictResponse, spokeResponse, envelopeResponse] = await Promise.all([
-        storeControlPlaneClient.getRuntimeSyncStatus(accessToken, tenantId, branchId),
-        storeControlPlaneClient.listRuntimeSyncConflicts(accessToken, tenantId, branchId),
-        storeControlPlaneClient.listRuntimeSyncSpokes(accessToken, tenantId, branchId),
-        storeControlPlaneClient.listRuntimeSyncEnvelopes(accessToken, tenantId, branchId),
-      ]);
-      startTransition(() => {
-        setSyncStatus(statusResponse);
-        setConflicts(conflictResponse.records);
-        setSpokes(spokeResponse.records);
-        setEnvelopes(envelopeResponse.records);
-      });
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to load sync monitoring');
-    } finally {
-      setIsBusy(false);
-    }
-  }
+export function StoreSyncRuntimeSection({
+  accessToken,
+  tenantId,
+  branchId,
+  runtimeHubServiceUrl,
+  runtimeHubManifestUrl,
+}: StoreSyncRuntimeSectionProps) {
+  const syncMonitoring = useStoreRuntimeSyncMonitoring({
+    accessToken,
+    tenantId,
+    branchId,
+  });
+  const spokePairing = useStoreRuntimeSpokePairing({
+    isEnabled: Boolean(accessToken),
+    runtimeHubManifestUrl,
+    runtimeHubServiceUrl,
+  });
 
   return (
     <SectionCard eyebrow="Runtime sync" title="Hub sync monitoring">
       <p style={{ margin: 0, color: '#4e5871' }}>Read-only branch runtime posture for staff sessions.</p>
 
-      <div style={{ height: '16px' }} />
+      {spokePairing.manifest ? (
+        <div style={{ marginTop: '16px' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '12px' }}>Prepare spoke activation</h3>
+          <DetailList
+            items={[
+              { label: 'Hub device', value: spokePairing.manifest.hub_device_code },
+              { label: 'Pairing modes', value: spokePairing.manifest.pairing_modes.join(', ') },
+              { label: 'Supported spoke roles', value: spokePairing.manifest.supported_runtime_profiles.join(', ') },
+            ]}
+          />
+          <ActionButton
+            onClick={() => void spokePairing.prepareDesktopSpokeActivation()}
+            disabled={spokePairing.isBusy || !runtimeHubServiceUrl}
+          >
+            Prepare spoke activation
+          </ActionButton>
+        </div>
+      ) : null}
 
-      <ActionButton onClick={() => void loadSyncMonitoring()} disabled={isBusy || !accessToken || !tenantId || !branchId}>
-        Load sync monitoring
-      </ActionButton>
-
-      {syncStatus ? (
+      {spokePairing.spokeActivation ? (
         <div style={{ marginTop: '16px' }}>
           <DetailList
             items={[
-              { label: 'Hub device', value: syncStatus.source_device_id ?? syncStatus.hub_device_id ?? 'Unbound' },
-              { label: 'Runtime state', value: syncStatus.runtime_state },
-              { label: 'Branch cursor', value: String(syncStatus.branch_cursor) },
-              { label: 'Last pull cursor', value: String(syncStatus.last_pull_cursor) },
-              { label: 'Open conflicts', value: String(syncStatus.open_conflict_count) },
-              { label: 'Connected spokes', value: String(syncStatus.connected_spoke_count) },
-              { label: 'Pending mutations', value: String(syncStatus.pending_mutation_count) },
-              { label: 'Local outbox depth', value: String(syncStatus.local_outbox_depth) },
+              { label: 'Activation code', value: spokePairing.spokeActivation.activation_code },
+              { label: 'Runtime role', value: spokePairing.spokeActivation.runtime_profile },
+              { label: 'Pairing mode', value: spokePairing.spokeActivation.pairing_mode },
+              { label: 'Expires at', value: spokePairing.spokeActivation.expires_at },
+            ]}
+          />
+          <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
+            {spokePairing.relayOperations.map((operation) => (
+              <li key={operation}>
+                {operation}
+                {' '}:: allowed
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div style={{ height: '16px' }} />
+
+      <ActionButton
+        onClick={() => void syncMonitoring.loadSyncMonitoring()}
+        disabled={syncMonitoring.isBusy || !accessToken || !tenantId || !branchId}
+      >
+        Load sync monitoring
+      </ActionButton>
+
+      {syncMonitoring.syncStatus ? (
+        <div style={{ marginTop: '16px' }}>
+          <DetailList
+            items={[
+              { label: 'Hub device', value: syncMonitoring.syncStatus.source_device_id ?? syncMonitoring.syncStatus.hub_device_id ?? 'Unbound' },
+              { label: 'Runtime state', value: syncMonitoring.syncStatus.runtime_state },
+              { label: 'Branch cursor', value: String(syncMonitoring.syncStatus.branch_cursor) },
+              { label: 'Last pull cursor', value: String(syncMonitoring.syncStatus.last_pull_cursor) },
+              { label: 'Open conflicts', value: String(syncMonitoring.syncStatus.open_conflict_count) },
+              { label: 'Connected spokes', value: String(syncMonitoring.syncStatus.connected_spoke_count) },
+              { label: 'Pending mutations', value: String(syncMonitoring.syncStatus.pending_mutation_count) },
+              { label: 'Local outbox depth', value: String(syncMonitoring.syncStatus.local_outbox_depth) },
             ]}
           />
         </div>
       ) : null}
 
-      {conflicts.length ? (
+      {syncMonitoring.conflicts.length ? (
         <ul style={{ marginBottom: '16px', marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {conflicts.map((record) => (
+          {syncMonitoring.conflicts.map((record) => (
             <li key={record.id}>
               {record.table_name} :: {record.record_id} :: {record.reason}
             </li>
@@ -85,19 +108,19 @@ export function StoreSyncRuntimeSection({ accessToken, tenantId, branchId }: Sto
         </ul>
       ) : null}
 
-      {spokes.length ? (
+      {syncMonitoring.spokes.length ? (
         <ul style={{ marginBottom: '16px', marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {spokes.map((record) => (
+          {syncMonitoring.spokes.map((record) => (
             <li key={record.spoke_device_id}>
-              {record.spoke_device_id} :: {record.connection_state} :: {record.hostname ?? record.runtime_kind}
+              {record.runtime_profile} :: {record.connection_state} :: {record.hostname ?? record.runtime_kind}
             </li>
           ))}
         </ul>
       ) : null}
 
-      {envelopes.length ? (
+      {syncMonitoring.envelopes.length ? (
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {envelopes.map((record) => (
+          {syncMonitoring.envelopes.map((record) => (
             <li key={record.id}>
               {record.entity_type} :: {record.status}
             </li>
@@ -105,7 +128,8 @@ export function StoreSyncRuntimeSection({ accessToken, tenantId, branchId }: Sto
         </ul>
       ) : null}
 
-      {errorMessage ? <p style={{ color: '#9d2b19', marginBottom: 0 }}>{errorMessage}</p> : null}
+      {spokePairing.errorMessage ? <p style={{ color: '#9d2b19', marginBottom: 0 }}>{spokePairing.errorMessage}</p> : null}
+      {syncMonitoring.errorMessage ? <p style={{ color: '#9d2b19', marginBottom: 0 }}>{syncMonitoring.errorMessage}</p> : null}
     </SectionCard>
   );
 }

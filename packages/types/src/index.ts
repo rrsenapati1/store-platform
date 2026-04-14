@@ -302,6 +302,7 @@ export interface ControlPlaneSyncSpokeRecord {
   spoke_device_id: string;
   hub_device_id: string;
   runtime_kind: string;
+  runtime_profile: string;
   hostname?: string | null;
   operating_system?: string | null;
   app_version?: string | null;

@@ -477,6 +477,7 @@ class SyncRuntimeService:
                 "spoke_device_id": record.spoke_device_id,
                 "hub_device_id": record.hub_device_id,
                 "runtime_kind": record.runtime_kind,
+                "runtime_profile": record.runtime_profile,
                 "hostname": record.hostname,
                 "operating_system": record.operating_system,
                 "app_version": record.app_version,

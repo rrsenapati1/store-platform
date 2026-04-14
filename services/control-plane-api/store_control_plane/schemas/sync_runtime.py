@@ -64,6 +64,7 @@ class SyncHeartbeatResponse(BaseModel):
 class SyncSpokeObservationRequest(BaseModel):
     spoke_device_id: str
     runtime_kind: str
+    runtime_profile: str | None = None
     hostname: str | None = None
     operating_system: str | None = None
     app_version: str | None = None
@@ -98,6 +99,7 @@ class SyncSpokeRecord(BaseModel):
     spoke_device_id: str
     hub_device_id: str
     runtime_kind: str
+    runtime_profile: str
     hostname: str | None = None
     operating_system: str | None = None
     app_version: str | None = None

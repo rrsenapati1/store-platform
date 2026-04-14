@@ -126,6 +126,7 @@ class HubSpokeObservation(Base, TimestampMixin):
     hub_device_id: Mapped[str] = mapped_column(ForeignKey("device_registrations.id", ondelete="CASCADE"), index=True)
     spoke_device_id: Mapped[str] = mapped_column(String(128), index=True)
     runtime_kind: Mapped[str] = mapped_column(String(64))
+    runtime_profile: Mapped[str] = mapped_column(String(64), default="desktop_spoke")
     hostname: Mapped[str | None] = mapped_column(String(255), default=None)
     operating_system: Mapped[str | None] = mapped_column(String(64), default=None)
     app_version: Mapped[str | None] = mapped_column(String(64), default=None)

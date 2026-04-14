@@ -320,6 +320,7 @@ class SyncRuntimeRepository:
                 self._session.add(record)
                 existing_records.append(record)
             record.runtime_kind = str(payload["runtime_kind"])
+            record.runtime_profile = str(payload.get("runtime_profile") or record.runtime_profile or "desktop_spoke")
             record.hostname = str(payload["hostname"]) if payload.get("hostname") else None
             record.operating_system = str(payload["operating_system"]) if payload.get("operating_system") else None
             record.app_version = str(payload["app_version"]) if payload.get("app_version") else None
