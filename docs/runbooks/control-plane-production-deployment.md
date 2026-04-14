@@ -24,6 +24,7 @@ Use separate VMs, secrets, Postgres data, and object-storage prefixes for `stagi
 On the app VM:
 
 - release bundle already copied to the target host
+  - `CP-026` release automation produces `store-control-plane-<version>.tar.gz` as a GitHub artifact or GitHub Release attachment; download that artifact before starting the deployment runbook
 - `/etc/store-control-plane/app.env`
 - web-build environment for owner-web and platform-admin if those apps are built from the same deployment pipeline
 - systemd units based on:
@@ -74,6 +75,15 @@ Always deploy:
 3. `prod`
 
 Do not skip staging for schema or secrets changes.
+
+## Artifact Source
+
+After `CP-026`, the expected control-plane release bundle source is:
+
+- GitHub Actions artifact from `.github/workflows/release-artifacts.yml`, or
+- GitHub Release attachment on a `v*` tag
+
+GitHub only builds the artifact. Operators still copy it to the app VM and run the deployment commands locally on that VM.
 
 ## App-VM Deployment Steps
 

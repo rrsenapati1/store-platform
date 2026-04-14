@@ -1,0 +1,146 @@
+name: release-artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Release version without the leading v
+        required: false
+        type: string
+      desktop_profile:
+        description: Desktop release profile for manual runs
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - prod
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-artifacts-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.vars.outputs.release_tag }}
+      release_version: ${{ steps.vars.outputs.release_version }}
+      desktop_profile: ${{ steps.vars.outputs.desktop_profile }}
+    steps:
+      - id: vars
+        shell: bash
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.release_version }}" ]; then
+            release_version="${{ github.event.inputs.release_version }}"
+            release_tag="v${release_version}"
+          else
+            release_tag="${GITHUB_REF_NAME}"
+            release_version="${release_tag#v}"
+          fi
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            desktop_profile="prod"
+          else
+            desktop_profile="${{ github.event.inputs.desktop_profile }}"
+          fi
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+          echo "release_version=${release_version}" >> "$GITHUB_OUTPUT"
+          echo "desktop_profile=${desktop_profile}" >> "$GITHUB_OUTPUT"
+
+  control-plane-release:
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build control-plane release bundle
+        run: node scripts/package-control-plane-release.mjs --version ${{ needs.prepare.outputs.release_version }} --output-dir dist/releases/control-plane
+      - name: Upload control-plane artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-plane-${{ needs.prepare.outputs.release_version }}
+          path: dist/releases/control-plane/**
+          if-no-files-found: error
+
+  web-release:
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install workspace dependencies
+        run: npm ci
+      - name: Build platform-admin
+        run: npm run build --workspace @store/platform-admin
+      - name: Build owner-web
+        run: npm run build --workspace @store/owner-web
+      - name: Package platform-admin release
+        run: node scripts/package-web-release.mjs --app platform-admin --version ${{ needs.prepare.outputs.release_version }} --output-dir dist/releases/web
+      - name: Package owner-web release
+        run: node scripts/package-web-release.mjs --app owner-web --version ${{ needs.prepare.outputs.release_version }} --output-dir dist/releases/web
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-${{ needs.prepare.outputs.release_version }}
+          path: dist/releases/web/**
+          if-no-files-found: error
+
+  desktop-release:
+    runs-on: windows-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install workspace dependencies
+        run: npm ci
+      - name: Build signed Store Desktop release
+        run: node scripts/build-store-desktop-release.mjs --profile ${{ needs.prepare.outputs.desktop_profile }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          STORE_DESKTOP_RELEASE_CONTROL_PLANE_BASE_URL: ${{ secrets.STORE_DESKTOP_RELEASE_CONTROL_PLANE_BASE_URL }}
+          STORE_DESKTOP_RELEASE_UPDATER_ENDPOINT: ${{ secrets.STORE_DESKTOP_RELEASE_UPDATER_ENDPOINT }}
+          STORE_DESKTOP_RELEASE_UPDATER_PUBLIC_KEY: ${{ secrets.STORE_DESKTOP_RELEASE_UPDATER_PUBLIC_KEY }}
+      - name: Stage Store Desktop artifacts
+        run: node scripts/stage-store-desktop-release-artifacts.mjs --version ${{ needs.prepare.outputs.release_version }} --profile ${{ needs.prepare.outputs.desktop_profile }} --bundle-dir apps/store-desktop/src-tauri/target/release/bundle/nsis --output-dir dist/releases/store-desktop
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-desktop-${{ needs.prepare.outputs.release_version }}-${{ needs.prepare.outputs.desktop_profile }}
+          path: dist/releases/store-desktop/**
+          if-no-files-found: error
+
+  publish-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - control-plane-release
+      - web-release
+      - desktop-release
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish GitHub release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          files: release-assets/**

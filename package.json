@@ -10,7 +10,16 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "ci:backend": "python -m pytest services/control-plane-api/tests -q",
+    "ci:platform-admin": "npm run test --workspace @store/platform-admin && npm run typecheck --workspace @store/platform-admin && npm run build --workspace @store/platform-admin",
+    "ci:owner-web": "npm run test --workspace @store/owner-web && npm run typecheck --workspace @store/owner-web && npm run build --workspace @store/owner-web",
+    "ci:store-desktop": "npm run test --workspace @store/store-desktop && npm run typecheck --workspace @store/store-desktop && npm run build --workspace @store/store-desktop && cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml --lib",
+    "ci:release-automation": "node --test scripts/package-control-plane-release.test.mjs scripts/package-web-release.test.mjs scripts/stage-store-desktop-release-artifacts.test.mjs scripts/github-workflows.test.mjs scripts/generate-store-desktop-update-manifest.test.mjs",
+    "release:control-plane": "node scripts/package-control-plane-release.mjs",
+    "release:platform-admin": "node scripts/package-web-release.mjs --app platform-admin",
+    "release:owner-web": "node scripts/package-web-release.mjs --app owner-web",
+    "release:store-desktop:stage": "node scripts/stage-store-desktop-release-artifacts.mjs"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",

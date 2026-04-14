@@ -2,6 +2,33 @@
 
 ## 2026-04-15
 
+- Completed CP-026 on CI/CD and release automation:
+  - added repo-owned release packaging scripts for the control-plane backend, owner-web, platform-admin, and staged Store Desktop installer artifacts instead of leaving GitHub workflows to hardcode archive behavior inline
+  - added GitHub Actions workflows for pull-request verification and tag-based release artifact builds, with backend, web, desktop, and release-automation checks split into explicit jobs
+  - kept production deployment and object-storage promotion manual by design, so GitHub publishes artifacts and GitHub Releases without taking SSH or VM authority
+  - added a dedicated GitHub Actions runbook and updated the control-plane and desktop deployment runbooks to explain the artifact-to-operator handoff
+- Added regression coverage for:
+  - control-plane release bundle contents and exclusion rules
+  - web dist archive packaging
+  - Store Desktop installer artifact staging
+  - GitHub workflow trigger, job, and command contract checks
+- Verified:
+  - `node --test scripts/package-control-plane-release.test.mjs scripts/package-web-release.test.mjs scripts/stage-store-desktop-release-artifacts.test.mjs scripts/github-workflows.test.mjs`
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `npm run test --workspace @store/platform-admin`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/platform-admin`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/platform-admin`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run build --workspace @store/store-desktop`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml --lib`
+  - `node scripts/package-control-plane-release.mjs --help`
+  - `node scripts/package-web-release.mjs --help`
+  - `node scripts/stage-store-desktop-release-artifacts.mjs --help`
+
 - Completed CP-025 on security and observability:
   - added control-plane structured request logging, request IDs, secure-response headers, and bounded rate limiting for public auth, desktop activation or unlock, and billing webhook surfaces instead of leaving hardening only in deployment notes
   - added backend Sentry bootstrap with event scrubbing and request, actor, tenant, branch, device, and job context binding so engineering diagnostics are available without leaking secrets or PIN material

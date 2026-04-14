@@ -12,6 +12,8 @@ This runbook covers the first Windows packaging contract for `apps/store-desktop
 
 This runbook does not cover hosted CI or CDN automation. It assumes the operator is building on Windows with access to the required signing inputs.
 
+After `CP-026`, GitHub Actions can build the signed Windows installer for tagged releases or manual runs. The operator still owns update-channel publication and rollback.
+
 ## Release Profiles
 
 The packaged desktop build reads a bundled release profile selected at build time with:
@@ -60,6 +62,22 @@ Important outputs:
 
 - `Store Runtime_<version>_x64-setup.exe`
 - matching `.sig` file
+
+## GitHub Actions Release Build
+
+`CP-026` adds `.github/workflows/release-artifacts.yml`.
+
+For tag builds:
+
+- pushing `v<semver>` builds the signed installer with the `prod` desktop profile
+- the workflow attaches the installer payloads to a GitHub Release
+
+For manual dispatch:
+
+- operators can choose `staging` or `prod`
+- the workflow uploads artifacts without requiring a GitHub Release tag flow
+
+GitHub builds the artifacts, but it does not publish `latest.json` into your update channel. Operators still download the installer and signature, upload them to the final channel location, then generate the update manifest with the final public URL.
 
 ## Generate The Static Update Manifest
 
