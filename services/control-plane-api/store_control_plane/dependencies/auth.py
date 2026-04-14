@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
+from ..sentry import bind_actor_scope, bind_sync_device_scope
 from ..services import ActorContext, AuthService, SyncDeviceContext, SyncRuntimeAuthService
 
 
@@ -36,7 +37,9 @@ async def get_current_actor(
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization")
     auth_service = AuthService(session, settings, identity_provider)
-    return await auth_service.get_actor_context(credentials.credentials)
+    actor = await auth_service.get_actor_context(credentials.credentials)
+    bind_actor_scope(actor)
+    return actor
 
 
 async def get_current_sync_device(
@@ -47,4 +50,6 @@ async def get_current_sync_device(
     if not device_id or not device_secret:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing device credentials")
     auth_service = SyncRuntimeAuthService(session)
-    return await auth_service.authenticate_hub_device(device_id=device_id, device_secret=device_secret)
+    device = await auth_service.authenticate_hub_device(device_id=device_id, device_secret=device_secret)
+    bind_sync_device_scope(device)
+    return device

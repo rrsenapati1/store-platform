@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@sentry/react": "^10.10.0",
     "@store/auth": "*",
     "@store/types": "*",
     "@store/ui": "*",

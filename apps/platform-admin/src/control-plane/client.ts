@@ -2,6 +2,7 @@ import type {
   ControlPlaneActor,
   ControlPlaneBillingPlan,
   ControlPlaneInvite,
+  ControlPlaneObservabilitySummary,
   ControlPlaneTenantLifecycleSummary,
   ControlPlanePlatformTenantRecord,
   ControlPlaneSession,
@@ -84,6 +85,9 @@ export const platformAdminClient = {
       undefined,
       accessToken,
     );
+  },
+  getObservabilitySummary(accessToken: string) {
+    return request<ControlPlaneObservabilitySummary>('/v1/platform/observability/summary', undefined, accessToken);
   },
   suspendTenantAccess(accessToken: string, tenantId: string, reason: string) {
     return request<ControlPlaneTenantLifecycleSummary>(

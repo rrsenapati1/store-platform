@@ -55,3 +55,43 @@ def test_build_settings_accepts_deployment_overrides() -> None:
     assert settings.release_version == "1.2.3"
     assert settings.object_storage_bucket == "store-prod-artifacts"
     assert settings.object_storage_prefix == "store/prod/control-plane"
+
+
+def test_settings_normalize_observability_and_security_fields(monkeypatch) -> None:
+    monkeypatch.setenv("STORE_CONTROL_PLANE_SENTRY_DSN", " https://public@example.ingest.sentry.io/1 ")
+    monkeypatch.setenv("STORE_CONTROL_PLANE_SENTRY_TRACES_SAMPLE_RATE", "0.25")
+    monkeypatch.setenv("STORE_CONTROL_PLANE_LOG_FORMAT", " JSON ")
+    monkeypatch.setenv("STORE_CONTROL_PLANE_RATE_LIMIT_WINDOW_SECONDS", "120")
+    monkeypatch.setenv("STORE_CONTROL_PLANE_RATE_LIMIT_AUTH_REQUESTS", "8")
+    monkeypatch.setenv("STORE_CONTROL_PLANE_RATE_LIMIT_WEBHOOK_REQUESTS", "20")
+    monkeypatch.setenv("STORE_CONTROL_PLANE_SECURE_HEADERS_ENABLED", "true")
+    monkeypatch.setenv("STORE_CONTROL_PLANE_SECURE_HEADERS_HSTS_ENABLED", " true ")
+    monkeypatch.setenv("STORE_CONTROL_PLANE_SECURE_HEADERS_CSP", " default-src 'self'; frame-ancestors 'none' ")
+
+    settings = Settings()
+
+    assert settings.sentry_dsn == "https://public@example.ingest.sentry.io/1"
+    assert settings.sentry_traces_sample_rate == 0.25
+    assert settings.log_format == "json"
+    assert settings.rate_limit_window_seconds == 120
+    assert settings.rate_limit_auth_requests == 8
+    assert settings.rate_limit_webhook_requests == 20
+    assert settings.secure_headers_enabled is True
+    assert settings.secure_headers_hsts_enabled is True
+    assert settings.secure_headers_csp == "default-src 'self'; frame-ancestors 'none'"
+
+
+def test_build_settings_accepts_observability_overrides() -> None:
+    settings = build_settings(
+        sentry_dsn=" https://public@example.ingest.sentry.io/2 ",
+        sentry_traces_sample_rate=0.5,
+        log_format=" plain ",
+        rate_limit_window_seconds=90,
+        secure_headers_enabled=False,
+    )
+
+    assert settings.sentry_dsn == "https://public@example.ingest.sentry.io/2"
+    assert settings.sentry_traces_sample_rate == 0.5
+    assert settings.log_format == "plain"
+    assert settings.rate_limit_window_seconds == 90
+    assert settings.secure_headers_enabled is False

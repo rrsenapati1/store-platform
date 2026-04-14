@@ -19,6 +19,10 @@ class ObjectStorageClientProtocol(Protocol):
 
     def download_file(self, *, bucket: str, key: str, local_path: Path) -> None: ...
 
+    def list_keys(self, *, bucket: str, prefix: str, limit: int = 100) -> list[str]: ...
+
+    def read_text(self, *, bucket: str, key: str) -> str: ...
+
 
 class S3CompatibleObjectStorageClient:
     def __init__(self, client: Any) -> None:
@@ -43,6 +47,16 @@ class S3CompatibleObjectStorageClient:
     def download_file(self, *, bucket: str, key: str, local_path: Path) -> None:
         local_path.parent.mkdir(parents=True, exist_ok=True)
         self._client.download_file(bucket, key, str(local_path))
+
+    def list_keys(self, *, bucket: str, prefix: str, limit: int = 100) -> list[str]:
+        response = self._client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=limit)
+        contents = response.get("Contents") or []
+        return [str(entry["Key"]) for entry in contents if entry.get("Key")]
+
+    def read_text(self, *, bucket: str, key: str) -> str:
+        response = self._client.get_object(Bucket=bucket, Key=key)
+        body = response["Body"].read()
+        return body.decode("utf-8")
 
 
 def build_object_storage_client(

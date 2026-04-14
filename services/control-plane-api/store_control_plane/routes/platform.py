@@ -13,6 +13,7 @@ from ..schemas import (
     BillingPlanResponse,
     OwnerInviteCreateRequest,
     OwnerInviteResponse,
+    PlatformObservabilitySummaryResponse,
     PlatformTenantListResponse,
     PlatformTenantRecord,
     TenantBillingOverrideRequest,
@@ -20,7 +21,7 @@ from ..schemas import (
     TenantCreatedResponse,
     TenantLifecycleSummaryResponse,
 )
-from ..services import ActorContext, CommerceService, OnboardingService, assert_platform_admin
+from ..services import ActorContext, CommerceService, OnboardingService, PlatformObservabilityService, assert_platform_admin
 
 router = APIRouter(prefix="/v1/platform", tags=["platform"])
 
@@ -84,6 +85,18 @@ async def create_owner_invite(
         full_name=invite.full_name,
         status=invite.status,
     )
+
+
+@router.get("/observability/summary", response_model=PlatformObservabilitySummaryResponse)
+async def get_platform_observability_summary(
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> PlatformObservabilitySummaryResponse:
+    assert_platform_admin(actor)
+    service = PlatformObservabilityService(session, settings)
+    summary = await service.build_summary()
+    return PlatformObservabilitySummaryResponse.model_validate(summary)
 
 
 @router.get("/billing/plans", response_model=BillingPlanListResponse)

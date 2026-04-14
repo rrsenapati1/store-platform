@@ -202,6 +202,82 @@ export interface ControlPlaneTenantLifecycleSummary {
   active_override?: ControlPlaneTenantBillingOverride | null;
 }
 
+export interface ControlPlaneObservabilityJobRecord {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  job_type: string;
+  status: string;
+  attempt_count: number;
+  max_attempts: number;
+  last_error?: string | null;
+  dead_lettered_at?: string | null;
+  updated_at: string;
+}
+
+export interface ControlPlaneObservabilityOperations {
+  queued_count: number;
+  running_count: number;
+  retryable_count: number;
+  dead_letter_count: number;
+  recent_failure_records: ControlPlaneObservabilityJobRecord[];
+}
+
+export interface ControlPlaneObservabilityRuntimeBranchRecord {
+  tenant_id: string;
+  branch_id: string;
+  hub_device_id: string;
+  runtime_state: string;
+  connected_spoke_count: number;
+  local_outbox_depth: number;
+  open_conflict_count: number;
+  last_heartbeat_at?: string | null;
+  last_local_spoke_sync_at?: string | null;
+}
+
+export interface ControlPlaneObservabilityRuntime {
+  tracked_branch_count: number;
+  degraded_branch_count: number;
+  connected_spoke_count: number;
+  open_conflict_count: number;
+  max_local_outbox_depth: number;
+  branches: ControlPlaneObservabilityRuntimeBranchRecord[];
+}
+
+export interface ControlPlaneObservabilityBackup {
+  configured: boolean;
+  status: string;
+  last_successful_backup_at?: string | null;
+  metadata_key?: string | null;
+  release_version?: string | null;
+  age_hours?: number | null;
+  detail?: string | null;
+}
+
+export interface ControlPlaneObservabilitySummary {
+  environment: string;
+  release_version: string;
+  system_health: {
+    status: string;
+    environment: string;
+    public_base_url: string;
+    release_version: string;
+    database: {
+      status: string;
+      detail?: string | null;
+    };
+    operations_worker: {
+      configured: boolean;
+      poll_seconds: number;
+      batch_size: number;
+      lease_seconds: number;
+    };
+  };
+  operations: ControlPlaneObservabilityOperations;
+  runtime: ControlPlaneObservabilityRuntime;
+  backup: ControlPlaneObservabilityBackup;
+}
+
 export interface ControlPlaneSubscriptionBootstrap {
   provider_name: string;
   provider_customer_id: string;

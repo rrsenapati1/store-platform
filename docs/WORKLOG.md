@@ -1,5 +1,31 @@
 # Store Worklog
 
+## 2026-04-15
+
+- Completed CP-025 on security and observability:
+  - added control-plane structured request logging, request IDs, secure-response headers, and bounded rate limiting for public auth, desktop activation or unlock, and billing webhook surfaces instead of leaving hardening only in deployment notes
+  - added backend Sentry bootstrap with event scrubbing and request, actor, tenant, branch, device, and job context binding so engineering diagnostics are available without leaking secrets or PIN material
+  - added a platform-admin observability summary route and UI posture for operations queue failures, degraded runtime branches, backup freshness, and current environment or release metadata instead of scattering operator status across unrelated screens
+  - added environment-guarded Sentry bootstrapping for owner-web and platform-admin so frontend production errors can be correlated by environment and release without activating in dev or test mode
+  - documented operator alert thresholds, incident flow, dependency scanning, and deployment-time observability wiring in dedicated runbooks
+- Added regression coverage for:
+  - settings normalization for Sentry, rate-limit, and secure-header configuration
+  - request-context logging and request-id propagation
+  - secure-header middleware
+  - auth and webhook rate limiting
+  - backend Sentry scrubbing and guarded initialization
+  - platform observability summary route behavior
+  - platform-admin observability rendering
+  - owner-web and platform-admin frontend Sentry bootstrap guards
+- Verified:
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `npm run test --workspace @store/platform-admin`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/platform-admin`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/platform-admin`
+  - `npm run build --workspace @store/owner-web`
+
 ## 2026-04-14
 
 - Completed CP-024 on production infrastructure:

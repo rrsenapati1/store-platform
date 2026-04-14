@@ -3,6 +3,7 @@ import type {
   ControlPlaneActor,
   ControlPlaneBillingPlan,
   ControlPlaneInvite,
+  ControlPlaneObservabilitySummary,
   ControlPlanePlatformTenantRecord,
   ControlPlaneTenantLifecycleSummary,
 } from '@store/types';
@@ -15,6 +16,7 @@ export function usePlatformAdminWorkspace() {
   const [tenants, setTenants] = useState<ControlPlanePlatformTenantRecord[]>([]);
   const [billingPlans, setBillingPlans] = useState<ControlPlaneBillingPlan[]>([]);
   const [activeTenantLifecycle, setActiveTenantLifecycle] = useState<ControlPlaneTenantLifecycleSummary | null>(null);
+  const [observabilitySummary, setObservabilitySummary] = useState<ControlPlaneObservabilitySummary | null>(null);
   const [activeTenantId, setActiveTenantId] = useState('');
   const [tenantName, setTenantName] = useState('');
   const [tenantSlug, setTenantSlug] = useState('');
@@ -58,15 +60,27 @@ export function usePlatformAdminWorkspace() {
     }
   }
 
+  async function refreshObservabilitySummary(nextAccessToken = accessToken) {
+    if (!nextAccessToken) {
+      setObservabilitySummary(null);
+      return;
+    }
+    const summary = await platformAdminClient.getObservabilitySummary(nextAccessToken);
+    startTransition(() => {
+      setObservabilitySummary(summary);
+    });
+  }
+
   async function startSession() {
     setIsBusy(true);
     setErrorMessage('');
     try {
       const session = await platformAdminClient.exchangeSession(korsenexToken);
-      const [nextActor, tenantList, planList] = await Promise.all([
+      const [nextActor, tenantList, planList, summary] = await Promise.all([
         platformAdminClient.getActor(session.access_token),
         platformAdminClient.listTenants(session.access_token),
         platformAdminClient.listBillingPlans(session.access_token),
+        platformAdminClient.getObservabilitySummary(session.access_token),
       ]);
       const selectedTenantId = tenantList.records[0]?.tenant_id ?? '';
       const lifecycle = selectedTenantId
@@ -77,6 +91,7 @@ export function usePlatformAdminWorkspace() {
         setActor(nextActor);
         setTenants(tenantList.records);
         setBillingPlans(planList.records);
+        setObservabilitySummary(summary);
         setActiveTenantId(selectedTenantId);
         setActiveTenantLifecycle(lifecycle);
       });
@@ -225,6 +240,7 @@ export function usePlatformAdminWorkspace() {
     isBusy,
     korsenexToken,
     latestInvite,
+    observabilitySummary,
     ownerEmail,
     ownerFullName,
     planAmountMinor,
@@ -237,6 +253,7 @@ export function usePlatformAdminWorkspace() {
     tenants,
     createBillingPlan,
     reactivateActiveTenantAccess,
+    refreshObservabilitySummary,
     selectTenant,
     setKorsenexToken,
     setOwnerEmail,

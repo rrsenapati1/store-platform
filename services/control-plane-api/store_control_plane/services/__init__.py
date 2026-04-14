@@ -15,6 +15,7 @@ from .customer_reporting import CustomerReportingService
 from .idp import build_identity_provider
 from .inventory import InventoryService
 from .onboarding import OnboardingService
+from .platform_observability import PlatformObservabilityService
 from .operations_queue import OperationsQueueService
 from .operations_worker import OperationsWorkerService
 from .procurement_finance import ProcurementFinanceService
@@ -43,6 +44,7 @@ __all__ = [
     "InventoryService",
     "OnboardingService",
     "OfflineContinuityService",
+    "PlatformObservabilityService",
     "ProcurementFinanceService",
     "PurchasingService",
     "OperationsQueueService",

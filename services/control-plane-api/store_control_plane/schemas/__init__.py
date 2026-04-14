@@ -24,6 +24,14 @@ from .inventory import GoodsReceiptCreateRequest, GoodsReceiptLineResponse, Good
 from .memberships import BranchMembershipCreateRequest, MembershipResponse, TenantMembershipCreateRequest
 from .operations import OperationsJobListResponse, OperationsJobResponse
 from .platform import OwnerInviteCreateRequest, OwnerInviteResponse, PlatformTenantListResponse, PlatformTenantRecord, TenantCreateRequest, TenantCreatedResponse
+from .platform_observability import (
+    PlatformObservabilityBackupResponse,
+    PlatformObservabilityJobRecord,
+    PlatformObservabilityOperationsResponse,
+    PlatformObservabilityRuntimeBranchRecord,
+    PlatformObservabilityRuntimeResponse,
+    PlatformObservabilitySummaryResponse,
+)
 from .procurement_finance import PurchaseInvoiceCreateRequest, PurchaseInvoiceLineResponse, PurchaseInvoiceListResponse, PurchaseInvoiceRecord, PurchaseInvoiceResponse, SupplierPayablesReportRecord, SupplierPayablesReportResponse, SupplierPaymentCreateRequest, SupplierPaymentResponse, SupplierReturnCreateRequest, SupplierReturnLineCreateRequest, SupplierReturnLineResponse, SupplierReturnResponse
 from .purchasing import PurchaseApprovalReportRecord, PurchaseApprovalReportResponse, PurchaseOrderApprovalRequest, PurchaseOrderCreateRequest, PurchaseOrderLineCreateRequest, PurchaseOrderLineResponse, PurchaseOrderListResponse, PurchaseOrderRecord, PurchaseOrderResponse, SupplierCreateRequest, SupplierListResponse, SupplierRecord, SupplierResponse
 from .runtime import PrintJobCompletionRequest, PrintJobListResponse, PrintJobPayload, PrintJobQueueRequest, PrintJobResponse, RuntimeDeviceHeartbeatResponse
@@ -131,6 +139,12 @@ __all__ = [
     "OwnerInviteResponse",
     "PaymentResponse",
     "PlatformTenantListResponse",
+    "PlatformObservabilityBackupResponse",
+    "PlatformObservabilityJobRecord",
+    "PlatformObservabilityOperationsResponse",
+    "PlatformObservabilityRuntimeBranchRecord",
+    "PlatformObservabilityRuntimeResponse",
+    "PlatformObservabilitySummaryResponse",
     "PlatformTenantRecord",
     "PurchaseInvoiceCreateRequest",
     "PurchaseInvoiceLineResponse",

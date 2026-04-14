@@ -25,6 +25,7 @@ On the app VM:
 
 - release bundle already copied to the target host
 - `/etc/store-control-plane/app.env`
+- web-build environment for owner-web and platform-admin if those apps are built from the same deployment pipeline
 - systemd units based on:
   - `services/control-plane-api/ops/systemd/store-control-plane-api.service.example`
   - `services/control-plane-api/ops/systemd/store-control-plane-worker.service.example`
@@ -38,6 +39,31 @@ On the DB VM:
 - `/etc/store-control-plane/db.env`
 - Postgres bound to a private network address or loopback-only tunnel
 - inbound firewall allowing only the app VM and operator IPs
+
+## Security And Observability Inputs
+
+At minimum, set these in `/etc/store-control-plane/app.env` for `staging` and `prod`:
+
+- `STORE_CONTROL_PLANE_LOG_FORMAT=json`
+- `STORE_CONTROL_PLANE_SENTRY_DSN`
+- `STORE_CONTROL_PLANE_SENTRY_TRACES_SAMPLE_RATE`
+- `STORE_CONTROL_PLANE_SENTRY_ENVIRONMENT`
+- `STORE_CONTROL_PLANE_RATE_LIMIT_WINDOW_SECONDS`
+- `STORE_CONTROL_PLANE_RATE_LIMIT_AUTH_REQUESTS`
+- `STORE_CONTROL_PLANE_RATE_LIMIT_ACTIVATION_REQUESTS`
+- `STORE_CONTROL_PLANE_RATE_LIMIT_WEBHOOK_REQUESTS`
+- `STORE_CONTROL_PLANE_SECURE_HEADERS_ENABLED=true`
+- `STORE_CONTROL_PLANE_SECURE_HEADERS_HSTS_ENABLED=true`
+- `STORE_CONTROL_PLANE_SECURE_HEADERS_CSP`
+
+If owner-web and platform-admin are built for the same environment, also set:
+
+- `VITE_SENTRY_DSN`
+- `VITE_DEPLOYMENT_ENVIRONMENT`
+- `VITE_RELEASE_VERSION`
+- `VITE_SENTRY_TRACES_SAMPLE_RATE`
+
+Do not reuse the same Sentry DSN between `staging` and `prod` unless you intentionally want both environments merged into one project.
 
 ## Release Order
 
@@ -72,10 +98,13 @@ Required checks after deployment:
 
 1. `GET /v1/system/health` returns `status=ok`
 2. `GET /v1/system/authority-boundary` returns the expected cutover posture
-3. owner sign-in still works
-4. packaged desktop activation or unlock against the environment still works
-5. worker service is active and logs show clean startup
-6. desktop release channel still points at the matching environment
+3. `GET /v1/platform/observability/summary` returns the expected environment, release version, queue posture, and backup metadata
+4. live API responses include secure headers
+5. owner sign-in still works
+6. packaged desktop activation or unlock against the environment still works
+7. worker service is active and logs show clean startup
+8. JSON request logs are being emitted on the app VM
+9. desktop release channel still points at the matching environment
 
 ## Failure Posture
 

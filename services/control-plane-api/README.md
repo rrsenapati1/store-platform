@@ -139,6 +139,37 @@ These files are templates only. Real secrets must be injected from operator-mana
 Production deployment guidance lives in [docs/runbooks/control-plane-production-deployment.md](../../docs/runbooks/control-plane-production-deployment.md).
 Backup and restore guidance lives in [docs/runbooks/control-plane-backup-restore.md](../../docs/runbooks/control-plane-backup-restore.md).
 
+## Security And Observability Configuration
+
+`CP-025` adds backend observability and first-pass request hardening knobs.
+
+Backend environment variables:
+
+- `STORE_CONTROL_PLANE_SENTRY_DSN`
+- `STORE_CONTROL_PLANE_SENTRY_TRACES_SAMPLE_RATE`
+- `STORE_CONTROL_PLANE_SENTRY_ENVIRONMENT`
+- `STORE_CONTROL_PLANE_LOG_FORMAT`
+  - `plain` for local development, `json` for deployed environments
+- `STORE_CONTROL_PLANE_RATE_LIMIT_WINDOW_SECONDS`
+- `STORE_CONTROL_PLANE_RATE_LIMIT_AUTH_REQUESTS`
+- `STORE_CONTROL_PLANE_RATE_LIMIT_ACTIVATION_REQUESTS`
+- `STORE_CONTROL_PLANE_RATE_LIMIT_WEBHOOK_REQUESTS`
+- `STORE_CONTROL_PLANE_SECURE_HEADERS_ENABLED`
+- `STORE_CONTROL_PLANE_SECURE_HEADERS_HSTS_ENABLED`
+- `STORE_CONTROL_PLANE_SECURE_HEADERS_CSP`
+
+Recommended starting posture:
+
+- `dev`
+  - no Sentry DSN
+  - `STORE_CONTROL_PLANE_LOG_FORMAT=plain`
+- `staging`
+  - staging-specific Sentry DSN or project
+  - `STORE_CONTROL_PLANE_LOG_FORMAT=json`
+- `prod`
+  - prod-specific Sentry DSN or project
+  - `STORE_CONTROL_PLANE_LOG_FORMAT=json`
+
 ## Development Fallback
 
 `stub` mode exists only for tests and isolated local development.

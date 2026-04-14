@@ -177,6 +177,82 @@ export function PlatformAdminWorkspace() {
           <p style={{ margin: 0, color: '#4e5871' }}>Select a tenant to inspect commercial lifecycle.</p>
         )}
       </SectionCard>
+
+      <SectionCard eyebrow="Platform observability" title="Operations queue">
+        {workspace.observabilitySummary ? (
+          <>
+            <DetailList
+              items={[
+                { label: 'Environment', value: workspace.observabilitySummary.environment },
+                { label: 'Release', value: workspace.observabilitySummary.release_version },
+                { label: 'Dead-letter jobs', value: String(workspace.observabilitySummary.operations.dead_letter_count) },
+                { label: 'Degraded branches', value: String(workspace.observabilitySummary.runtime.degraded_branch_count) },
+                {
+                  label: 'Backup',
+                  value: (
+                    <StatusBadge
+                      label={workspace.observabilitySummary.backup.status.toUpperCase()}
+                      tone={workspace.observabilitySummary.backup.status === 'ok' ? 'success' : 'warning'}
+                    />
+                  ),
+                },
+              ]}
+            />
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
+              <ActionButton onClick={() => void workspace.refreshObservabilitySummary()} disabled={workspace.isBusy || !workspace.actor}>
+                Refresh observability
+              </ActionButton>
+            </div>
+            <div style={{ marginTop: '16px' }}>
+              <h3 style={{ marginBottom: '10px' }}>Recent failing jobs</h3>
+              {workspace.observabilitySummary.operations.recent_failure_records.length ? (
+                <ul style={{ margin: 0, color: '#4e5871', lineHeight: 1.7 }}>
+                  {workspace.observabilitySummary.operations.recent_failure_records.map((record) => (
+                    <li key={record.id}>
+                      <strong>{record.job_type}</strong> in {record.branch_id} with status{' '}
+                      <StatusBadge label={record.status} tone={record.status === 'DEAD_LETTER' ? 'warning' : 'neutral'} />
+                      {record.last_error ? `: ${record.last_error}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ margin: 0, color: '#4e5871' }}>No retryable or dead-letter jobs.</p>
+              )}
+            </div>
+            <div style={{ marginTop: '16px' }}>
+              <h3 style={{ marginBottom: '10px' }}>Degraded branches</h3>
+              {workspace.observabilitySummary.runtime.branches.length ? (
+                <ul style={{ margin: 0, color: '#4e5871', lineHeight: 1.7 }}>
+                  {workspace.observabilitySummary.runtime.branches.map((branch) => (
+                    <li key={`${branch.tenant_id}:${branch.branch_id}`}>
+                      {branch.branch_id} on {branch.hub_device_id}{' '}
+                      <StatusBadge label={branch.runtime_state} tone={branch.runtime_state === 'HEALTHY' ? 'success' : 'warning'} />{' '}
+                      with {branch.open_conflict_count} open conflicts and outbox depth {branch.local_outbox_depth}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ margin: 0, color: '#4e5871' }}>No tracked branch runtime degradation.</p>
+              )}
+            </div>
+            <div style={{ marginTop: '16px' }}>
+              <h3 style={{ marginBottom: '10px' }}>Backup posture</h3>
+              <DetailList
+                items={[
+                  { label: 'Metadata key', value: workspace.observabilitySummary.backup.metadata_key || 'Unavailable' },
+                  { label: 'Backup release', value: workspace.observabilitySummary.backup.release_version || 'Unavailable' },
+                  {
+                    label: 'Last successful backup',
+                    value: workspace.observabilitySummary.backup.last_successful_backup_at || 'Unavailable',
+                  },
+                ]}
+              />
+            </div>
+          </>
+        ) : (
+          <p style={{ margin: 0, color: '#4e5871' }}>Start a session to load deployment, queue, and runtime observability.</p>
+        )}
+      </SectionCard>
     </AppShell>
   );
 }

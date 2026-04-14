@@ -18,6 +18,70 @@ function jsonResponse(body: unknown, status = 200): MockResponse {
   };
 }
 
+function observabilitySummaryResponse() {
+  return {
+    environment: 'staging',
+    release_version: '2026.04.15-observability',
+    system_health: {
+      status: 'ok',
+      environment: 'staging',
+      public_base_url: 'https://control.staging.store.korsenex.com',
+      release_version: '2026.04.15-observability',
+      database: { status: 'ok', detail: null },
+      operations_worker: { configured: true, poll_seconds: 5, batch_size: 25, lease_seconds: 60 },
+    },
+    operations: {
+      queued_count: 0,
+      running_count: 0,
+      retryable_count: 0,
+      dead_letter_count: 1,
+      recent_failure_records: [
+        {
+          id: 'job-dead-letter-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-acme',
+          job_type: 'UNKNOWN_JOB',
+          status: 'DEAD_LETTER',
+          attempt_count: 1,
+          max_attempts: 1,
+          last_error: 'Unsupported operations job type: UNKNOWN_JOB',
+          dead_lettered_at: '2026-04-15T02:05:00',
+          updated_at: '2026-04-15T02:05:00',
+        },
+      ],
+    },
+    runtime: {
+      tracked_branch_count: 1,
+      degraded_branch_count: 1,
+      connected_spoke_count: 2,
+      open_conflict_count: 1,
+      max_local_outbox_depth: 3,
+      branches: [
+        {
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-acme',
+          hub_device_id: 'hub-device-1',
+          runtime_state: 'DEGRADED',
+          connected_spoke_count: 2,
+          local_outbox_depth: 3,
+          open_conflict_count: 1,
+          last_heartbeat_at: '2026-04-15T02:04:00',
+          last_local_spoke_sync_at: '2026-04-15T02:03:00',
+        },
+      ],
+    },
+    backup: {
+      configured: true,
+      status: 'ok',
+      last_successful_backup_at: '2026-04-15T02:00:00',
+      metadata_key: 'control-plane/staging/postgres-backups/20260415T020000Z/metadata.json',
+      release_version: '2026.04.15-observability',
+      age_hours: 1.5,
+      detail: null,
+    },
+  };
+}
+
 describe('platform admin onboarding flow', () => {
   const originalFetch = globalThis.fetch;
 
@@ -84,6 +148,7 @@ describe('platform admin onboarding flow', () => {
           },
         ],
       }),
+      jsonResponse(observabilitySummaryResponse()),
       jsonResponse({
         tenant_id: 'tenant-acme',
         subscription: {
@@ -260,6 +325,7 @@ describe('platform admin onboarding flow', () => {
           },
         ],
       }),
+      jsonResponse(observabilitySummaryResponse()),
       jsonResponse({
         tenant_id: 'tenant-acme',
         subscription: {
@@ -411,5 +477,99 @@ describe('platform admin onboarding flow', () => {
     await waitFor(() => {
       expect(screen.getByText('SUSPENDED')).toBeInTheDocument();
     });
+  });
+
+  test('shows the observability cockpit summary after session bootstrap', async () => {
+    mockResponses([
+      jsonResponse({ access_token: 'session-platform', token_type: 'Bearer' }),
+      jsonResponse({
+        user_id: 'user-platform',
+        email: 'admin@store.local',
+        full_name: 'Platform Admin',
+        is_platform_admin: true,
+        tenant_memberships: [],
+        branch_memberships: [],
+      }),
+      jsonResponse({
+        records: [
+          {
+            tenant_id: 'tenant-acme',
+            name: 'Acme Retail',
+            slug: 'acme-retail',
+            status: 'ACTIVE',
+            onboarding_status: 'OWNER_INVITE_PENDING',
+          },
+        ],
+      }),
+      jsonResponse({
+        records: [
+          {
+            id: 'plan-launch',
+            code: 'launch-starter',
+            display_name: 'Launch Starter',
+            billing_cadence: 'monthly',
+            currency_code: 'INR',
+            amount_minor: 149900,
+            trial_days: 14,
+            branch_limit: 2,
+            device_limit: 4,
+            offline_runtime_hours: 48,
+            grace_window_days: 5,
+            feature_flags: { offline_continuity: true },
+            provider_plan_refs: { cashfree: 'cf_plan_launch_starter', razorpay: 'rp_plan_launch_starter' },
+            is_default: true,
+            status: 'ACTIVE',
+          },
+        ],
+      }),
+      jsonResponse(observabilitySummaryResponse()),
+      jsonResponse({
+        tenant_id: 'tenant-acme',
+        subscription: {
+          id: 'sub-acme',
+          tenant_id: 'tenant-acme',
+          billing_plan_id: 'plan-launch',
+          provider_name: null,
+          provider_customer_id: null,
+          provider_subscription_id: null,
+          lifecycle_status: 'TRIALING',
+          mandate_status: null,
+          trial_started_at: '2026-04-14T00:00:00',
+          trial_ends_at: '2026-04-28T00:00:00',
+          current_period_started_at: null,
+          current_period_ends_at: null,
+          grace_until: null,
+          canceled_at: null,
+        },
+        entitlement: {
+          id: 'ent-acme',
+          tenant_id: 'tenant-acme',
+          billing_plan_id: 'plan-launch',
+          active_plan_code: 'launch-starter',
+          lifecycle_status: 'TRIALING',
+          branch_limit: 2,
+          device_limit: 4,
+          offline_runtime_hours: 48,
+          grace_until: null,
+          suspend_at: '2026-05-03T00:00:00',
+          feature_flags: { offline_continuity: true },
+          policy_source: 'subscription',
+          policy_metadata: { reason: 'trial_issued' },
+        },
+        active_override: null,
+      }),
+    ]);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('Korsenex token'), {
+      target: { value: 'stub:sub=platform-1;email=admin@store.local;name=Platform Admin' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Start control plane session' }));
+
+    expect(await screen.findByText('Platform Admin')).toBeInTheDocument();
+    expect(screen.getByText('Operations queue')).toBeInTheDocument();
+    expect(screen.getByText('DEGRADED')).toBeInTheDocument();
+    expect(screen.getByText('control-plane/staging/postgres-backups/20260415T020000Z/metadata.json')).toBeInTheDocument();
   });
 });
