@@ -2,6 +2,7 @@ mod runtime_paths;
 mod runtime_cache;
 mod runtime_continuity;
 mod runtime_control_plane_origin;
+mod runtime_hardware;
 mod runtime_hub_identity;
 mod runtime_hub_service;
 mod runtime_spoke_registry;
@@ -16,6 +17,10 @@ use runtime_cache::{
 use runtime_continuity::{
     cmd_clear_store_runtime_continuity, cmd_get_store_runtime_continuity_status,
     cmd_load_store_runtime_continuity, cmd_save_store_runtime_continuity,
+};
+use runtime_hardware::{
+    cmd_clear_store_runtime_hardware_profile, cmd_get_store_runtime_hardware_status,
+    cmd_save_store_runtime_hardware_profile,
 };
 use runtime_hub_identity::{
     cmd_clear_store_runtime_hub_identity, cmd_load_store_runtime_hub_identity,
@@ -45,6 +50,9 @@ pub fn run() {
             cmd_load_store_runtime_session,
             cmd_save_store_runtime_session,
             cmd_clear_store_runtime_session,
+            cmd_get_store_runtime_hardware_status,
+            cmd_save_store_runtime_hardware_profile,
+            cmd_clear_store_runtime_hardware_profile,
             cmd_load_store_runtime_hub_identity,
             cmd_save_store_runtime_hub_identity,
             cmd_clear_store_runtime_hub_identity,
