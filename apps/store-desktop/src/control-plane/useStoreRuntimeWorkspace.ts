@@ -67,6 +67,7 @@ import { isStoreRuntimeDeveloperBootstrapEnabled } from './storeRuntimeAuthMode'
 import { ensureStoreRuntimeHubIdentity } from './runtimeHubIdentity';
 import { loadStoreRuntimeShellStatus, useStoreRuntimeShellStatus } from './useStoreRuntimeShellStatus';
 import { ControlPlaneRequestError, storeControlPlaneClient } from './client';
+import { useStoreRuntimeBarcodeScanner } from './useStoreRuntimeBarcodeScanner';
 import { useStoreRuntimeHardwareIntegration } from './useStoreRuntimeHardwareIntegration';
 import { useStoreRuntimeOfflineContinuity } from './useStoreRuntimeOfflineContinuity';
 type CacheStatus = 'EMPTY' | 'HYDRATED' | 'SYNCED';
@@ -168,6 +169,17 @@ export function useStoreRuntimeWorkspace() {
       startTransition(() => {
         setErrorMessage(message);
       });
+    },
+  });
+  const runtimeBarcodeScanner = useStoreRuntimeBarcodeScanner({
+    runtimeShellKind: runtimeShellStatus?.runtime_kind ?? null,
+    isSessionLive,
+    isLocalUnlocked,
+    onBarcodeDetected(barcode) {
+      startTransition(() => {
+        setScannedBarcode(barcode);
+      });
+      void lookupScannedBarcode(barcode);
     },
   });
   const offlineContinuity = useStoreRuntimeOfflineContinuity({
@@ -937,14 +949,15 @@ export function useStoreRuntimeWorkspace() {
     }
   }
 
-  async function lookupScannedBarcode() {
-    if (!accessToken || !tenantId || !branchId || !scannedBarcode) {
+  async function lookupScannedBarcode(barcodeOverride?: string) {
+    const barcodeToLookup = barcodeOverride ?? scannedBarcode;
+    if (!accessToken || !tenantId || !branchId || !barcodeToLookup) {
       return;
     }
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const lookup = await storeControlPlaneClient.lookupCatalogScan(accessToken, tenantId, branchId, scannedBarcode);
+      const lookup = await storeControlPlaneClient.lookupCatalogScan(accessToken, tenantId, branchId, barcodeToLookup);
       startTransition(() => {
         setLatestScanLookup(lookup);
       });
@@ -1300,6 +1313,8 @@ export function useStoreRuntimeWorkspace() {
     runtimeHardwarePrinters: runtimeHardware.hardwareStatus?.printers ?? [],
     runtimeLabelPrinterName: runtimeHardware.hardwareStatus?.profile.label_printer_name ?? null,
     runtimeReceiptPrinterName: runtimeHardware.hardwareStatus?.profile.receipt_printer_name ?? null,
+    runtimeScannerCaptureState: runtimeBarcodeScanner.scannerCaptureState,
+    runtimeScannerLastScanAt: runtimeBarcodeScanner.lastScanAt,
     runtimeHeartbeat,
     runtimeHome: runtimeShellStatus?.runtime_home ?? null,
     runtimeHostname: runtimeShellStatus?.hostname ?? null,

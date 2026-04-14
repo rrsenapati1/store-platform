@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useState } from 'react';
 import type { ControlPlanePrintJob } from '@store/types';
+import type { StoreRuntimeHardwareStatus } from '../runtime-hardware/storeRuntimeHardware';
 
 const { tauriState, dispatches, mockInvoke } = vi.hoisted(() => ({
   tauriState: {
@@ -29,7 +30,7 @@ const { tauriState, dispatches, mockInvoke } = vi.hoisted(() => ({
         last_printed_at: null,
         last_scan_at: null,
       },
-    },
+    } as StoreRuntimeHardwareStatus,
   },
   dispatches: [] as Array<Record<string, unknown>>,
   mockInvoke: vi.fn(async (command: string, payload?: Record<string, unknown>) => {

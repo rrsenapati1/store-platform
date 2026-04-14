@@ -2,6 +2,8 @@ import { ActionButton, DetailList, FormField, SectionCard } from '@store/ui';
 import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
 
 export function StoreBarcodeLookupSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
+  const isPackagedRuntime = workspace.runtimeShellKind === 'packaged_desktop';
+
   return (
     <SectionCard eyebrow="Barcode lookup" title="Counter scan lookup">
       <FormField id="scanned-barcode" label="Scanned barcode" value={workspace.scannedBarcode} onChange={workspace.setScannedBarcode} />
@@ -11,6 +13,17 @@ export function StoreBarcodeLookupSection({ workspace }: { workspace: StoreRunti
       >
         Lookup scanned barcode
       </ActionButton>
+
+      {isPackagedRuntime ? (
+        <div style={{ marginTop: '16px' }}>
+          <DetailList
+            items={[
+              { label: 'Scanner capture', value: workspace.runtimeScannerCaptureState ?? 'Unavailable' },
+              { label: 'Last scan', value: workspace.runtimeScannerLastScanAt ?? 'No scanner activity yet' },
+            ]}
+          />
+        </div>
+      ) : null}
 
       {workspace.latestScanLookup ? (
         <div style={{ marginTop: '16px' }}>

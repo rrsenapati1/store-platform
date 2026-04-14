@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
 
@@ -81,6 +81,7 @@ describe('store runtime barcode lookup flow', () => {
   });
 
   afterEach(() => {
+    cleanup();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
