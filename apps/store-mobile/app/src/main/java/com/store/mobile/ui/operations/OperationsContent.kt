@@ -22,10 +22,13 @@ fun mobileOperationsSectionLabel(section: MobileOperationsSection): String {
 @Composable
 fun MobileOperationsContent(
     activeSection: MobileOperationsSection,
-    draftBarcode: String,
     scanLookupState: ScanLookupUiState,
+    isTabletLayout: Boolean,
     onDraftBarcodeChange: (String) -> Unit,
     onLookupBarcode: () -> Unit,
+    onCameraPermissionResolved: (Boolean) -> Unit,
+    onCameraPreviewFailure: (String) -> Unit,
+    onCameraBarcodeDetected: (String) -> Unit,
     receivingBoard: ReceivingBoard,
     stockCountContext: StockCountContext,
     expiryReport: ExpiryReport,
@@ -34,10 +37,13 @@ fun MobileOperationsContent(
     when (activeSection) {
         MobileOperationsSection.SCAN -> {
             ScanLookupScreen(
-                draftBarcode = draftBarcode,
                 state = scanLookupState,
+                isTabletLayout = isTabletLayout,
                 onDraftBarcodeChange = onDraftBarcodeChange,
                 onLookupBarcode = onLookupBarcode,
+                onCameraPermissionResolved = onCameraPermissionResolved,
+                onCameraPreviewFailure = onCameraPreviewFailure,
+                onCameraBarcodeDetected = onCameraBarcodeDetected,
             )
         }
 

@@ -1,28 +1,114 @@
 package com.store.mobile.ui.scan
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 
 @Composable
 fun ScanLookupScreen(
-    draftBarcode: String,
     state: ScanLookupUiState,
+    isTabletLayout: Boolean,
     onDraftBarcodeChange: (String) -> Unit,
     onLookupBarcode: () -> Unit,
+    onCameraPermissionResolved: (Boolean) -> Unit,
+    onCameraPreviewFailure: (String) -> Unit,
+    onCameraBarcodeDetected: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val permissionGranted = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.CAMERA,
+    ) == PackageManager.PERMISSION_GRANTED
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = onCameraPermissionResolved,
+    )
+
+    LaunchedEffect(permissionGranted) {
+        onCameraPermissionResolved(permissionGranted)
+    }
+
+    if (isTabletLayout) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            ScanCameraPanel(
+                modifier = Modifier.weight(0.56f),
+                state = state,
+                onRequestPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                onRetryCamera = { onCameraPermissionResolved(permissionGranted) },
+                onCameraPreviewFailure = onCameraPreviewFailure,
+                onCameraBarcodeDetected = onCameraBarcodeDetected,
+            )
+            ScanLookupDetailsPanel(
+                modifier = Modifier.weight(0.44f),
+                state = state,
+                onDraftBarcodeChange = onDraftBarcodeChange,
+                onLookupBarcode = onLookupBarcode,
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            ScanCameraPanel(
+                modifier = Modifier.fillMaxWidth(),
+                state = state,
+                onRequestPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                onRetryCamera = { onCameraPermissionResolved(permissionGranted) },
+                onCameraPreviewFailure = onCameraPreviewFailure,
+                onCameraBarcodeDetected = onCameraBarcodeDetected,
+            )
+            ScanLookupDetailsPanel(
+                modifier = Modifier.fillMaxWidth(),
+                state = state,
+                onDraftBarcodeChange = onDraftBarcodeChange,
+                onLookupBarcode = onLookupBarcode,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScanCameraPanel(
+    modifier: Modifier,
+    state: ScanLookupUiState,
+    onRequestPermission: () -> Unit,
+    onRetryCamera: () -> Unit,
+    onCameraPreviewFailure: (String) -> Unit,
+    onCameraBarcodeDetected: (String) -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(24.dp),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
@@ -30,11 +116,69 @@ fun ScanLookupScreen(
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = "Camera permission is declared; the first slice uses the same barcode path through manual entry until live preview wiring lands.",
+            text = "Use live camera preview for instant catalog lookup, or fall back to manual barcode entry when needed.",
             style = MaterialTheme.typography.bodyMedium,
         )
+
+        when (state.cameraStatus) {
+            ScanCameraStatus.CHECKING -> {
+                ScanCameraMessageCard(
+                    title = "Checking camera access",
+                    message = "Preparing the live barcode scanner for this device.",
+                )
+            }
+
+            ScanCameraStatus.PERMISSION_REQUIRED -> {
+                ScanCameraMessageCard(
+                    title = "Camera permission required",
+                    message = "Allow camera access to scan barcodes live on this device.",
+                    actionLabel = "Allow camera",
+                    onAction = onRequestPermission,
+                )
+            }
+
+            ScanCameraStatus.READY -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    CameraBarcodePreview(
+                        modifier = Modifier.fillMaxSize(),
+                        onBarcodeDetected = onCameraBarcodeDetected,
+                        onCameraFailure = onCameraPreviewFailure,
+                    )
+                }
+            }
+
+            ScanCameraStatus.UNAVAILABLE -> {
+                ScanCameraMessageCard(
+                    title = "Camera unavailable",
+                    message = state.cameraMessage
+                        ?: "Live preview could not start. Manual barcode entry is still available.",
+                    actionLabel = "Retry camera",
+                    onAction = onRetryCamera,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScanLookupDetailsPanel(
+    modifier: Modifier,
+    state: ScanLookupUiState,
+    onDraftBarcodeChange: (String) -> Unit,
+    onLookupBarcode: () -> Unit,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         OutlinedTextField(
-            value = draftBarcode,
+            value = state.draftBarcode,
             onValueChange = onDraftBarcodeChange,
             label = { Text("Barcode") },
             modifier = Modifier.fillMaxWidth(),
@@ -47,12 +191,30 @@ fun ScanLookupScreen(
             Text("Lookup barcode")
         }
         if (state.productName.isNotBlank()) {
-            Text(text = state.productName, style = MaterialTheme.typography.titleLarge)
-            Text(text = "Barcode: ${state.barcode}", style = MaterialTheme.typography.bodyMedium)
-            Text(text = "SKU: ${state.skuCode}", style = MaterialTheme.typography.bodyMedium)
-            Text(text = "Price: ${state.priceLabel}", style = MaterialTheme.typography.bodyMedium)
-            Text(text = "Stock: ${state.stockLabel}", style = MaterialTheme.typography.bodyMedium)
-            Text(text = "Status: ${state.availabilityStatus}", style = MaterialTheme.typography.bodyMedium)
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(text = state.productName, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = if (state.lastScanSource == ScanLookupSource.CAMERA) {
+                            "Live camera scan"
+                        } else {
+                            "Manual lookup"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(text = "Barcode: ${state.barcode}", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "SKU: ${state.skuCode}", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "Price: ${state.priceLabel}", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "Stock: ${state.stockLabel}", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "Status: ${state.availabilityStatus}", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
         state.errorMessage?.let { message ->
             Text(
@@ -60,6 +222,37 @@ fun ScanLookupScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
+        }
+        if (state.cameraStatus == ScanCameraStatus.READY) {
+            Text(
+                text = "Point the camera at a barcode. Repeated detections are throttled to keep lookup stable.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScanCameraMessageCard(
+    title: String,
+    message: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(text = message, style = MaterialTheme.typography.bodyMedium)
+            if (actionLabel != null && onAction != null) {
+                Button(onClick = onAction) {
+                    Text(actionLabel)
+                }
+            }
         }
     }
 }

@@ -25,10 +25,12 @@ import com.store.mobile.ui.scan.ScanLookupUiState
 fun InventoryTabletShell(
     activeSection: MobileOperationsSection,
     onSelectSection: (MobileOperationsSection) -> Unit,
-    draftBarcode: String,
     scanLookupState: ScanLookupUiState,
     onDraftBarcodeChange: (String) -> Unit,
     onLookupBarcode: () -> Unit,
+    onCameraPermissionResolved: (Boolean) -> Unit,
+    onCameraPreviewFailure: (String) -> Unit,
+    onCameraBarcodeDetected: (String) -> Unit,
     receivingBoard: ReceivingBoard,
     stockCountContext: StockCountContext,
     expiryReport: ExpiryReport,
@@ -68,10 +70,13 @@ fun InventoryTabletShell(
         Column(modifier = Modifier.weight(0.68f)) {
             MobileOperationsContent(
                 activeSection = activeSection,
-                draftBarcode = draftBarcode,
                 scanLookupState = scanLookupState,
+                isTabletLayout = true,
                 onDraftBarcodeChange = onDraftBarcodeChange,
                 onLookupBarcode = onLookupBarcode,
+                onCameraPermissionResolved = onCameraPermissionResolved,
+                onCameraPreviewFailure = onCameraPreviewFailure,
+                onCameraBarcodeDetected = onCameraBarcodeDetected,
                 receivingBoard = receivingBoard,
                 stockCountContext = stockCountContext,
                 expiryReport = expiryReport,

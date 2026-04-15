@@ -14,10 +14,12 @@ import com.store.mobile.ui.scan.ScanLookupUiState
 fun HandheldStoreShell(
     activeSection: MobileOperationsSection,
     onSelectSection: (MobileOperationsSection) -> Unit,
-    draftBarcode: String,
     scanLookupState: ScanLookupUiState,
     onDraftBarcodeChange: (String) -> Unit,
     onLookupBarcode: () -> Unit,
+    onCameraPermissionResolved: (Boolean) -> Unit,
+    onCameraPreviewFailure: (String) -> Unit,
+    onCameraBarcodeDetected: (String) -> Unit,
     receivingBoard: ReceivingBoard,
     stockCountContext: StockCountContext,
     expiryReport: ExpiryReport,
@@ -29,10 +31,13 @@ fun HandheldStoreShell(
     )
     MobileOperationsContent(
         activeSection = activeSection,
-        draftBarcode = draftBarcode,
         scanLookupState = scanLookupState,
+        isTabletLayout = false,
         onDraftBarcodeChange = onDraftBarcodeChange,
         onLookupBarcode = onLookupBarcode,
+        onCameraPermissionResolved = onCameraPermissionResolved,
+        onCameraPreviewFailure = onCameraPreviewFailure,
+        onCameraBarcodeDetected = onCameraBarcodeDetected,
         receivingBoard = receivingBoard,
         stockCountContext = stockCountContext,
         expiryReport = expiryReport,

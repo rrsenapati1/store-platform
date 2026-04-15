@@ -1,5 +1,7 @@
 package com.store.mobile.scan
 
+import com.store.mobile.ui.scan.ScanCameraStatus
+import com.store.mobile.ui.scan.ScanLookupSource
 import com.store.mobile.ui.scan.ScanLookupViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -22,10 +24,58 @@ class ScanLookupViewModelTest {
         )
         val viewModel = ScanLookupViewModel(repository)
 
-        viewModel.lookupScannedBarcode(" 1234567890123 ")
+        viewModel.updateDraftBarcode(" 1234567890123 ")
+        viewModel.lookupDraftBarcode()
 
         assertEquals("ACME TEA", viewModel.state.productName)
         assertEquals("1234567890123", viewModel.state.barcode)
         assertEquals("18", viewModel.state.stockLabel)
+        assertEquals("1234567890123", viewModel.state.draftBarcode)
+        assertEquals(ScanLookupSource.MANUAL, viewModel.state.lastScanSource)
+    }
+
+    @Test
+    fun cameraDetectionResolvesLookupStateAndMarksCameraAsReady() {
+        val repository = InMemoryScanLookupRepository(
+            records = listOf(
+                ScanLookupRecord(
+                    productId = "prod-1",
+                    productName = "ACME TEA",
+                    skuCode = "TEA-001",
+                    barcode = "1234567890123",
+                    sellingPrice = 125.0,
+                    stockOnHand = 18.0,
+                    availabilityStatus = "IN_STOCK",
+                ),
+            ),
+        )
+        val viewModel = ScanLookupViewModel(repository)
+
+        viewModel.setCameraPermission(granted = true)
+        viewModel.onCameraBarcodeDetected("1234567890123", detectedAtMillis = 5_000L)
+
+        assertEquals(ScanCameraStatus.READY, viewModel.state.cameraStatus)
+        assertEquals("1234567890123", viewModel.state.draftBarcode)
+        assertEquals("ACME TEA", viewModel.state.productName)
+        assertEquals(ScanLookupSource.CAMERA, viewModel.state.lastScanSource)
+    }
+
+    @Test
+    fun deniedCameraPermissionMovesStateToPermissionRequired() {
+        val viewModel = ScanLookupViewModel(InMemoryScanLookupRepository())
+
+        viewModel.setCameraPermission(granted = false)
+
+        assertEquals(ScanCameraStatus.PERMISSION_REQUIRED, viewModel.state.cameraStatus)
+    }
+
+    @Test
+    fun cameraFailureMovesStateToUnavailable() {
+        val viewModel = ScanLookupViewModel(InMemoryScanLookupRepository())
+
+        viewModel.reportCameraUnavailable("Camera binding failed.")
+
+        assertEquals(ScanCameraStatus.UNAVAILABLE, viewModel.state.cameraStatus)
+        assertEquals("Camera binding failed.", viewModel.state.cameraMessage)
     }
 }

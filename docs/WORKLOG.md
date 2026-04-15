@@ -2,6 +2,16 @@
 
 ## 2026-04-15
 
+- Started `V2-002` and effectively closed the remaining `V2-001` runtime-surface gap:
+  - replaced the Android app's manual-entry-only scan placeholder with a real live camera preview pipeline using CameraX and on-device ML Kit barcode detection
+  - kept one shared scanner/session layer for both `mobile_store_spoke` handheld mode and `inventory_tablet_spoke` tablet mode, while preserving different layouts in each shell
+  - moved scan draft state and camera posture into the shared view-model so manual entry, permission handling, duplicate-scan throttling, and preview failures all follow one contract
+  - kept manual barcode entry as a first-class fallback so scan workflows degrade cleanly when permission is denied or preview binding fails
+- Verified:
+  - `cd apps/store-mobile && .\\gradlew.bat testDebugUnitTest --tests com.store.mobile.scan.CameraBarcodeScannerTest --tests com.store.mobile.scan.ScanLookupViewModelTest`
+  - `cd apps/store-mobile && .\\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+
 - Expanded `V2-001` with the first customer-display runtime slice:
   - kept customer display inside `apps/store-desktop` as a terminal-owned second-window surface instead of introducing a separate paired device too early
   - added a dedicated customer-display payload model, browser-safe state transport, and a customer-facing route that renders idle, active-cart, payment-progress, and sale-complete posture from cashier-owned state

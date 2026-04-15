@@ -49,7 +49,6 @@ fun StoreMobileApp() {
     val stockCountRepository = remember { InMemoryStockCountRepository() }
     val expiryRepository = remember { InMemoryExpiryRepository() }
     var pairingState by remember { mutableStateOf(pairingViewModel.state) }
-    var scanDraftBarcode by remember { mutableStateOf("") }
     var scanLookupState by remember { mutableStateOf(scanLookupViewModel.state) }
     var handheldSection by remember { mutableStateOf(MobileOperationsSection.SCAN) }
     var tabletSection by remember { mutableStateOf(MobileOperationsSection.RECEIVING) }
@@ -108,11 +107,28 @@ fun StoreMobileApp() {
                         InventoryTabletShell(
                             activeSection = tabletSection,
                             onSelectSection = { section -> tabletSection = section },
-                            draftBarcode = scanDraftBarcode,
                             scanLookupState = scanLookupState,
-                            onDraftBarcodeChange = { barcode -> scanDraftBarcode = barcode },
+                            onDraftBarcodeChange = { barcode ->
+                                scanLookupViewModel.updateDraftBarcode(barcode)
+                                scanLookupState = scanLookupViewModel.state
+                            },
                             onLookupBarcode = {
-                                scanLookupViewModel.lookupScannedBarcode(scanDraftBarcode)
+                                scanLookupViewModel.lookupDraftBarcode()
+                                scanLookupState = scanLookupViewModel.state
+                            },
+                            onCameraPermissionResolved = { granted ->
+                                scanLookupViewModel.setCameraPermission(granted)
+                                scanLookupState = scanLookupViewModel.state
+                            },
+                            onCameraPreviewFailure = { message ->
+                                scanLookupViewModel.reportCameraUnavailable(message)
+                                scanLookupState = scanLookupViewModel.state
+                            },
+                            onCameraBarcodeDetected = { barcode ->
+                                scanLookupViewModel.onCameraBarcodeDetected(
+                                    rawBarcode = barcode,
+                                    detectedAtMillis = System.currentTimeMillis(),
+                                )
                                 scanLookupState = scanLookupViewModel.state
                             },
                             receivingBoard = receivingBoard,
@@ -124,11 +140,28 @@ fun StoreMobileApp() {
                         HandheldStoreShell(
                             activeSection = handheldSection,
                             onSelectSection = { section -> handheldSection = section },
-                            draftBarcode = scanDraftBarcode,
                             scanLookupState = scanLookupState,
-                            onDraftBarcodeChange = { barcode -> scanDraftBarcode = barcode },
+                            onDraftBarcodeChange = { barcode ->
+                                scanLookupViewModel.updateDraftBarcode(barcode)
+                                scanLookupState = scanLookupViewModel.state
+                            },
                             onLookupBarcode = {
-                                scanLookupViewModel.lookupScannedBarcode(scanDraftBarcode)
+                                scanLookupViewModel.lookupDraftBarcode()
+                                scanLookupState = scanLookupViewModel.state
+                            },
+                            onCameraPermissionResolved = { granted ->
+                                scanLookupViewModel.setCameraPermission(granted)
+                                scanLookupState = scanLookupViewModel.state
+                            },
+                            onCameraPreviewFailure = { message ->
+                                scanLookupViewModel.reportCameraUnavailable(message)
+                                scanLookupState = scanLookupViewModel.state
+                            },
+                            onCameraBarcodeDetected = { barcode ->
+                                scanLookupViewModel.onCameraBarcodeDetected(
+                                    rawBarcode = barcode,
+                                    detectedAtMillis = System.currentTimeMillis(),
+                                )
                                 scanLookupState = scanLookupViewModel.state
                             },
                             receivingBoard = receivingBoard,
