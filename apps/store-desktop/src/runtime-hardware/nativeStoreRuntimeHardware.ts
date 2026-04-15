@@ -2,6 +2,7 @@ import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 import { createBrowserStoreRuntimeHardware } from './browserStoreRuntimeHardware';
 import type {
   StoreRuntimeHardwareAdapter,
+  StoreRuntimeHardwareScannerActivityInput,
   StoreRuntimeHardwareInvoke,
   StoreRuntimeHardwarePrintJobInput,
   StoreRuntimeHardwareProfileInput,
@@ -53,6 +54,7 @@ export function createNativeStoreRuntimeHardware(options: NativeStoreRuntimeHard
         return toHardwareStatus(await invoke('cmd_save_store_runtime_hardware_profile', {
           receipt_printer_name: profile.receipt_printer_name,
           label_printer_name: profile.label_printer_name,
+          preferred_scanner_id: profile.preferred_scanner_id,
         }));
       } catch (error) {
         if (shouldFallbackToBrowserHardware(error)) {
@@ -69,6 +71,19 @@ export function createNativeStoreRuntimeHardware(options: NativeStoreRuntimeHard
       } catch (error) {
         if (shouldFallbackToBrowserHardware(error)) {
           return browserFallback.dispatchPrintJob(job);
+        }
+        throw error;
+      }
+    },
+    async recordScannerActivity(activity: StoreRuntimeHardwareScannerActivityInput) {
+      try {
+        return toHardwareStatus(await invoke('cmd_record_store_runtime_scanner_activity', {
+          barcode_preview: activity.barcode_preview,
+          scanner_transport: activity.scanner_transport,
+        }));
+      } catch (error) {
+        if (shouldFallbackToBrowserHardware(error)) {
+          return browserFallback.recordScannerActivity(activity);
         }
         throw error;
       }

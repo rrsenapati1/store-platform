@@ -258,6 +258,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
     return savePrinterProfile({
       receipt_printer_name: printerName,
       label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
+      preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
     });
   }
 
@@ -265,6 +266,26 @@ export function useStoreRuntimeHardwareIntegration(args: {
     return savePrinterProfile({
       receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
       label_printer_name: printerName,
+      preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
+    });
+  }
+
+  async function assignPreferredScanner(scannerId: string | null) {
+    return savePrinterProfile({
+      receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
+      label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
+      preferred_scanner_id: scannerId,
+    });
+  }
+
+  async function recordScannerActivity(activity: {
+    barcode_preview: string;
+    scanner_transport: 'keyboard_wedge' | 'usb_hid' | 'bluetooth_hid' | 'unknown' | null;
+  }) {
+    const nextStatus = await hardwareAdapterRef.current.recordScannerActivity(activity);
+    applyStateTransition(() => {
+      setHardwareStatus(nextStatus);
+      setHardwareError(null);
     });
   }
 
@@ -274,5 +295,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
     refreshHardwareStatus,
     assignLabelPrinter,
     assignReceiptPrinter,
+    assignPreferredScanner,
+    recordScannerActivity,
   };
 }

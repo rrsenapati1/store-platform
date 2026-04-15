@@ -10,6 +10,17 @@ const { tauriState, dispatches, mockInvoke } = vi.hoisted(() => ({
   tauriState: {
     hardwareStatus: {
       bridge_state: 'ready',
+      scanners: [
+        {
+          id: 'scanner-zebra-1',
+          label: 'Zebra DS2208',
+          transport: 'usb_hid',
+          vendor_name: 'Zebra',
+          product_name: 'DS2208',
+          serial_number: 'ZB-001',
+          is_connected: true,
+        },
+      ],
       printers: [
         {
           name: 'Thermal-01',
@@ -21,18 +32,19 @@ const { tauriState, dispatches, mockInvoke } = vi.hoisted(() => ({
       profile: {
         receipt_printer_name: 'Thermal-01',
         label_printer_name: 'Label-01',
+        preferred_scanner_id: 'scanner-zebra-1',
         updated_at: '2026-04-14T16:00:00.000Z',
       },
       diagnostics: {
         scanner_capture_state: 'ready',
-        scanner_transport: 'keyboard_wedge',
+        scanner_transport: 'usb_hid',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
         last_scan_at: null,
         last_scan_barcode_preview: null,
-        scanner_status_message: 'Ready for external scanner input',
-        scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
+        scanner_status_message: 'Preferred HID scanner connected: Zebra DS2208',
+        scanner_setup_hint: 'Scan into the active packaged terminal to keep HID activity diagnostics current.',
       },
     } as StoreRuntimeHardwareStatus,
   },
@@ -118,6 +130,17 @@ describe('packaged runtime hardware integration', () => {
     dispatches.length = 0;
     tauriState.hardwareStatus = {
       bridge_state: 'ready',
+      scanners: [
+        {
+          id: 'scanner-zebra-1',
+          label: 'Zebra DS2208',
+          transport: 'usb_hid',
+          vendor_name: 'Zebra',
+          product_name: 'DS2208',
+          serial_number: 'ZB-001',
+          is_connected: true,
+        },
+      ],
       printers: [
         {
           name: 'Thermal-01',
@@ -129,18 +152,19 @@ describe('packaged runtime hardware integration', () => {
       profile: {
         receipt_printer_name: 'Thermal-01',
         label_printer_name: 'Label-01',
+        preferred_scanner_id: 'scanner-zebra-1',
         updated_at: '2026-04-14T16:00:00.000Z',
       },
       diagnostics: {
         scanner_capture_state: 'ready',
-        scanner_transport: 'keyboard_wedge',
+        scanner_transport: 'usb_hid',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
         last_scan_at: null,
         last_scan_barcode_preview: null,
-        scanner_status_message: 'Ready for external scanner input',
-        scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
+        scanner_status_message: 'Preferred HID scanner connected: Zebra DS2208',
+        scanner_setup_hint: 'Scan into the active packaged terminal to keep HID activity diagnostics current.',
       },
     };
 
@@ -210,8 +234,8 @@ describe('packaged runtime hardware integration', () => {
       expect(screen.getByTestId('last-print-message')).toHaveTextContent('Printed SALES_INVOICE on Thermal-01');
     });
 
-    expect(screen.getByTestId('scanner-transport')).toHaveTextContent('keyboard_wedge');
-    expect(screen.getByTestId('scanner-status-message')).toHaveTextContent('Ready for external scanner input');
+    expect(screen.getByTestId('scanner-transport')).toHaveTextContent('usb_hid');
+    expect(screen.getByTestId('scanner-status-message')).toHaveTextContent('Preferred HID scanner connected: Zebra DS2208');
     expect(screen.getByTestId('error-message')).toHaveTextContent('none');
     expect(dispatches).toHaveLength(1);
   });

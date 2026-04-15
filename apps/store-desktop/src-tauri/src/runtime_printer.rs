@@ -279,6 +279,7 @@ pub mod tests {
         let profile = StoreRuntimeHardwareProfileRecord {
             receipt_printer_name: Some("Thermal-01".to_string()),
             label_printer_name: Some("Label-01".to_string()),
+            preferred_scanner_id: None,
             updated_at: Some("1".to_string()),
         };
 
@@ -312,6 +313,7 @@ pub mod tests {
         let profile = StoreRuntimeHardwareProfileRecord {
             receipt_printer_name: Some("Thermal-01".to_string()),
             label_printer_name: None,
+            preferred_scanner_id: None,
             updated_at: Some("1".to_string()),
         };
 

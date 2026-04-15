@@ -84,6 +84,8 @@ export function StoreRuntimeShellSection({ workspace }: { workspace: StoreRuntim
           { label: 'Hardware bridge', value: workspace.runtimeHardwareBridgeState ?? 'Unavailable' },
           { label: 'Scanner capture', value: workspace.runtimeScannerCaptureState ?? 'Unavailable' },
           { label: 'Scanner transport', value: workspace.runtimeScannerTransport ?? 'Unknown' },
+          { label: 'Discovered scanners', value: String(workspace.runtimeHardwareScanners.length) },
+          { label: 'Preferred scanner', value: workspace.runtimePreferredScannerId ?? 'Not assigned' },
           { label: 'Scanner status', value: workspace.runtimeScannerStatusMessage ?? 'No scanner diagnostics available' },
           { label: 'Scanner setup hint', value: workspace.runtimeScannerSetupHint ?? 'No scanner setup guidance available' },
           { label: 'Last scan preview', value: workspace.runtimeScannerLastScanPreview ?? 'No scanner activity yet' },

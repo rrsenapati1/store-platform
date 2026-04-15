@@ -2,6 +2,16 @@
 
 ## 2026-04-15
 
+- Completed `V2-002` on Store Desktop HID scanner inventory:
+  - added a Windows-first HID scanner backend in the packaged runtime so Store Desktop can discover likely local scanner candidates instead of relying only on wedge heuristics
+  - extended the local hardware profile with a preferred scanner assignment and surfaced preferred-scanner connected/disconnected posture through the packaged runtime diagnostics contract
+  - kept keyboard-wedge capture as the active desktop barcode input path, but now publish accepted scan activity back into the native hardware store so local diagnostics track real scan activity
+  - surfaced discovered local scanners and preferred-scanner controls in the barcode lookup section, and exposed scanner count/preferred scanner posture in the shell identity section
+- Verified:
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml --lib`
+
 - Expanded `V2-002` on Store Desktop scanner hardening:
   - kept the existing packaged desktop keyboard-wedge scan path, but extended it with richer scanner diagnostics instead of leaving scanner readiness implicit
   - added scanner transport, status message, setup hint, and last-scan preview to the runtime hardware diagnostics contract across browser fallback, packaged shell, and native persisted hardware state

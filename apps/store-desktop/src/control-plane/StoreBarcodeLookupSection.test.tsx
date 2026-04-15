@@ -19,6 +19,28 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     runtimeScannerStatusMessage: 'Ready for external scanner input',
     runtimeScannerSetupHint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
     runtimeScannerLastScanPreview: 'ACMETEA',
+    runtimePreferredScannerId: 'scanner-zebra-1',
+    runtimeHardwareScanners: [
+      {
+        id: 'scanner-zebra-1',
+        label: 'Zebra DS2208',
+        transport: 'usb_hid',
+        vendor_name: 'Zebra',
+        product_name: 'DS2208',
+        serial_number: 'ZB-001',
+        is_connected: true,
+      },
+      {
+        id: 'scanner-blue-1',
+        label: 'Socket Mobile S740',
+        transport: 'bluetooth_hid',
+        vendor_name: 'Socket Mobile',
+        product_name: 'S740',
+        serial_number: 'SO-001',
+        is_connected: true,
+      },
+    ],
+    assignRuntimePreferredScanner: vi.fn(async () => {}),
     latestScanLookup: null,
     ...overrides,
   } as unknown as StoreRuntimeWorkspaceState;
@@ -32,5 +54,10 @@ describe('store barcode lookup section', () => {
     expect(screen.getByText('keyboard_wedge')).toBeInTheDocument();
     expect(screen.getByText('ACMETEA')).toBeInTheDocument();
     expect(screen.getByText('Ready for external scanner input')).toBeInTheDocument();
+    expect(screen.getByText('Discovered local scanners')).toBeInTheDocument();
+    expect(screen.getByText('Zebra DS2208')).toBeInTheDocument();
+    expect(screen.getByText('Socket Mobile S740')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Use as preferred scanner' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Clear preferred scanner' })).toBeInTheDocument();
   });
 });

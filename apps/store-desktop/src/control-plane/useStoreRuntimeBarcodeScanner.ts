@@ -19,6 +19,10 @@ function buildScannerDiagnostics(args: {
   runtimeShellKind: string | null;
   isSessionLive: boolean;
   isLocalUnlocked: boolean;
+  hardwareScannerCaptureState?: 'ready' | 'unavailable' | 'browser_fallback' | 'attention_required';
+  hardwareScannerTransport?: 'keyboard_wedge' | 'usb_hid' | 'bluetooth_hid' | 'unknown';
+  hardwareScannerStatusMessage?: string | null;
+  hardwareScannerSetupHint?: string | null;
   lastScanAt: string | null;
   lastScanBarcodePreview: string | null;
 }) {
@@ -44,6 +48,17 @@ function buildScannerDiagnostics(args: {
     };
   }
 
+  if (args.hardwareScannerCaptureState && args.hardwareScannerCaptureState !== 'browser_fallback') {
+    return {
+      scannerCaptureState: args.hardwareScannerCaptureState,
+      scannerTransport: args.hardwareScannerTransport ?? 'unknown',
+      scannerStatusMessage: args.hardwareScannerStatusMessage ?? 'No scanner diagnostics available',
+      scannerSetupHint: args.hardwareScannerSetupHint ?? 'No scanner setup guidance available',
+      lastScanAt: args.lastScanAt,
+      lastScanBarcodePreview: args.lastScanBarcodePreview,
+    };
+  }
+
   return {
     scannerCaptureState: 'ready' as const,
     scannerTransport: 'keyboard_wedge' as const,
@@ -58,6 +73,14 @@ export function useStoreRuntimeBarcodeScanner(args: {
   runtimeShellKind: string | null;
   isSessionLive: boolean;
   isLocalUnlocked: boolean;
+  hardwareScannerCaptureState?: 'ready' | 'unavailable' | 'browser_fallback' | 'attention_required';
+  hardwareScannerTransport?: 'keyboard_wedge' | 'usb_hid' | 'bluetooth_hid' | 'unknown';
+  hardwareScannerStatusMessage?: string | null;
+  hardwareScannerSetupHint?: string | null;
+  onScannerActivityRecorded?: (activity: {
+    barcode_preview: string;
+    scanner_transport: 'keyboard_wedge' | 'usb_hid' | 'bluetooth_hid' | 'unknown' | null;
+  }) => void;
   onBarcodeDetected: (barcode: string) => void;
 }) {
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
@@ -65,6 +88,7 @@ export function useStoreRuntimeBarcodeScanner(args: {
   const bufferRef = useRef<string[]>([]);
   const clearBufferTimeoutRef = useRef<number | null>(null);
   const applyBarcodeDetected = useEffectEvent(args.onBarcodeDetected);
+  const applyScannerActivityRecorded = useEffectEvent(args.onScannerActivityRecorded ?? (() => {}));
 
   useEffect(() => {
     if (!isScannerCaptureActive(args)) {
@@ -99,6 +123,10 @@ export function useStoreRuntimeBarcodeScanner(args: {
         const detectedAt = new Date().toISOString();
         setLastScanAt(detectedAt);
         setLastScanBarcodePreview(barcode.slice(0, 16));
+        applyScannerActivityRecorded({
+          barcode_preview: barcode.slice(0, 16),
+          scanner_transport: args.hardwareScannerTransport ?? 'keyboard_wedge',
+        });
         applyBarcodeDetected(barcode);
         return;
       }
@@ -129,6 +157,10 @@ export function useStoreRuntimeBarcodeScanner(args: {
     runtimeShellKind: args.runtimeShellKind,
     isSessionLive: args.isSessionLive,
     isLocalUnlocked: args.isLocalUnlocked,
+    hardwareScannerCaptureState: args.hardwareScannerCaptureState,
+    hardwareScannerTransport: args.hardwareScannerTransport,
+    hardwareScannerStatusMessage: args.hardwareScannerStatusMessage,
+    hardwareScannerSetupHint: args.hardwareScannerSetupHint,
     lastScanAt,
     lastScanBarcodePreview,
   });

@@ -6,10 +6,12 @@ import type {
 function buildBrowserFallbackStatus(): StoreRuntimeHardwareStatus {
   return {
     bridge_state: 'browser_fallback',
+    scanners: [],
     printers: [],
     profile: {
       receipt_printer_name: null,
       label_printer_name: null,
+      preferred_scanner_id: null,
       updated_at: null,
     },
     diagnostics: {
@@ -35,6 +37,9 @@ export function createBrowserStoreRuntimeHardware(): StoreRuntimeHardwareAdapter
       return buildBrowserFallbackStatus();
     },
     async dispatchPrintJob() {
+      return buildBrowserFallbackStatus();
+    },
+    async recordScannerActivity() {
       return buildBrowserFallbackStatus();
     },
   };

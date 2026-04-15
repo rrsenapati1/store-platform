@@ -30,6 +30,39 @@ export function StoreBarcodeLookupSection({ workspace }: { workspace: StoreRunti
         </div>
       ) : null}
 
+      {isPackagedRuntime ? (
+        <div style={{ marginTop: '16px' }}>
+          <h3 style={{ marginBottom: '10px' }}>Discovered local scanners</h3>
+          {workspace.runtimePreferredScannerId ? (
+            <p style={{ marginTop: 0, color: '#4e5871' }}>
+              Preferred scanner: <strong>{workspace.runtimePreferredScannerId}</strong>
+            </p>
+          ) : null}
+          <ul style={{ margin: 0, color: '#4e5871', lineHeight: 1.7 }}>
+            {workspace.runtimeHardwareScanners.length ? (
+              workspace.runtimeHardwareScanners.map((scanner) => (
+                <li key={scanner.id} style={{ marginBottom: '12px' }}>
+                  <strong>{scanner.label}</strong>
+                  <span> :: {scanner.transport} :: {scanner.is_connected ? 'connected' : 'disconnected'}</span>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '8px' }}>
+                    <ActionButton onClick={() => void workspace.assignRuntimePreferredScanner(scanner.id)} disabled={workspace.isBusy}>
+                      Use as preferred scanner
+                    </ActionButton>
+                    {workspace.runtimePreferredScannerId === scanner.id ? (
+                      <ActionButton onClick={() => void workspace.assignRuntimePreferredScanner(null)} disabled={workspace.isBusy}>
+                        Clear preferred scanner
+                      </ActionButton>
+                    ) : null}
+                  </div>
+                </li>
+              ))
+            ) : (
+              <li>No local HID scanner candidates discovered yet.</li>
+            )}
+          </ul>
+        </div>
+      ) : null}
+
       {workspace.latestScanLookup ? (
         <div style={{ marginTop: '16px' }}>
           <h3 style={{ marginBottom: '10px' }}>Latest scan lookup</h3>

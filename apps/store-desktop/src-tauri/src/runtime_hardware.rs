@@ -3,6 +3,9 @@ use crate::runtime_printer::{
     dispatch_print_job, list_printers_with_backend, PrinterBackend, StoreRuntimePrintJobInput,
     SystemPrinterBackend,
 };
+use crate::runtime_scanner::{
+    list_scanners_with_backend, ScannerBackend, StoreRuntimeScannerRecord, SystemScannerBackend,
+};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -22,6 +25,7 @@ pub struct StoreRuntimePrinterRecord {
 pub struct StoreRuntimeHardwareProfileRecord {
     pub receipt_printer_name: Option<String>,
     pub label_printer_name: Option<String>,
+    pub preferred_scanner_id: Option<String>,
     pub updated_at: Option<String>,
 }
 
@@ -29,6 +33,7 @@ pub struct StoreRuntimeHardwareProfileRecord {
 pub struct StoreRuntimeHardwareProfileInput {
     pub receipt_printer_name: Option<String>,
     pub label_printer_name: Option<String>,
+    pub preferred_scanner_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -47,9 +52,16 @@ pub struct StoreRuntimeHardwareDiagnostics {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StoreRuntimeHardwareStatus {
     pub bridge_state: String,
+    pub scanners: Vec<StoreRuntimeScannerRecord>,
     pub printers: Vec<StoreRuntimePrinterRecord>,
     pub profile: StoreRuntimeHardwareProfileRecord,
     pub diagnostics: StoreRuntimeHardwareDiagnostics,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StoreRuntimeScannerActivityInput {
+    pub barcode_preview: String,
+    pub scanner_transport: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -76,6 +88,15 @@ impl PrinterBackend for EmptyPrinterBackend {
     }
 }
 
+#[derive(Default)]
+struct EmptyScannerBackend;
+
+impl ScannerBackend for EmptyScannerBackend {
+    fn list_scanners(&self) -> Result<Vec<StoreRuntimeScannerRecord>, String> {
+        Ok(Vec::new())
+    }
+}
+
 fn runtime_hardware_path() -> PathBuf {
     runtime_home_dir().join(STORE_RUNTIME_HARDWARE_FILE_NAME)
 }
@@ -92,6 +113,7 @@ fn default_hardware_profile() -> StoreRuntimeHardwareProfileRecord {
     StoreRuntimeHardwareProfileRecord {
         receipt_printer_name: None,
         label_printer_name: None,
+        preferred_scanner_id: None,
         updated_at: None,
     }
 }
@@ -122,11 +144,13 @@ fn default_hardware_state() -> StoreRuntimeHardwareStateRecord {
 
 fn resolve_hardware_status(
     bridge_state: &str,
+    scanners: Vec<StoreRuntimeScannerRecord>,
     printers: Vec<StoreRuntimePrinterRecord>,
     state: StoreRuntimeHardwareStateRecord,
 ) -> StoreRuntimeHardwareStatus {
     StoreRuntimeHardwareStatus {
         bridge_state: bridge_state.to_string(),
+        scanners,
         printers,
         profile: state.profile,
         diagnostics: state.diagnostics,
@@ -168,8 +192,23 @@ fn save_hardware_profile_to_path(
     state.profile = StoreRuntimeHardwareProfileRecord {
         receipt_printer_name: profile.receipt_printer_name,
         label_printer_name: profile.label_printer_name,
+        preferred_scanner_id: profile.preferred_scanner_id,
         updated_at: Some(current_timestamp_string()),
     };
+    save_hardware_state(path, &state)?;
+    load_hardware_status(path)
+}
+
+fn record_scanner_activity_to_path(
+    path: &Path,
+    activity: StoreRuntimeScannerActivityInput,
+) -> Result<StoreRuntimeHardwareStatus, String> {
+    let mut state = load_hardware_state(path)?;
+    state.diagnostics.last_scan_at = Some(current_timestamp_string());
+    state.diagnostics.last_scan_barcode_preview = Some(activity.barcode_preview);
+    if let Some(scanner_transport) = activity.scanner_transport {
+        state.diagnostics.scanner_transport = Some(scanner_transport);
+    }
     save_hardware_state(path, &state)?;
     load_hardware_status(path)
 }
@@ -182,22 +221,142 @@ fn clear_hardware_profile(path: &Path) -> Result<(), String> {
 }
 
 fn load_hardware_status(path: &Path) -> Result<StoreRuntimeHardwareStatus, String> {
-    load_hardware_status_with_backend(path, &EmptyPrinterBackend)
+    load_hardware_status_with_backends(path, &EmptyPrinterBackend, &EmptyScannerBackend)
 }
 
-fn load_hardware_status_with_backend<B: PrinterBackend>(
+fn resolve_scanner_diagnostics(
+    state: &mut StoreRuntimeHardwareStateRecord,
+    scanners: &[StoreRuntimeScannerRecord],
+    scanner_error: Option<&str>,
+) {
+    if let Some(error) = scanner_error {
+        state.diagnostics.scanner_capture_state = "unavailable".to_string();
+        state.diagnostics.scanner_transport = Some("unknown".to_string());
+        state.diagnostics.scanner_status_message = Some(error.to_string());
+        state.diagnostics.scanner_setup_hint = Some(
+            "Reconnect the HID scanner or restart the packaged terminal to retry scanner discovery."
+                .to_string(),
+        );
+        return;
+    }
+
+    if let Some(preferred_scanner_id) = state.profile.preferred_scanner_id.as_deref() {
+        if let Some(scanner) = scanners
+            .iter()
+            .find(|candidate| candidate.id == preferred_scanner_id && candidate.is_connected)
+        {
+            state.diagnostics.scanner_capture_state = "ready".to_string();
+            state.diagnostics.scanner_transport = Some(scanner.transport.clone());
+            state.diagnostics.scanner_status_message =
+                Some(format!("Preferred HID scanner connected: {}", scanner.label));
+            state.diagnostics.scanner_setup_hint = Some(
+                "Scan into the active packaged terminal to keep HID activity diagnostics current."
+                    .to_string(),
+            );
+            return;
+        }
+
+        state.diagnostics.scanner_capture_state = "attention_required".to_string();
+        state.diagnostics.scanner_transport = Some("unknown".to_string());
+        state.diagnostics.scanner_status_message =
+            Some("Preferred HID scanner not connected".to_string());
+        state.diagnostics.scanner_setup_hint = Some(
+            "Reconnect the preferred scanner or choose a different local scanner.".to_string(),
+        );
+        return;
+    }
+
+    if let Some(scanner) = scanners.iter().find(|candidate| candidate.is_connected) {
+        state.diagnostics.scanner_capture_state = "ready".to_string();
+        state.diagnostics.scanner_transport = Some(scanner.transport.clone());
+        state.diagnostics.scanner_status_message = Some(format!(
+            "{} HID scanner candidate{} discovered. Assign one for stronger presence diagnostics.",
+            scanners.len(),
+            if scanners.len() == 1 { "" } else { "s" }
+        ));
+        state.diagnostics.scanner_setup_hint = Some(
+            "Use the barcode lookup section to choose a preferred local scanner.".to_string(),
+        );
+        return;
+    }
+
+    if state.diagnostics.last_scan_at.is_some()
+        && state
+            .diagnostics
+            .scanner_transport
+            .as_deref()
+            .is_some_and(|value| value != "unknown")
+    {
+        state.diagnostics.scanner_capture_state = "ready".to_string();
+        state.diagnostics.scanner_status_message = Some(
+            "Recent scanner activity recorded. HID inventory is not currently exposing a local scanner candidate."
+                .to_string(),
+        );
+        state.diagnostics.scanner_setup_hint = Some(
+            "Reconnect the scanner or rescan in the active packaged terminal if HID inventory stays empty."
+                .to_string(),
+        );
+        return;
+    }
+
+    state.diagnostics.scanner_capture_state = "ready".to_string();
+    state.diagnostics.scanner_transport = Some("keyboard_wedge".to_string());
+    state.diagnostics.scanner_status_message = Some(
+        "No HID scanner candidates discovered yet. Keyboard-wedge scanning still works."
+            .to_string(),
+    );
+    state.diagnostics.scanner_setup_hint = Some(
+        "Connect a USB/Bluetooth HID scanner or keep using wedge scanning in the active packaged terminal."
+            .to_string(),
+    );
+}
+
+fn load_hardware_status_with_backends<B: PrinterBackend, S: ScannerBackend>(
     path: &Path,
-    backend: &B,
+    printer_backend: &B,
+    scanner_backend: &S,
 ) -> Result<StoreRuntimeHardwareStatus, String> {
-    let state = load_hardware_state(path)?;
-    match list_printers_with_backend(backend) {
-        Ok(printers) => Ok(resolve_hardware_status("ready", printers, state)),
+    let mut state = load_hardware_state(path)?;
+    let scanner_result = list_scanners_with_backend(scanner_backend);
+    let scanners = match scanner_result.as_ref() {
+        Ok(records) => records.clone(),
+        Err(_) => Vec::new(),
+    };
+    resolve_scanner_diagnostics(&mut state, &scanners, scanner_result.as_ref().err().map(|value| value.as_str()));
+
+    match list_printers_with_backend(printer_backend) {
+        Ok(printers) => Ok(resolve_hardware_status("ready", scanners, printers, state)),
         Err(error) => {
-            let mut degraded_state = state;
-            degraded_state.diagnostics.last_print_message = Some(error);
-            Ok(resolve_hardware_status("unavailable", Vec::new(), degraded_state))
+            state.diagnostics.last_print_message = Some(error);
+            Ok(resolve_hardware_status(
+                "unavailable",
+                scanners,
+                Vec::new(),
+                state,
+            ))
         }
     }
+}
+
+#[cfg(test)]
+fn load_hardware_status_with_backends_for_tests<B: PrinterBackend, S: ScannerBackend>(
+    printer_backend: &B,
+    scanner_backend: &S,
+    state: StoreRuntimeHardwareStateRecord,
+) -> Result<StoreRuntimeHardwareStatus, String> {
+    let mut next_state = state;
+    let scanner_result = list_scanners_with_backend(scanner_backend);
+    let scanners = match scanner_result.as_ref() {
+        Ok(records) => records.clone(),
+        Err(_) => Vec::new(),
+    };
+    resolve_scanner_diagnostics(
+        &mut next_state,
+        &scanners,
+        scanner_result.as_ref().err().map(|value| value.as_str()),
+    );
+    let printers = list_printers_with_backend(printer_backend)?;
+    Ok(resolve_hardware_status("ready", scanners, printers, next_state))
 }
 
 fn dispatch_print_job_with_backend<B: PrinterBackend>(
@@ -212,7 +371,7 @@ fn dispatch_print_job_with_backend<B: PrinterBackend>(
             state.diagnostics.last_print_message = Some(result.message);
             state.diagnostics.last_printed_at = Some(result.printed_at);
             save_hardware_state(path, &state)?;
-            load_hardware_status_with_backend(path, backend)
+            load_hardware_status_with_backends(path, backend, &SystemScannerBackend)
         }
         Err(error) => {
             state.diagnostics.last_print_status = Some("failed".to_string());
@@ -225,7 +384,11 @@ fn dispatch_print_job_with_backend<B: PrinterBackend>(
 
 #[tauri::command]
 pub fn cmd_get_store_runtime_hardware_status() -> Result<StoreRuntimeHardwareStatus, String> {
-    load_hardware_status_with_backend(&runtime_hardware_path(), &SystemPrinterBackend)
+    load_hardware_status_with_backends(
+        &runtime_hardware_path(),
+        &SystemPrinterBackend,
+        &SystemScannerBackend,
+    )
 }
 
 #[tauri::command]
@@ -247,11 +410,19 @@ pub fn cmd_dispatch_store_runtime_print_job(
     dispatch_print_job_with_backend(&runtime_hardware_path(), &mut SystemPrinterBackend, job)
 }
 
+#[tauri::command]
+pub fn cmd_record_store_runtime_scanner_activity(
+    activity: StoreRuntimeScannerActivityInput,
+) -> Result<StoreRuntimeHardwareStatus, String> {
+    record_scanner_activity_to_path(&runtime_hardware_path(), activity)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::runtime_printer::StoreRuntimePrintJobInput;
     use crate::runtime_paths::runtime_home_test_guard;
+    use crate::runtime_scanner::{ScannerBackend, StoreRuntimeScannerRecord};
     use std::env;
     use std::fs;
     use uuid::Uuid;
@@ -276,11 +447,22 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct FakeScannerBackend {
+        scanners: Vec<StoreRuntimeScannerRecord>,
+    }
+
+    impl ScannerBackend for FakeScannerBackend {
+        fn list_scanners(&self) -> Result<Vec<StoreRuntimeScannerRecord>, String> {
+            Ok(self.scanners.clone())
+        }
+    }
+
     #[test]
     fn runtime_hardware_status_defaults_to_empty_profile() {
         let _guard = runtime_home_test_guard()
             .lock()
-            .expect("lock runtime-home guard");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let previous_runtime_home = env::var("STORE_RUNTIME_HOME").ok();
         let runtime_home = env::temp_dir().join(format!(
             "store-runtime-hardware-store-{}",
@@ -295,19 +477,21 @@ mod tests {
         let status = load_hardware_status(&runtime_hardware_path()).expect("load hardware status");
 
         assert_eq!(status.bridge_state, "ready");
+        assert_eq!(status.scanners.len(), 0);
         assert_eq!(status.printers.len(), 0);
         assert_eq!(status.profile.receipt_printer_name, None);
         assert_eq!(status.profile.label_printer_name, None);
+        assert_eq!(status.profile.preferred_scanner_id, None);
         assert_eq!(status.diagnostics.scanner_capture_state, "ready");
         assert_eq!(status.diagnostics.scanner_transport.as_deref(), Some("keyboard_wedge"));
         assert_eq!(status.diagnostics.last_scan_barcode_preview, None);
         assert_eq!(
             status.diagnostics.scanner_status_message.as_deref(),
-            Some("Ready for external scanner input")
+            Some("No HID scanner candidates discovered yet. Keyboard-wedge scanning still works.")
         );
         assert_eq!(
             status.diagnostics.scanner_setup_hint.as_deref(),
-            Some("Connect a keyboard-wedge scanner and scan into the active packaged terminal.")
+            Some("Connect a USB/Bluetooth HID scanner or keep using wedge scanning in the active packaged terminal.")
         );
 
         if let Some(value) = previous_runtime_home {
@@ -322,7 +506,7 @@ mod tests {
     fn runtime_hardware_profile_round_trips_through_native_store() {
         let _guard = runtime_home_test_guard()
             .lock()
-            .expect("lock runtime-home guard");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let previous_runtime_home = env::var("STORE_RUNTIME_HOME").ok();
         let runtime_home = env::temp_dir().join(format!(
             "store-runtime-hardware-store-round-trip-{}",
@@ -339,6 +523,7 @@ mod tests {
             StoreRuntimeHardwareProfileInput {
                 receipt_printer_name: Some("Thermal-01".to_string()),
                 label_printer_name: Some("Label-01".to_string()),
+                preferred_scanner_id: Some("scanner-zebra-1".to_string()),
             },
         )
         .expect("save hardware profile");
@@ -346,8 +531,10 @@ mod tests {
 
         assert_eq!(saved.profile.receipt_printer_name.as_deref(), Some("Thermal-01"));
         assert_eq!(saved.profile.label_printer_name.as_deref(), Some("Label-01"));
+        assert_eq!(saved.profile.preferred_scanner_id.as_deref(), Some("scanner-zebra-1"));
         assert_eq!(loaded.profile.receipt_printer_name.as_deref(), Some("Thermal-01"));
         assert_eq!(loaded.profile.label_printer_name.as_deref(), Some("Label-01"));
+        assert_eq!(loaded.profile.preferred_scanner_id.as_deref(), Some("scanner-zebra-1"));
         assert!(loaded.profile.updated_at.is_some());
 
         if let Some(value) = previous_runtime_home {
@@ -362,7 +549,7 @@ mod tests {
     fn runtime_hardware_dispatch_updates_last_print_diagnostics() {
         let _guard = runtime_home_test_guard()
             .lock()
-            .expect("lock runtime-home guard");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let previous_runtime_home = env::var("STORE_RUNTIME_HOME").ok();
         let runtime_home = env::temp_dir().join(format!(
             "store-runtime-hardware-dispatch-{}",
@@ -389,6 +576,7 @@ mod tests {
             StoreRuntimeHardwareProfileInput {
                 receipt_printer_name: Some("Thermal-01".to_string()),
                 label_printer_name: None,
+                preferred_scanner_id: None,
             },
         ).expect("save hardware profile");
 
@@ -410,6 +598,79 @@ mod tests {
         assert_eq!(status.diagnostics.last_print_status.as_deref(), Some("completed"));
         assert_eq!(status.diagnostics.last_print_message.as_deref(), Some("Printed SALES_INVOICE on Thermal-01"));
         assert!(status.diagnostics.last_printed_at.is_some());
+
+        if let Some(value) = previous_runtime_home {
+            env::set_var("STORE_RUNTIME_HOME", value);
+        } else {
+            env::remove_var("STORE_RUNTIME_HOME");
+        }
+        let _ = fs::remove_dir_all(runtime_home);
+    }
+
+    #[test]
+    fn runtime_hardware_marks_preferred_scanner_missing_as_attention_required() {
+        let state = StoreRuntimeHardwareStateRecord {
+            profile: StoreRuntimeHardwareProfileRecord {
+                receipt_printer_name: None,
+                label_printer_name: None,
+                preferred_scanner_id: Some("scanner-zebra-1".to_string()),
+                updated_at: Some("1".to_string()),
+            },
+            diagnostics: default_hardware_diagnostics(),
+        };
+        let printer_backend = FakePrinterBackend::default();
+        let scanner_backend = FakeScannerBackend {
+            scanners: vec![StoreRuntimeScannerRecord {
+                id: "scanner-blue-1".to_string(),
+                label: "Socket Mobile S740".to_string(),
+                transport: "bluetooth_hid".to_string(),
+                vendor_name: Some("Socket Mobile".to_string()),
+                product_name: Some("S740".to_string()),
+                serial_number: Some("SO-001".to_string()),
+                is_connected: true,
+            }],
+        };
+
+        let status = load_hardware_status_with_backends_for_tests(&printer_backend, &scanner_backend, state)
+            .expect("load hardware status");
+
+        assert_eq!(status.diagnostics.scanner_capture_state, "attention_required");
+        assert_eq!(status.diagnostics.scanner_transport.as_deref(), Some("unknown"));
+        assert!(status
+            .diagnostics
+            .scanner_status_message
+            .as_deref()
+            .is_some_and(|value| value.contains("Preferred HID scanner not connected")));
+    }
+
+    #[test]
+    fn runtime_hardware_records_scanner_activity_in_native_store() {
+        let _guard = runtime_home_test_guard()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_runtime_home = env::var("STORE_RUNTIME_HOME").ok();
+        let runtime_home = env::temp_dir().join(format!(
+            "store-runtime-hardware-scanner-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir_all(&runtime_home).expect("create runtime home");
+        env::set_var(
+            "STORE_RUNTIME_HOME",
+            runtime_home.to_string_lossy().to_string(),
+        );
+
+        let status = record_scanner_activity_to_path(
+            &runtime_hardware_path(),
+            StoreRuntimeScannerActivityInput {
+                barcode_preview: "ACMETEA".to_string(),
+                scanner_transport: Some("usb_hid".to_string()),
+            },
+        )
+        .expect("record scanner activity");
+
+        assert_eq!(status.diagnostics.last_scan_barcode_preview.as_deref(), Some("ACMETEA"));
+        assert_eq!(status.diagnostics.scanner_transport.as_deref(), Some("usb_hid"));
+        assert!(status.diagnostics.last_scan_at.is_some());
 
         if let Some(value) = previous_runtime_home {
             env::set_var("STORE_RUNTIME_HOME", value);

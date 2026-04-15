@@ -7,6 +7,17 @@ describe('resolved store runtime hardware adapter', () => {
       if (command === 'cmd_get_store_runtime_hardware_status') {
         return {
           bridge_state: 'ready',
+          scanners: [
+            {
+              id: 'scanner-zebra-1',
+              label: 'Zebra DS2208',
+              transport: 'usb_hid',
+              vendor_name: 'Zebra',
+              product_name: 'DS2208',
+              serial_number: 'ZB-001',
+              is_connected: true,
+            },
+          ],
           printers: [
             {
               name: 'Thermal-01',
@@ -18,11 +29,12 @@ describe('resolved store runtime hardware adapter', () => {
           profile: {
             receipt_printer_name: 'Thermal-01',
             label_printer_name: null,
+            preferred_scanner_id: 'scanner-zebra-1',
             updated_at: '2026-04-14T16:00:00.000Z',
           },
           diagnostics: {
             scanner_capture_state: 'ready',
-            scanner_transport: 'keyboard_wedge',
+            scanner_transport: 'usb_hid',
             last_print_status: null,
             last_print_message: null,
             last_printed_at: null,
@@ -36,15 +48,27 @@ describe('resolved store runtime hardware adapter', () => {
       if (command === 'cmd_save_store_runtime_hardware_profile') {
         return {
           bridge_state: 'ready',
+          scanners: [
+            {
+              id: payload?.preferred_scanner_id === 'scanner-blue-1' ? 'scanner-blue-1' : 'scanner-zebra-1',
+              label: payload?.preferred_scanner_id === 'scanner-blue-1' ? 'Socket Mobile S740' : 'Zebra DS2208',
+              transport: payload?.preferred_scanner_id === 'scanner-blue-1' ? 'bluetooth_hid' : 'usb_hid',
+              vendor_name: payload?.preferred_scanner_id === 'scanner-blue-1' ? 'Socket Mobile' : 'Zebra',
+              product_name: payload?.preferred_scanner_id === 'scanner-blue-1' ? 'S740' : 'DS2208',
+              serial_number: payload?.preferred_scanner_id === 'scanner-blue-1' ? 'SO-001' : 'ZB-001',
+              is_connected: true,
+            },
+          ],
           printers: [],
           profile: {
             receipt_printer_name: payload?.receipt_printer_name ?? null,
             label_printer_name: payload?.label_printer_name ?? null,
+            preferred_scanner_id: payload?.preferred_scanner_id ?? null,
             updated_at: '2026-04-14T16:05:00.000Z',
           },
           diagnostics: {
             scanner_capture_state: 'ready',
-            scanner_transport: 'keyboard_wedge',
+            scanner_transport: payload?.preferred_scanner_id === 'scanner-blue-1' ? 'bluetooth_hid' : 'usb_hid',
             last_print_status: null,
             last_print_message: null,
             last_printed_at: null,
@@ -52,6 +76,40 @@ describe('resolved store runtime hardware adapter', () => {
             last_scan_barcode_preview: null,
             scanner_status_message: 'Ready for external scanner input',
             scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
+          },
+        };
+      }
+      if (command === 'cmd_record_store_runtime_scanner_activity') {
+        return {
+          bridge_state: 'ready',
+          scanners: [
+            {
+              id: 'scanner-zebra-1',
+              label: 'Zebra DS2208',
+              transport: 'usb_hid',
+              vendor_name: 'Zebra',
+              product_name: 'DS2208',
+              serial_number: 'ZB-001',
+              is_connected: true,
+            },
+          ],
+          printers: [],
+          profile: {
+            receipt_printer_name: 'Thermal-01',
+            label_printer_name: null,
+            preferred_scanner_id: 'scanner-zebra-1',
+            updated_at: '2026-04-14T16:05:00.000Z',
+          },
+          diagnostics: {
+            scanner_capture_state: 'ready',
+            scanner_transport: payload?.scanner_transport ?? 'usb_hid',
+            last_print_status: null,
+            last_print_message: null,
+            last_printed_at: null,
+            last_scan_at: '2026-04-15T12:00:00.000Z',
+            last_scan_barcode_preview: payload?.barcode_preview ?? null,
+            scanner_status_message: 'Preferred HID scanner connected: Zebra DS2208',
+            scanner_setup_hint: 'Scan into the active packaged terminal to keep HID activity diagnostics current.',
           },
         };
       }
@@ -65,6 +123,17 @@ describe('resolved store runtime hardware adapter', () => {
 
     await expect(adapter.getStatus()).resolves.toEqual({
       bridge_state: 'ready',
+      scanners: [
+        {
+          id: 'scanner-zebra-1',
+          label: 'Zebra DS2208',
+          transport: 'usb_hid',
+          vendor_name: 'Zebra',
+          product_name: 'DS2208',
+          serial_number: 'ZB-001',
+          is_connected: true,
+        },
+      ],
       printers: [
         {
           name: 'Thermal-01',
@@ -76,11 +145,12 @@ describe('resolved store runtime hardware adapter', () => {
       profile: {
         receipt_printer_name: 'Thermal-01',
         label_printer_name: null,
+        preferred_scanner_id: 'scanner-zebra-1',
         updated_at: '2026-04-14T16:00:00.000Z',
       },
       diagnostics: {
         scanner_capture_state: 'ready',
-        scanner_transport: 'keyboard_wedge',
+        scanner_transport: 'usb_hid',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
@@ -95,18 +165,31 @@ describe('resolved store runtime hardware adapter', () => {
       adapter.saveProfile({
         receipt_printer_name: 'Thermal-02',
         label_printer_name: 'Label-01',
+        preferred_scanner_id: 'scanner-blue-1',
       }),
     ).resolves.toEqual({
       bridge_state: 'ready',
+      scanners: [
+        {
+          id: 'scanner-blue-1',
+          label: 'Socket Mobile S740',
+          transport: 'bluetooth_hid',
+          vendor_name: 'Socket Mobile',
+          product_name: 'S740',
+          serial_number: 'SO-001',
+          is_connected: true,
+        },
+      ],
       printers: [],
       profile: {
         receipt_printer_name: 'Thermal-02',
         label_printer_name: 'Label-01',
+        preferred_scanner_id: 'scanner-blue-1',
         updated_at: '2026-04-14T16:05:00.000Z',
       },
       diagnostics: {
         scanner_capture_state: 'ready',
-        scanner_transport: 'keyboard_wedge',
+        scanner_transport: 'bluetooth_hid',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
@@ -121,6 +204,50 @@ describe('resolved store runtime hardware adapter', () => {
     expect(invoke).toHaveBeenNthCalledWith(2, 'cmd_save_store_runtime_hardware_profile', {
       receipt_printer_name: 'Thermal-02',
       label_printer_name: 'Label-01',
+      preferred_scanner_id: 'scanner-blue-1',
+    });
+
+    await expect(
+      adapter.recordScannerActivity({
+        barcode_preview: 'ACMETEA',
+        scanner_transport: 'usb_hid',
+      }),
+    ).resolves.toEqual({
+      bridge_state: 'ready',
+      scanners: [
+        {
+          id: 'scanner-zebra-1',
+          label: 'Zebra DS2208',
+          transport: 'usb_hid',
+          vendor_name: 'Zebra',
+          product_name: 'DS2208',
+          serial_number: 'ZB-001',
+          is_connected: true,
+        },
+      ],
+      printers: [],
+      profile: {
+        receipt_printer_name: 'Thermal-01',
+        label_printer_name: null,
+        preferred_scanner_id: 'scanner-zebra-1',
+        updated_at: '2026-04-14T16:05:00.000Z',
+      },
+      diagnostics: {
+        scanner_capture_state: 'ready',
+        scanner_transport: 'usb_hid',
+        last_print_status: null,
+        last_print_message: null,
+        last_printed_at: null,
+        last_scan_at: '2026-04-15T12:00:00.000Z',
+        last_scan_barcode_preview: 'ACMETEA',
+        scanner_status_message: 'Preferred HID scanner connected: Zebra DS2208',
+        scanner_setup_hint: 'Scan into the active packaged terminal to keep HID activity diagnostics current.',
+      },
+    });
+
+    expect(invoke).toHaveBeenNthCalledWith(3, 'cmd_record_store_runtime_scanner_activity', {
+      barcode_preview: 'ACMETEA',
+      scanner_transport: 'usb_hid',
     });
   });
 
@@ -131,10 +258,12 @@ describe('resolved store runtime hardware adapter', () => {
 
     await expect(adapter.getStatus()).resolves.toEqual({
       bridge_state: 'browser_fallback',
+      scanners: [],
       printers: [],
       profile: {
         receipt_printer_name: null,
         label_printer_name: null,
+        preferred_scanner_id: null,
         updated_at: null,
       },
       diagnostics: {
@@ -161,10 +290,12 @@ describe('resolved store runtime hardware adapter', () => {
 
     await expect(adapter.getStatus()).resolves.toEqual({
       bridge_state: 'browser_fallback',
+      scanners: [],
       printers: [],
       profile: {
         receipt_printer_name: null,
         label_printer_name: null,
+        preferred_scanner_id: null,
         updated_at: null,
       },
       diagnostics: {

@@ -5,12 +5,23 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useState } from 'react';
 import { useStoreRuntimeBarcodeScanner } from './useStoreRuntimeBarcodeScanner';
 
-function BarcodeScannerHarness() {
+function BarcodeScannerHarness(props: {
+  hardwareScannerCaptureState?: 'ready' | 'attention_required' | 'unavailable' | 'browser_fallback';
+  hardwareScannerTransport?: 'keyboard_wedge' | 'usb_hid' | 'bluetooth_hid' | 'unknown';
+  hardwareScannerStatusMessage?: string | null;
+  hardwareScannerSetupHint?: string | null;
+  onScannerActivityRecorded?: (activity: { barcode_preview: string; scanner_transport: string | null }) => void;
+} = {}) {
   const [barcode, setBarcode] = useState('');
   const scanner = useStoreRuntimeBarcodeScanner({
     runtimeShellKind: 'packaged_desktop',
     isSessionLive: true,
     isLocalUnlocked: true,
+    hardwareScannerCaptureState: props.hardwareScannerCaptureState ?? 'ready',
+    hardwareScannerTransport: props.hardwareScannerTransport ?? 'keyboard_wedge',
+    hardwareScannerStatusMessage: props.hardwareScannerStatusMessage ?? 'Ready for external scanner input',
+    hardwareScannerSetupHint: props.hardwareScannerSetupHint ?? 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
+    onScannerActivityRecorded: props.onScannerActivityRecorded,
     onBarcodeDetected: setBarcode,
   });
 
@@ -61,6 +72,39 @@ describe('packaged runtime barcode scanner capture', () => {
     expect(screen.getByTestId('scanner-transport')).toHaveTextContent('keyboard_wedge');
     expect(screen.getByTestId('barcode-preview')).toHaveTextContent('ACMETEA');
     expect(screen.getByTestId('scanner-status-message')).toHaveTextContent('Ready for external scanner input');
+  });
+
+  test('prefers native hid diagnostics and publishes accepted scan activity', async () => {
+    const onScannerActivityRecorded = vi.fn();
+
+    render(
+      <BarcodeScannerHarness
+        hardwareScannerCaptureState="attention_required"
+        hardwareScannerTransport="usb_hid"
+        hardwareScannerStatusMessage="Preferred HID scanner not connected"
+        hardwareScannerSetupHint="Reconnect the preferred scanner or choose a different local scanner."
+        onScannerActivityRecorded={onScannerActivityRecorded}
+      />,
+    );
+
+    expect(screen.getByTestId('scanner-state')).toHaveTextContent('attention_required');
+    expect(screen.getByTestId('scanner-transport')).toHaveTextContent('usb_hid');
+    expect(screen.getByTestId('scanner-status-message')).toHaveTextContent('Preferred HID scanner not connected');
+
+    fireEvent.keyDown(window, { key: 'A' });
+    fireEvent.keyDown(window, { key: 'C' });
+    fireEvent.keyDown(window, { key: 'M' });
+    fireEvent.keyDown(window, { key: 'E' });
+    fireEvent.keyDown(window, { key: 'Enter' });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onScannerActivityRecorded).toHaveBeenCalledWith({
+      barcode_preview: 'ACME',
+      scanner_transport: 'usb_hid',
+    });
   });
 
   test('ignores ordinary slow typing cadence', async () => {

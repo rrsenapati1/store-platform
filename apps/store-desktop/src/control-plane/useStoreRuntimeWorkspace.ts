@@ -178,6 +178,13 @@ export function useStoreRuntimeWorkspace() {
     runtimeShellKind: runtimeShellStatus?.runtime_kind ?? null,
     isSessionLive,
     isLocalUnlocked,
+    hardwareScannerCaptureState: runtimeHardware.hardwareStatus?.diagnostics.scanner_capture_state,
+    hardwareScannerTransport: runtimeHardware.hardwareStatus?.diagnostics.scanner_transport ?? undefined,
+    hardwareScannerStatusMessage: runtimeHardware.hardwareStatus?.diagnostics.scanner_status_message ?? undefined,
+    hardwareScannerSetupHint: runtimeHardware.hardwareStatus?.diagnostics.scanner_setup_hint ?? undefined,
+    onScannerActivityRecorded(activity) {
+      void runtimeHardware.recordScannerActivity(activity).catch(() => {});
+    },
     onBarcodeDetected(barcode) {
       applyStateTransition(() => {
         setScannedBarcode(barcode);
@@ -1316,6 +1323,7 @@ export function useStoreRuntimeWorkspace() {
     replayPendingRuntimeActions: replayPendingRuntimeActions,
     refreshPrintQueue,
     assignRuntimeLabelPrinter: runtimeHardware.assignLabelPrinter,
+    assignRuntimePreferredScanner: runtimeHardware.assignPreferredScanner,
     assignRuntimeReceiptPrinter: runtimeHardware.assignReceiptPrinter,
     runtimeAppVersion: runtimeShellStatus?.app_version ?? null,
     runtimeArchitecture: runtimeShellStatus?.architecture ?? null,
@@ -1329,7 +1337,9 @@ export function useStoreRuntimeWorkspace() {
     runtimeHardwareLastScanAt: runtimeHardware.hardwareStatus?.diagnostics.last_scan_at ?? null,
     runtimeHardwareLastScanPreview: runtimeHardware.hardwareStatus?.diagnostics.last_scan_barcode_preview ?? null,
     runtimeHardwarePrinters: runtimeHardware.hardwareStatus?.printers ?? [],
+    runtimeHardwareScanners: runtimeHardware.hardwareStatus?.scanners ?? [],
     runtimeLabelPrinterName: runtimeHardware.hardwareStatus?.profile.label_printer_name ?? null,
+    runtimePreferredScannerId: runtimeHardware.hardwareStatus?.profile.preferred_scanner_id ?? null,
     runtimeReceiptPrinterName: runtimeHardware.hardwareStatus?.profile.receipt_printer_name ?? null,
     runtimeScannerCaptureState: runtimeBarcodeScanner.scannerCaptureState,
     runtimeScannerLastScanAt: runtimeBarcodeScanner.lastScanAt,
