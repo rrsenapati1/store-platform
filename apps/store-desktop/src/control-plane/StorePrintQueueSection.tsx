@@ -53,6 +53,14 @@ export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeW
         <ActionButton onClick={() => void workspace.refreshPrintQueue()} disabled={workspace.isBusy || !workspace.isSessionLive || !hasDevice}>
           Refresh print queue
         </ActionButton>
+        {isPackagedRuntime ? (
+          <ActionButton
+            onClick={() => void workspace.openRuntimeCashDrawer()}
+            disabled={workspace.isBusy || !workspace.isSessionLive || !workspace.runtimeCashDrawerPrinterName}
+          >
+            Open assigned cash drawer
+          </ActionButton>
+        ) : null}
         {!isPackagedRuntime ? (
           <ActionButton onClick={() => void workspace.completeFirstPrintJob()} disabled={workspace.isBusy || !workspace.isSessionLive || workspace.printJobs.length === 0 || !hasDevice}>
             Mark first job completed
@@ -67,6 +75,10 @@ export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeW
               { label: 'Hardware bridge', value: workspace.runtimeHardwareBridgeState ?? 'Unavailable' },
               { label: 'Receipt printer', value: workspace.runtimeReceiptPrinterName ?? 'Not assigned' },
               { label: 'Label printer', value: workspace.runtimeLabelPrinterName ?? 'Not assigned' },
+              { label: 'Cash drawer', value: workspace.runtimeCashDrawerPrinterName ?? 'Not assigned' },
+              { label: 'Cash drawer status', value: workspace.runtimeCashDrawerStatusMessage ?? 'No cash drawer diagnostics available' },
+              { label: 'Cash drawer setup hint', value: workspace.runtimeCashDrawerSetupHint ?? 'No cash drawer setup guidance available' },
+              { label: 'Last cash drawer action', value: workspace.runtimeHardwareLastCashDrawerMessage ?? 'No cash drawer activity yet' },
               { label: 'Last local print', value: workspace.runtimeHardwareLastPrintMessage ?? 'No local print activity yet' },
             ]}
           />
@@ -88,6 +100,9 @@ export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeW
                     </ActionButton>
                     <ActionButton onClick={() => void workspace.assignRuntimeLabelPrinter(printer.name)} disabled={workspace.isBusy}>
                       Use for labels
+                    </ActionButton>
+                    <ActionButton onClick={() => void workspace.assignRuntimeCashDrawerPrinter(printer.name)} disabled={workspace.isBusy}>
+                      Use for cash drawer
                     </ActionButton>
                   </div>
                 </li>

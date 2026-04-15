@@ -11,6 +11,7 @@ function buildBrowserFallbackStatus(): StoreRuntimeHardwareStatus {
     profile: {
       receipt_printer_name: null,
       label_printer_name: null,
+      cash_drawer_printer_name: null,
       preferred_scanner_id: null,
       updated_at: null,
     },
@@ -20,8 +21,13 @@ function buildBrowserFallbackStatus(): StoreRuntimeHardwareStatus {
       last_print_status: null,
       last_print_message: null,
       last_printed_at: null,
+      last_cash_drawer_status: null,
+      last_cash_drawer_message: null,
+      last_cash_drawer_opened_at: null,
       last_scan_at: null,
       last_scan_barcode_preview: null,
+      cash_drawer_status_message: 'Cash drawer controls require the packaged desktop runtime.',
+      cash_drawer_setup_hint: 'Open the packaged desktop runtime to assign a local printer-backed cash drawer.',
       scanner_status_message: 'Scanner capture diagnostics require the packaged desktop runtime.',
       scanner_setup_hint: 'Open the packaged desktop runtime for wedge-scanner capture.',
     },
@@ -37,6 +43,9 @@ export function createBrowserStoreRuntimeHardware(): StoreRuntimeHardwareAdapter
       return buildBrowserFallbackStatus();
     },
     async dispatchPrintJob() {
+      return buildBrowserFallbackStatus();
+    },
+    async openCashDrawer() {
       return buildBrowserFallbackStatus();
     },
     async recordScannerActivity() {

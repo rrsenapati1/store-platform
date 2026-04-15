@@ -1233,6 +1233,18 @@ export function useStoreRuntimeWorkspace() {
     }
   }
 
+  async function openRuntimeCashDrawer() {
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      await runtimeHardware.openCashDrawer();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to open the assigned cash drawer');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function completeFirstPrintJob() {
     const firstJob = printJobs[0];
     if (!accessToken || !tenantId || !branchId || !selectedRuntimeDeviceId || !firstJob) {
@@ -1323,8 +1335,10 @@ export function useStoreRuntimeWorkspace() {
     replayPendingRuntimeActions: replayPendingRuntimeActions,
     refreshPrintQueue,
     assignRuntimeLabelPrinter: runtimeHardware.assignLabelPrinter,
+    assignRuntimeCashDrawerPrinter: runtimeHardware.assignCashDrawerPrinter,
     assignRuntimePreferredScanner: runtimeHardware.assignPreferredScanner,
     assignRuntimeReceiptPrinter: runtimeHardware.assignReceiptPrinter,
+    openRuntimeCashDrawer,
     runtimeAppVersion: runtimeShellStatus?.app_version ?? null,
     runtimeArchitecture: runtimeShellStatus?.architecture ?? null,
     runtimeCacheDatabasePath: runtimeShellStatus?.cache_db_path ?? null,
@@ -1334,10 +1348,16 @@ export function useStoreRuntimeWorkspace() {
     runtimeHardwareLastPrintMessage: runtimeHardware.hardwareStatus?.diagnostics.last_print_message ?? null,
     runtimeHardwareLastPrintStatus: runtimeHardware.hardwareStatus?.diagnostics.last_print_status ?? null,
     runtimeHardwareLastPrintedAt: runtimeHardware.hardwareStatus?.diagnostics.last_printed_at ?? null,
+    runtimeHardwareLastCashDrawerMessage: runtimeHardware.hardwareStatus?.diagnostics.last_cash_drawer_message ?? null,
+    runtimeHardwareLastCashDrawerOpenedAt: runtimeHardware.hardwareStatus?.diagnostics.last_cash_drawer_opened_at ?? null,
+    runtimeHardwareLastCashDrawerStatus: runtimeHardware.hardwareStatus?.diagnostics.last_cash_drawer_status ?? null,
     runtimeHardwareLastScanAt: runtimeHardware.hardwareStatus?.diagnostics.last_scan_at ?? null,
     runtimeHardwareLastScanPreview: runtimeHardware.hardwareStatus?.diagnostics.last_scan_barcode_preview ?? null,
     runtimeHardwarePrinters: runtimeHardware.hardwareStatus?.printers ?? [],
     runtimeHardwareScanners: runtimeHardware.hardwareStatus?.scanners ?? [],
+    runtimeCashDrawerPrinterName: runtimeHardware.hardwareStatus?.profile.cash_drawer_printer_name ?? null,
+    runtimeCashDrawerStatusMessage: runtimeHardware.hardwareStatus?.diagnostics.cash_drawer_status_message ?? null,
+    runtimeCashDrawerSetupHint: runtimeHardware.hardwareStatus?.diagnostics.cash_drawer_setup_hint ?? null,
     runtimeLabelPrinterName: runtimeHardware.hardwareStatus?.profile.label_printer_name ?? null,
     runtimePreferredScannerId: runtimeHardware.hardwareStatus?.profile.preferred_scanner_id ?? null,
     runtimeReceiptPrinterName: runtimeHardware.hardwareStatus?.profile.receipt_printer_name ?? null,

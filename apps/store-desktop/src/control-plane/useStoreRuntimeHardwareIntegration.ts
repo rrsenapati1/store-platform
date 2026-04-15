@@ -258,6 +258,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
     return savePrinterProfile({
       receipt_printer_name: printerName,
       label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
+      cash_drawer_printer_name: hardwareStatus?.profile.cash_drawer_printer_name ?? null,
       preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
     });
   }
@@ -266,6 +267,16 @@ export function useStoreRuntimeHardwareIntegration(args: {
     return savePrinterProfile({
       receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
       label_printer_name: printerName,
+      cash_drawer_printer_name: hardwareStatus?.profile.cash_drawer_printer_name ?? null,
+      preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
+    });
+  }
+
+  async function assignCashDrawerPrinter(printerName: string | null) {
+    return savePrinterProfile({
+      receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
+      label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
+      cash_drawer_printer_name: printerName,
       preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
     });
   }
@@ -274,8 +285,34 @@ export function useStoreRuntimeHardwareIntegration(args: {
     return savePrinterProfile({
       receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
       label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
+      cash_drawer_printer_name: hardwareStatus?.profile.cash_drawer_printer_name ?? null,
       preferred_scanner_id: scannerId,
     });
+  }
+
+  async function openCashDrawer() {
+    try {
+      const nextStatus = await hardwareAdapterRef.current.openCashDrawer();
+      applyStateTransition(() => {
+        setHardwareStatus(nextStatus);
+        setHardwareError(null);
+      });
+      return nextStatus;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to open the assigned cash drawer';
+      try {
+        const refreshedStatus = await hardwareAdapterRef.current.getStatus();
+        applyStateTransition(() => {
+          setHardwareStatus(refreshedStatus);
+          setHardwareError(message);
+        });
+      } catch {
+        applyStateTransition(() => {
+          setHardwareError(message);
+        });
+      }
+      throw error instanceof Error ? error : new Error(message);
+    }
   }
 
   async function recordScannerActivity(activity: {
@@ -294,8 +331,10 @@ export function useStoreRuntimeHardwareIntegration(args: {
     hardwareStatus,
     refreshHardwareStatus,
     assignLabelPrinter,
+    assignCashDrawerPrinter,
     assignReceiptPrinter,
     assignPreferredScanner,
+    openCashDrawer,
     recordScannerActivity,
   };
 }

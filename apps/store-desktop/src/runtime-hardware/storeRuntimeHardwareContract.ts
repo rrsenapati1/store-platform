@@ -29,6 +29,7 @@ export interface StoreRuntimeScannerRecord {
 export interface StoreRuntimeHardwareProfile {
   receipt_printer_name: string | null;
   label_printer_name: string | null;
+  cash_drawer_printer_name: string | null;
   preferred_scanner_id: string | null;
   updated_at: string | null;
 }
@@ -36,6 +37,7 @@ export interface StoreRuntimeHardwareProfile {
 export interface StoreRuntimeHardwareProfileInput {
   receipt_printer_name: string | null;
   label_printer_name: string | null;
+  cash_drawer_printer_name: string | null;
   preferred_scanner_id: string | null;
 }
 
@@ -45,8 +47,13 @@ export interface StoreRuntimeHardwareDiagnostics {
   last_print_status: string | null;
   last_print_message: string | null;
   last_printed_at: string | null;
+  last_cash_drawer_status: string | null;
+  last_cash_drawer_message: string | null;
+  last_cash_drawer_opened_at: string | null;
   last_scan_at: string | null;
   last_scan_barcode_preview: string | null;
+  cash_drawer_status_message: string | null;
+  cash_drawer_setup_hint: string | null;
   scanner_status_message: string | null;
   scanner_setup_hint: string | null;
 }
@@ -76,6 +83,7 @@ export interface StoreRuntimeHardwareAdapter {
   getStatus(): Promise<StoreRuntimeHardwareStatus>;
   saveProfile(profile: StoreRuntimeHardwareProfileInput): Promise<StoreRuntimeHardwareStatus>;
   dispatchPrintJob(job: StoreRuntimeHardwarePrintJobInput): Promise<StoreRuntimeHardwareStatus>;
+  openCashDrawer(): Promise<StoreRuntimeHardwareStatus>;
   recordScannerActivity(activity: StoreRuntimeHardwareScannerActivityInput): Promise<StoreRuntimeHardwareStatus>;
 }
 
@@ -97,6 +105,7 @@ function isHardwareProfile(value: unknown): value is StoreRuntimeHardwareProfile
   return isObject(value)
     && (typeof value.receipt_printer_name === 'string' || value.receipt_printer_name === null)
     && (typeof value.label_printer_name === 'string' || value.label_printer_name === null)
+    && (typeof value.cash_drawer_printer_name === 'string' || value.cash_drawer_printer_name === null)
     && (typeof value.preferred_scanner_id === 'string' || value.preferred_scanner_id === null)
     && (typeof value.updated_at === 'string' || value.updated_at === null);
 }
@@ -134,8 +143,13 @@ function isHardwareDiagnostics(value: unknown): value is StoreRuntimeHardwareDia
     && (typeof value.last_print_status === 'string' || value.last_print_status === null)
     && (typeof value.last_print_message === 'string' || value.last_print_message === null)
     && (typeof value.last_printed_at === 'string' || value.last_printed_at === null)
+    && (typeof value.last_cash_drawer_status === 'string' || value.last_cash_drawer_status === null)
+    && (typeof value.last_cash_drawer_message === 'string' || value.last_cash_drawer_message === null)
+    && (typeof value.last_cash_drawer_opened_at === 'string' || value.last_cash_drawer_opened_at === null)
     && (typeof value.last_scan_at === 'string' || value.last_scan_at === null)
     && (typeof value.last_scan_barcode_preview === 'string' || value.last_scan_barcode_preview === null)
+    && (typeof value.cash_drawer_status_message === 'string' || value.cash_drawer_status_message === null)
+    && (typeof value.cash_drawer_setup_hint === 'string' || value.cash_drawer_setup_hint === null)
     && (typeof value.scanner_status_message === 'string' || value.scanner_status_message === null)
     && (typeof value.scanner_setup_hint === 'string' || value.scanner_setup_hint === null);
 }

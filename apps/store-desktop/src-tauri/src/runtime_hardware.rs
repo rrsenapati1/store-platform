@@ -1,4 +1,7 @@
 use crate::runtime_paths::runtime_home_dir;
+use crate::runtime_cash_drawer::{
+    dispatch_cash_drawer_open, CashDrawerBackend, SystemCashDrawerBackend,
+};
 use crate::runtime_printer::{
     dispatch_print_job, list_printers_with_backend, PrinterBackend, StoreRuntimePrintJobInput,
     SystemPrinterBackend,
@@ -25,6 +28,7 @@ pub struct StoreRuntimePrinterRecord {
 pub struct StoreRuntimeHardwareProfileRecord {
     pub receipt_printer_name: Option<String>,
     pub label_printer_name: Option<String>,
+    pub cash_drawer_printer_name: Option<String>,
     pub preferred_scanner_id: Option<String>,
     pub updated_at: Option<String>,
 }
@@ -33,6 +37,7 @@ pub struct StoreRuntimeHardwareProfileRecord {
 pub struct StoreRuntimeHardwareProfileInput {
     pub receipt_printer_name: Option<String>,
     pub label_printer_name: Option<String>,
+    pub cash_drawer_printer_name: Option<String>,
     pub preferred_scanner_id: Option<String>,
 }
 
@@ -43,8 +48,13 @@ pub struct StoreRuntimeHardwareDiagnostics {
     pub last_print_status: Option<String>,
     pub last_print_message: Option<String>,
     pub last_printed_at: Option<String>,
+    pub last_cash_drawer_status: Option<String>,
+    pub last_cash_drawer_message: Option<String>,
+    pub last_cash_drawer_opened_at: Option<String>,
     pub last_scan_at: Option<String>,
     pub last_scan_barcode_preview: Option<String>,
+    pub cash_drawer_status_message: Option<String>,
+    pub cash_drawer_setup_hint: Option<String>,
     pub scanner_status_message: Option<String>,
     pub scanner_setup_hint: Option<String>,
 }
@@ -113,6 +123,7 @@ fn default_hardware_profile() -> StoreRuntimeHardwareProfileRecord {
     StoreRuntimeHardwareProfileRecord {
         receipt_printer_name: None,
         label_printer_name: None,
+        cash_drawer_printer_name: None,
         preferred_scanner_id: None,
         updated_at: None,
     }
@@ -125,8 +136,17 @@ fn default_hardware_diagnostics() -> StoreRuntimeHardwareDiagnostics {
         last_print_status: None,
         last_print_message: None,
         last_printed_at: None,
+        last_cash_drawer_status: None,
+        last_cash_drawer_message: None,
+        last_cash_drawer_opened_at: None,
         last_scan_at: None,
         last_scan_barcode_preview: None,
+        cash_drawer_status_message: Some(
+            "Assign a local receipt printer to enable cash drawer pulses.".to_string(),
+        ),
+        cash_drawer_setup_hint: Some(
+            "Use a receipt printer with a connected RJ11 cash drawer.".to_string(),
+        ),
         scanner_status_message: Some("Ready for external scanner input".to_string()),
         scanner_setup_hint: Some(
             "Connect a keyboard-wedge scanner and scan into the active packaged terminal."
@@ -192,11 +212,30 @@ fn save_hardware_profile_to_path(
     state.profile = StoreRuntimeHardwareProfileRecord {
         receipt_printer_name: profile.receipt_printer_name,
         label_printer_name: profile.label_printer_name,
+        cash_drawer_printer_name: profile.cash_drawer_printer_name,
         preferred_scanner_id: profile.preferred_scanner_id,
         updated_at: Some(current_timestamp_string()),
     };
     save_hardware_state(path, &state)?;
     load_hardware_status(path)
+}
+
+fn save_hardware_profile_with_backends<P: PrinterBackend, S: ScannerBackend>(
+    path: &Path,
+    profile: StoreRuntimeHardwareProfileInput,
+    printer_backend: &P,
+    scanner_backend: &S,
+) -> Result<StoreRuntimeHardwareStatus, String> {
+    let mut state = load_hardware_state(path)?;
+    state.profile = StoreRuntimeHardwareProfileRecord {
+        receipt_printer_name: profile.receipt_printer_name,
+        label_printer_name: profile.label_printer_name,
+        cash_drawer_printer_name: profile.cash_drawer_printer_name,
+        preferred_scanner_id: profile.preferred_scanner_id,
+        updated_at: Some(current_timestamp_string()),
+    };
+    save_hardware_state(path, &state)?;
+    load_hardware_status_with_backends(path, printer_backend, scanner_backend)
 }
 
 fn record_scanner_activity_to_path(
@@ -222,6 +261,79 @@ fn clear_hardware_profile(path: &Path) -> Result<(), String> {
 
 fn load_hardware_status(path: &Path) -> Result<StoreRuntimeHardwareStatus, String> {
     load_hardware_status_with_backends(path, &EmptyPrinterBackend, &EmptyScannerBackend)
+}
+
+fn resolve_cash_drawer_diagnostics(
+    state: &mut StoreRuntimeHardwareStateRecord,
+    printers: &[StoreRuntimePrinterRecord],
+    printer_error: Option<&str>,
+) {
+    if let Some(error) = printer_error {
+        state.diagnostics.cash_drawer_status_message = Some(error.to_string());
+        state.diagnostics.cash_drawer_setup_hint = Some(
+            "Reconnect the assigned receipt printer or restart the packaged terminal to retry cash drawer access."
+                .to_string(),
+        );
+        return;
+    }
+
+    if let Some(printer_name) = state.profile.cash_drawer_printer_name.as_deref() {
+        if let Some(printer) = printers.iter().find(|candidate| candidate.name == printer_name) {
+            if printer.is_online == Some(false) {
+                state.diagnostics.cash_drawer_status_message = Some(format!(
+                    "Assigned cash drawer printer is offline: {}.",
+                    printer.label
+                ));
+                state.diagnostics.cash_drawer_setup_hint = Some(
+                    "Reconnect the assigned receipt printer or choose another local printer for the cash drawer."
+                        .to_string(),
+                );
+                return;
+            }
+
+            if state.diagnostics.last_cash_drawer_status.as_deref() == Some("failed") {
+                state.diagnostics.cash_drawer_status_message =
+                    state.diagnostics.last_cash_drawer_message.clone();
+                state.diagnostics.cash_drawer_setup_hint = Some(
+                    "Retry after confirming the drawer cable and receipt printer power are both healthy."
+                        .to_string(),
+                );
+                return;
+            }
+
+            if state.diagnostics.last_cash_drawer_status.as_deref() == Some("opened") {
+                state.diagnostics.cash_drawer_status_message =
+                    Some(format!("Cash drawer pulse sent to {}.", printer.label));
+                state.diagnostics.cash_drawer_setup_hint = Some(
+                    "Close the drawer fully before the next manual open action.".to_string(),
+                );
+                return;
+            }
+
+            state.diagnostics.cash_drawer_status_message =
+                Some(format!("Cash drawer is assigned to {}.", printer.label));
+            state.diagnostics.cash_drawer_setup_hint = Some(
+                "Open the assigned cash drawer only after a cashier confirms the sale state."
+                    .to_string(),
+            );
+            return;
+        }
+
+        state.diagnostics.cash_drawer_status_message = Some(format!(
+            "Assigned cash drawer printer not discovered: {}.",
+            printer_name
+        ));
+        state.diagnostics.cash_drawer_setup_hint = Some(
+            "Reconnect the assigned receipt printer or choose another discovered local printer."
+                .to_string(),
+        );
+        return;
+    }
+
+    state.diagnostics.cash_drawer_status_message =
+        Some("Assign a local receipt printer to enable cash drawer pulses.".to_string());
+    state.diagnostics.cash_drawer_setup_hint =
+        Some("Use a receipt printer with a connected RJ11 cash drawer.".to_string());
 }
 
 fn resolve_scanner_diagnostics(
@@ -318,24 +430,46 @@ fn load_hardware_status_with_backends<B: PrinterBackend, S: ScannerBackend>(
 ) -> Result<StoreRuntimeHardwareStatus, String> {
     let mut state = load_hardware_state(path)?;
     let scanner_result = list_scanners_with_backend(scanner_backend);
+    let printer_result = list_printers_with_backend(printer_backend);
     let scanners = match scanner_result.as_ref() {
         Ok(records) => records.clone(),
         Err(_) => Vec::new(),
     };
-    resolve_scanner_diagnostics(&mut state, &scanners, scanner_result.as_ref().err().map(|value| value.as_str()));
+    let printers = match printer_result.as_ref() {
+        Ok(records) => records.clone(),
+        Err(_) => Vec::new(),
+    };
+    resolve_cash_drawer_diagnostics(
+        &mut state,
+        &printers,
+        printer_result.as_ref().err().map(|value| value.as_str()),
+    );
+    resolve_scanner_diagnostics(
+        &mut state,
+        &scanners,
+        scanner_result.as_ref().err().map(|value| value.as_str()),
+    );
 
-    match list_printers_with_backend(printer_backend) {
-        Ok(printers) => Ok(resolve_hardware_status("ready", scanners, printers, state)),
-        Err(error) => {
-            state.diagnostics.last_print_message = Some(error);
-            Ok(resolve_hardware_status(
-                "unavailable",
-                scanners,
-                Vec::new(),
-                state,
-            ))
-        }
+    if let Err(error) = printer_result {
+        state.diagnostics.last_print_message = Some(error);
+        return Ok(resolve_hardware_status(
+            "unavailable",
+            scanners,
+            printers,
+            state,
+        ));
     }
+
+    if scanner_result.is_err() {
+        return Ok(resolve_hardware_status(
+            "unavailable",
+            scanners,
+            printers,
+            state,
+        ));
+    }
+
+    Ok(resolve_hardware_status("ready", scanners, printers, state))
 }
 
 #[cfg(test)]
@@ -350,12 +484,13 @@ fn load_hardware_status_with_backends_for_tests<B: PrinterBackend, S: ScannerBac
         Ok(records) => records.clone(),
         Err(_) => Vec::new(),
     };
+    let printers = list_printers_with_backend(printer_backend)?;
+    resolve_cash_drawer_diagnostics(&mut next_state, &printers, None);
     resolve_scanner_diagnostics(
         &mut next_state,
         &scanners,
         scanner_result.as_ref().err().map(|value| value.as_str()),
     );
-    let printers = list_printers_with_backend(printer_backend)?;
     Ok(resolve_hardware_status("ready", scanners, printers, next_state))
 }
 
@@ -382,6 +517,44 @@ fn dispatch_print_job_with_backend<B: PrinterBackend>(
     }
 }
 
+fn open_cash_drawer_with_backends<D: CashDrawerBackend, P: PrinterBackend, S: ScannerBackend>(
+    path: &Path,
+    drawer_backend: &mut D,
+    printer_backend: &P,
+    scanner_backend: &S,
+) -> Result<StoreRuntimeHardwareStatus, String> {
+    let mut next_state = load_hardware_state(path)?;
+    match dispatch_cash_drawer_open(drawer_backend, &next_state.profile) {
+        Ok(result) => {
+            next_state.diagnostics.last_cash_drawer_status = Some("opened".to_string());
+            next_state.diagnostics.last_cash_drawer_message = Some(result.message);
+            next_state.diagnostics.last_cash_drawer_opened_at = Some(result.opened_at);
+            save_hardware_state(path, &next_state)?;
+            load_hardware_status_with_backends(path, printer_backend, scanner_backend)
+        }
+        Err(error) => {
+            next_state.diagnostics.last_cash_drawer_status = Some("failed".to_string());
+            next_state.diagnostics.last_cash_drawer_message = Some(error.clone());
+            save_hardware_state(path, &next_state)?;
+            let _ = load_hardware_status_with_backends(path, printer_backend, scanner_backend);
+            Err(error)
+        }
+    }
+}
+
+#[cfg(test)]
+fn open_cash_drawer_with_backend<D: CashDrawerBackend>(
+    path: &Path,
+    drawer_backend: &mut D,
+) -> Result<StoreRuntimeHardwareStatus, String> {
+    open_cash_drawer_with_backends(
+        path,
+        drawer_backend,
+        &EmptyPrinterBackend,
+        &EmptyScannerBackend,
+    )
+}
+
 #[tauri::command]
 pub fn cmd_get_store_runtime_hardware_status() -> Result<StoreRuntimeHardwareStatus, String> {
     load_hardware_status_with_backends(
@@ -395,7 +568,12 @@ pub fn cmd_get_store_runtime_hardware_status() -> Result<StoreRuntimeHardwareSta
 pub fn cmd_save_store_runtime_hardware_profile(
     profile: StoreRuntimeHardwareProfileInput,
 ) -> Result<StoreRuntimeHardwareStatus, String> {
-    save_hardware_profile_to_path(&runtime_hardware_path(), profile)
+    save_hardware_profile_with_backends(
+        &runtime_hardware_path(),
+        profile,
+        &SystemPrinterBackend,
+        &SystemScannerBackend,
+    )
 }
 
 #[tauri::command]
@@ -408,6 +586,16 @@ pub fn cmd_dispatch_store_runtime_print_job(
     job: StoreRuntimePrintJobInput,
 ) -> Result<StoreRuntimeHardwareStatus, String> {
     dispatch_print_job_with_backend(&runtime_hardware_path(), &mut SystemPrinterBackend, job)
+}
+
+#[tauri::command]
+pub fn cmd_open_store_runtime_cash_drawer() -> Result<StoreRuntimeHardwareStatus, String> {
+    open_cash_drawer_with_backends(
+        &runtime_hardware_path(),
+        &mut SystemCashDrawerBackend,
+        &SystemPrinterBackend,
+        &SystemScannerBackend,
+    )
 }
 
 #[tauri::command]
@@ -481,9 +669,21 @@ mod tests {
         assert_eq!(status.printers.len(), 0);
         assert_eq!(status.profile.receipt_printer_name, None);
         assert_eq!(status.profile.label_printer_name, None);
+        assert_eq!(status.profile.cash_drawer_printer_name, None);
         assert_eq!(status.profile.preferred_scanner_id, None);
         assert_eq!(status.diagnostics.scanner_capture_state, "ready");
         assert_eq!(status.diagnostics.scanner_transport.as_deref(), Some("keyboard_wedge"));
+        assert_eq!(status.diagnostics.last_cash_drawer_status, None);
+        assert_eq!(status.diagnostics.last_cash_drawer_message, None);
+        assert_eq!(status.diagnostics.last_cash_drawer_opened_at, None);
+        assert_eq!(
+            status.diagnostics.cash_drawer_status_message.as_deref(),
+            Some("Assign a local receipt printer to enable cash drawer pulses.")
+        );
+        assert_eq!(
+            status.diagnostics.cash_drawer_setup_hint.as_deref(),
+            Some("Use a receipt printer with a connected RJ11 cash drawer.")
+        );
         assert_eq!(status.diagnostics.last_scan_barcode_preview, None);
         assert_eq!(
             status.diagnostics.scanner_status_message.as_deref(),
@@ -523,6 +723,7 @@ mod tests {
             StoreRuntimeHardwareProfileInput {
                 receipt_printer_name: Some("Thermal-01".to_string()),
                 label_printer_name: Some("Label-01".to_string()),
+                cash_drawer_printer_name: Some("Thermal-01".to_string()),
                 preferred_scanner_id: Some("scanner-zebra-1".to_string()),
             },
         )
@@ -531,9 +732,11 @@ mod tests {
 
         assert_eq!(saved.profile.receipt_printer_name.as_deref(), Some("Thermal-01"));
         assert_eq!(saved.profile.label_printer_name.as_deref(), Some("Label-01"));
+        assert_eq!(saved.profile.cash_drawer_printer_name.as_deref(), Some("Thermal-01"));
         assert_eq!(saved.profile.preferred_scanner_id.as_deref(), Some("scanner-zebra-1"));
         assert_eq!(loaded.profile.receipt_printer_name.as_deref(), Some("Thermal-01"));
         assert_eq!(loaded.profile.label_printer_name.as_deref(), Some("Label-01"));
+        assert_eq!(loaded.profile.cash_drawer_printer_name.as_deref(), Some("Thermal-01"));
         assert_eq!(loaded.profile.preferred_scanner_id.as_deref(), Some("scanner-zebra-1"));
         assert!(loaded.profile.updated_at.is_some());
 
@@ -576,6 +779,7 @@ mod tests {
             StoreRuntimeHardwareProfileInput {
                 receipt_printer_name: Some("Thermal-01".to_string()),
                 label_printer_name: None,
+                cash_drawer_printer_name: Some("Thermal-01".to_string()),
                 preferred_scanner_id: None,
             },
         ).expect("save hardware profile");
@@ -613,6 +817,7 @@ mod tests {
             profile: StoreRuntimeHardwareProfileRecord {
                 receipt_printer_name: None,
                 label_printer_name: None,
+                cash_drawer_printer_name: None,
                 preferred_scanner_id: Some("scanner-zebra-1".to_string()),
                 updated_at: Some("1".to_string()),
             },
@@ -671,6 +876,61 @@ mod tests {
         assert_eq!(status.diagnostics.last_scan_barcode_preview.as_deref(), Some("ACMETEA"));
         assert_eq!(status.diagnostics.scanner_transport.as_deref(), Some("usb_hid"));
         assert!(status.diagnostics.last_scan_at.is_some());
+
+        if let Some(value) = previous_runtime_home {
+            env::set_var("STORE_RUNTIME_HOME", value);
+        } else {
+            env::remove_var("STORE_RUNTIME_HOME");
+        }
+        let _ = fs::remove_dir_all(runtime_home);
+    }
+
+    #[test]
+    fn runtime_hardware_open_cash_drawer_requires_assignment_and_records_diagnostics() {
+        let _guard = runtime_home_test_guard()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_runtime_home = env::var("STORE_RUNTIME_HOME").ok();
+        let runtime_home = env::temp_dir().join(format!(
+            "store-runtime-hardware-cash-drawer-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir_all(&runtime_home).expect("create runtime home");
+        env::set_var(
+            "STORE_RUNTIME_HOME",
+            runtime_home.to_string_lossy().to_string(),
+        );
+
+        let error = open_cash_drawer_with_backend(
+            &runtime_hardware_path(),
+            &mut crate::runtime_cash_drawer::tests::FakeCashDrawerBackend::default(),
+        )
+        .expect_err("cash drawer open should fail without assignment");
+        assert!(error.contains("cash drawer"));
+
+        save_hardware_profile_to_path(
+            &runtime_hardware_path(),
+            StoreRuntimeHardwareProfileInput {
+                receipt_printer_name: Some("Thermal-01".to_string()),
+                label_printer_name: None,
+                cash_drawer_printer_name: Some("Thermal-01".to_string()),
+                preferred_scanner_id: None,
+            },
+        )
+        .expect("save hardware profile");
+
+        let status = open_cash_drawer_with_backend(
+            &runtime_hardware_path(),
+            &mut crate::runtime_cash_drawer::tests::FakeCashDrawerBackend::default(),
+        )
+        .expect("cash drawer open");
+
+        assert_eq!(status.diagnostics.last_cash_drawer_status.as_deref(), Some("opened"));
+        assert_eq!(
+            status.diagnostics.last_cash_drawer_message.as_deref(),
+            Some("Opened cash drawer through Thermal-01")
+        );
+        assert!(status.diagnostics.last_cash_drawer_opened_at.is_some());
 
         if let Some(value) = previous_runtime_home {
             env::set_var("STORE_RUNTIME_HOME", value);

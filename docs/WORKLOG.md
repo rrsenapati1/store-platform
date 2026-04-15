@@ -2,6 +2,14 @@
 
 ## 2026-04-15
 
+- Started `V2-003` with Store Desktop cash-drawer integration:
+  - added a packaged-runtime cash-drawer bridge that opens the drawer through the locally assigned printer path instead of introducing a separate device authority model
+  - extended the desktop hardware profile and diagnostics contract with cash-drawer assignment, setup hints, last-open posture, and packaged-vs-browser fallback status
+  - surfaced cash-drawer assignment and manual-open controls in the counter print queue section, and mirrored the current drawer posture into the runtime shell identity section for operator recovery
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- src/runtime-hardware/storeRuntimeHardwareAdapter.test.ts src/control-plane/StorePrintQueueSection.test.tsx src/control-plane/StoreRuntimeWorkspace.hardware.test.tsx`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml runtime_hardware --lib`
+
 - Completed `V2-002` on Store Desktop HID scanner inventory:
   - added a Windows-first HID scanner backend in the packaged runtime so Store Desktop can discover likely local scanner candidates instead of relying only on wedge heuristics
   - extended the local hardware profile with a preferred scanner assignment and surfaced preferred-scanner connected/disconnected posture through the packaged runtime diagnostics contract

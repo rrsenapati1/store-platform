@@ -24,6 +24,8 @@ function shouldFallbackToBrowserHardware(error: unknown) {
   }
   return /Unexpected command:\s*cmd_(get|save)_store_runtime_hardware_|Unexpected command:\s*cmd_dispatch_store_runtime_print_job/i.test(
     error.message,
+  ) || /Unexpected command:\s*cmd_open_store_runtime_cash_drawer/i.test(
+    error.message,
   );
 }
 
@@ -54,6 +56,7 @@ export function createNativeStoreRuntimeHardware(options: NativeStoreRuntimeHard
         return toHardwareStatus(await invoke('cmd_save_store_runtime_hardware_profile', {
           receipt_printer_name: profile.receipt_printer_name,
           label_printer_name: profile.label_printer_name,
+          cash_drawer_printer_name: profile.cash_drawer_printer_name,
           preferred_scanner_id: profile.preferred_scanner_id,
         }));
       } catch (error) {
@@ -71,6 +74,16 @@ export function createNativeStoreRuntimeHardware(options: NativeStoreRuntimeHard
       } catch (error) {
         if (shouldFallbackToBrowserHardware(error)) {
           return browserFallback.dispatchPrintJob(job);
+        }
+        throw error;
+      }
+    },
+    async openCashDrawer() {
+      try {
+        return toHardwareStatus(await invoke('cmd_open_store_runtime_cash_drawer'));
+      } catch (error) {
+        if (shouldFallbackToBrowserHardware(error)) {
+          return browserFallback.openCashDrawer();
         }
         throw error;
       }

@@ -1,5 +1,6 @@
 mod runtime_paths;
 mod runtime_cache;
+mod runtime_cash_drawer;
 mod runtime_continuity;
 mod runtime_control_plane_origin;
 mod runtime_customer_display;
@@ -28,7 +29,8 @@ use runtime_customer_display::{
 };
 use runtime_hardware::{
     cmd_clear_store_runtime_hardware_profile, cmd_dispatch_store_runtime_print_job,
-    cmd_get_store_runtime_hardware_status, cmd_record_store_runtime_scanner_activity,
+    cmd_get_store_runtime_hardware_status, cmd_open_store_runtime_cash_drawer,
+    cmd_record_store_runtime_scanner_activity,
     cmd_save_store_runtime_hardware_profile,
 };
 use runtime_hub_identity::{
@@ -67,6 +69,7 @@ pub fn run() {
             cmd_save_store_runtime_hardware_profile,
             cmd_clear_store_runtime_hardware_profile,
             cmd_dispatch_store_runtime_print_job,
+            cmd_open_store_runtime_cash_drawer,
             cmd_record_store_runtime_scanner_activity,
             cmd_load_store_runtime_hub_identity,
             cmd_save_store_runtime_hub_identity,
