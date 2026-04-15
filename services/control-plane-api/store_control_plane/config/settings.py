@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     compliance_irp_timeout_seconds: float = 10.0
     subscription_provider_mode: str = "stub"
     subscription_checkout_base_url: str = "https://payments.store.local"
+    checkout_payment_provider_mode: str = "stub"
+    cashfree_payment_client_id: str | None = None
+    cashfree_payment_client_secret: str | None = None
+    cashfree_payment_api_base_url: str = "https://sandbox.cashfree.com"
+    cashfree_payment_api_version: str = "2025-01-01"
+    cashfree_payment_webhook_secret: str | None = None
     cashfree_webhook_secret: str | None = None
     razorpay_webhook_secret: str | None = None
     object_storage_endpoint_url: str | None = None
@@ -90,6 +96,11 @@ class Settings(BaseSettings):
         "compliance_irp_get_by_document_url",
         "compliance_irp_get_gstin_details_url",
         "subscription_checkout_base_url",
+        "cashfree_payment_client_id",
+        "cashfree_payment_client_secret",
+        "cashfree_payment_api_base_url",
+        "cashfree_payment_api_version",
+        "cashfree_payment_webhook_secret",
         "object_storage_endpoint_url",
         "object_storage_region",
         "object_storage_bucket",
@@ -109,7 +120,15 @@ class Settings(BaseSettings):
             return normalized or None
         return value
 
-    @field_validator("public_base_url", "korsenex_idp_jwks_url", "korsenex_idp_issuer", "subscription_checkout_base_url", "object_storage_endpoint_url", mode="after")
+    @field_validator(
+        "public_base_url",
+        "korsenex_idp_jwks_url",
+        "korsenex_idp_issuer",
+        "subscription_checkout_base_url",
+        "cashfree_payment_api_base_url",
+        "object_storage_endpoint_url",
+        mode="after",
+    )
     @classmethod
     def _normalize_urls(cls, value: str | None) -> str | None:
         if value is None:
@@ -204,6 +223,15 @@ class Settings(BaseSettings):
                 return normalized
         return value
 
+    @field_validator("checkout_payment_provider_mode", mode="before")
+    @classmethod
+    def _normalize_checkout_payment_provider_mode(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"stub", "cashfree"}:
+                return normalized
+        return value
+
 
 def build_settings(
     *,
@@ -221,6 +249,12 @@ def build_settings(
     compliance_irp_mode: str | None = None,
     subscription_provider_mode: str | None = None,
     subscription_checkout_base_url: str | None = None,
+    checkout_payment_provider_mode: str | None = None,
+    cashfree_payment_client_id: str | None = None,
+    cashfree_payment_client_secret: str | None = None,
+    cashfree_payment_api_base_url: str | None = None,
+    cashfree_payment_api_version: str | None = None,
+    cashfree_payment_webhook_secret: str | None = None,
     object_storage_endpoint_url: str | None = None,
     object_storage_region: str | None = None,
     object_storage_bucket: str | None = None,
@@ -269,6 +303,18 @@ def build_settings(
         overrides["subscription_provider_mode"] = subscription_provider_mode
     if subscription_checkout_base_url is not None:
         overrides["subscription_checkout_base_url"] = subscription_checkout_base_url
+    if checkout_payment_provider_mode is not None:
+        overrides["checkout_payment_provider_mode"] = checkout_payment_provider_mode
+    if cashfree_payment_client_id is not None:
+        overrides["cashfree_payment_client_id"] = cashfree_payment_client_id
+    if cashfree_payment_client_secret is not None:
+        overrides["cashfree_payment_client_secret"] = cashfree_payment_client_secret
+    if cashfree_payment_api_base_url is not None:
+        overrides["cashfree_payment_api_base_url"] = cashfree_payment_api_base_url
+    if cashfree_payment_api_version is not None:
+        overrides["cashfree_payment_api_version"] = cashfree_payment_api_version
+    if cashfree_payment_webhook_secret is not None:
+        overrides["cashfree_payment_webhook_secret"] = cashfree_payment_webhook_secret
     if object_storage_endpoint_url is not None:
         overrides["object_storage_endpoint_url"] = object_storage_endpoint_url
     if object_storage_region is not None:

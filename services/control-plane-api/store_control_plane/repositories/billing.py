@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import CreditNote, CreditNoteTaxLine, ExchangeOrder, InvoiceTaxLine, Payment, Sale, SaleLine, SaleReturn, SaleReturnLine, SalesInvoice
+from ..models import CheckoutPaymentSession, CreditNote, CreditNoteTaxLine, ExchangeOrder, InvoiceTaxLine, Payment, Sale, SaleLine, SaleReturn, SaleReturnLine, SalesInvoice
 from ..utils import new_id
 
 
@@ -166,6 +166,54 @@ class BillingRepository:
             payments=created_payments,
         )
 
+    async def create_checkout_payment_session(
+        self,
+        *,
+        session_id: str,
+        tenant_id: str,
+        branch_id: str,
+        actor_user_id: str | None,
+        provider_name: str,
+        provider_order_id: str,
+        provider_payment_session_id: str | None,
+        payment_method: str,
+        lifecycle_status: str,
+        provider_status: str,
+        order_amount: float,
+        currency_code: str,
+        cart_summary_hash: str,
+        cart_snapshot: dict,
+        customer_name: str,
+        customer_gstin: str | None,
+        qr_payload: dict,
+        qr_expires_at,
+        provider_response_payload: dict,
+    ) -> CheckoutPaymentSession:
+        record = CheckoutPaymentSession(
+            id=session_id,
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            provider_name=provider_name,
+            provider_order_id=provider_order_id,
+            provider_payment_session_id=provider_payment_session_id,
+            payment_method=payment_method,
+            lifecycle_status=lifecycle_status,
+            provider_status=provider_status,
+            order_amount=order_amount,
+            currency_code=currency_code,
+            cart_summary_hash=cart_summary_hash,
+            cart_snapshot=cart_snapshot,
+            customer_name=customer_name,
+            customer_gstin=customer_gstin,
+            qr_payload=qr_payload,
+            qr_expires_at=qr_expires_at,
+            provider_response_payload=provider_response_payload,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
     async def create_sale_return(
         self,
         *,
@@ -285,6 +333,32 @@ class BillingRepository:
         tax_lines = (await self.list_tax_lines_for_invoices(invoice_ids=[invoice.id])).get(invoice.id, [])
         payments = (await self.list_payments_for_sales(sale_ids=[sale.id])).get(sale.id, [])
         return SaleBundle(sale=sale, invoice=invoice, payments=payments, lines=lines, tax_lines=tax_lines)
+
+    async def get_checkout_payment_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        checkout_payment_session_id: str,
+    ) -> CheckoutPaymentSession | None:
+        statement = select(CheckoutPaymentSession).where(
+            CheckoutPaymentSession.tenant_id == tenant_id,
+            CheckoutPaymentSession.branch_id == branch_id,
+            CheckoutPaymentSession.id == checkout_payment_session_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def get_checkout_payment_session_by_provider_order(
+        self,
+        *,
+        provider_name: str,
+        provider_order_id: str,
+    ) -> CheckoutPaymentSession | None:
+        statement = select(CheckoutPaymentSession).where(
+            CheckoutPaymentSession.provider_name == provider_name,
+            CheckoutPaymentSession.provider_order_id == provider_order_id,
+        )
+        return await self._session.scalar(statement)
 
     async def list_sale_lines_for_sales(self, *, sale_ids: list[str]) -> dict[str, list[SaleLine]]:
         if not sale_ids:

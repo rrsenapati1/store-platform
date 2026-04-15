@@ -2,7 +2,7 @@ from .audit import AuditListResponse, AuditRecord
 from .auth import ActorBranchMembership, ActorResponse, ActorTenantMembership, OIDCExchangeRequest, RuntimeActivationRedeemRequest, RuntimeActivationRedeemResponse, SessionTokenResponse, SignOutResponse
 from .batches import BatchExpiryReportRecord, BatchExpiryReportResponse, BatchExpiryWriteOffCreateRequest, BatchExpiryWriteOffResponse, BatchLotResponse, GoodsReceiptBatchLotCreateRequest, GoodsReceiptBatchLotResponse
 from .barcode import BarcodeAllocationRequest, BarcodeAllocationResponse, BarcodeLabelPreviewResponse, BarcodeScanLookupResponse
-from .billing import CreditNoteResponse, CreditNoteTaxLineResponse, InvoiceTaxLineResponse, PaymentResponse, RefundApprovalRequest, SaleCreateRequest, SaleLineCreateRequest, SaleLineResponse, SaleListResponse, SaleRecord, SaleResponse, SaleReturnCreateRequest, SaleReturnLineCreateRequest, SaleReturnLineResponse, SaleReturnListResponse, SaleReturnRecord, SaleReturnResponse
+from .billing import CheckoutPaymentQrPayloadResponse, CheckoutPaymentSessionCreateRequest, CheckoutPaymentSessionResponse, CheckoutPaymentWebhookResponse, CreditNoteResponse, CreditNoteTaxLineResponse, InvoiceTaxLineResponse, PaymentResponse, RefundApprovalRequest, SaleCreateRequest, SaleLineCreateRequest, SaleLineResponse, SaleListResponse, SaleRecord, SaleResponse, SaleReturnCreateRequest, SaleReturnLineCreateRequest, SaleReturnLineResponse, SaleReturnListResponse, SaleReturnRecord, SaleReturnResponse
 from .exchanges import ExchangeCreateRequest, ExchangePaymentAllocationResponse, ExchangeResponse
 from .catalog import BranchCatalogItemListResponse, BranchCatalogItemRecord, BranchCatalogItemResponse, BranchCatalogItemUpsertRequest, CatalogProductCreateRequest, CatalogProductListResponse, CatalogProductRecord, CatalogProductResponse
 from .compliance import AttachIrnRequest, BranchIrpProfileResponse, BranchIrpProfileUpsertRequest, GstExportCreateRequest, GstExportJobListResponse, GstExportJobResponse
@@ -95,6 +95,10 @@ __all__ = [
     "CatalogProductListResponse",
     "CatalogProductRecord",
     "CatalogProductResponse",
+    "CheckoutPaymentQrPayloadResponse",
+    "CheckoutPaymentSessionCreateRequest",
+    "CheckoutPaymentSessionResponse",
+    "CheckoutPaymentWebhookResponse",
     "CreditNoteResponse",
     "CreditNoteTaxLineResponse",
     "CustomerDirectoryRecord",

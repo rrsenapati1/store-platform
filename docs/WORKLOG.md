@@ -2,6 +2,17 @@
 
 ## 2026-04-15
 
+- Expanded `V2-003` on Store Desktop with Cashfree dynamic UPI QR checkout:
+  - added a new control-plane checkout payment-session lane for in-store Cashfree QR creation, status polling, cancel/retry, and webhook-driven sale finalization so desktop checkout no longer has to post a sale before payment confirmation
+  - extracted Store Desktop QR-session orchestration into a dedicated checkout-payment hook, kept `useStoreRuntimeWorkspace.ts` as orchestration-only wiring, and extended the billing surface with QR state, retry/cancel/manual-fallback controls, and finalized-sale refresh
+  - extended the customer-display payload and route so active QR sessions surface dynamic UPI payload details and payment-in-progress posture before the sale completes
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_checkout_payment_sessions.py services/control-plane-api/tests/test_billing_foundation_flow.py -q`
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+
 - Expanded `V2-003` on Store Desktop with weighing-scale integration:
   - added a packaged-runtime serial-scale bridge so the Windows desktop shell can discover local COM-style scale candidates, assign one preferred scale, and manually read a live weight without changing billing authority
   - extended the desktop hardware contract with scale diagnostics, last-weight posture, and browser-fallback messaging so operators can see scale readiness and latest read results alongside printers, scanners, and cash drawer

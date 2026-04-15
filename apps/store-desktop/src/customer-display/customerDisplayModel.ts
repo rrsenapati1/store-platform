@@ -6,6 +6,12 @@ export interface CustomerDisplayLineItem {
   amount: number;
 }
 
+export interface CustomerDisplayPaymentQr {
+  format: string;
+  value: string;
+  expires_at: string | null;
+}
+
 export interface CustomerDisplayPayload {
   state: CustomerDisplayState;
   title: string;
@@ -18,6 +24,7 @@ export interface CustomerDisplayPayload {
   grand_total: number | null;
   cash_received: number | null;
   change_due: number | null;
+  payment_qr: CustomerDisplayPaymentQr | null;
   updated_at: string | null;
 }
 
@@ -53,6 +60,17 @@ export interface BuildCustomerDisplayPayloadArgs {
   saleQuantity: string;
   paymentMethod: string;
   latestSale: CustomerDisplayCompletedSale | null;
+  checkoutPaymentSession: {
+    payment_method: string;
+    lifecycle_status: string;
+    order_amount: number;
+    currency_code: string;
+    qr_payload: {
+      format: string;
+      value: string;
+    };
+    qr_expires_at?: string | null;
+  } | null;
   isBusy: boolean;
 }
 
@@ -86,6 +104,15 @@ function isCustomerDisplayLineItem(value: unknown): value is CustomerDisplayLine
     && typeof value.amount === 'number';
 }
 
+function isCustomerDisplayPaymentQr(value: unknown): value is CustomerDisplayPaymentQr {
+  if (!isObject(value)) {
+    return false;
+  }
+  return typeof value.format === 'string'
+    && typeof value.value === 'string'
+    && (typeof value.expires_at === 'string' || value.expires_at === null);
+}
+
 export function isCustomerDisplayPayload(value: unknown): value is CustomerDisplayPayload {
   if (!isObject(value)) {
     return false;
@@ -106,6 +133,7 @@ export function isCustomerDisplayPayload(value: unknown): value is CustomerDispl
     && (typeof value.grand_total === 'number' || value.grand_total === null)
     && (typeof value.cash_received === 'number' || value.cash_received === null)
     && (typeof value.change_due === 'number' || value.change_due === null)
+    && (value.payment_qr === null || isCustomerDisplayPaymentQr(value.payment_qr))
     && (typeof value.updated_at === 'string' || value.updated_at === null);
 }
 
@@ -124,6 +152,7 @@ export function buildIdleCustomerDisplayPayload(branchName: string | null): Cust
     grand_total: null,
     cash_received: null,
     change_due: null,
+    payment_qr: null,
     updated_at: null,
   };
 }
@@ -153,11 +182,59 @@ export function buildCustomerDisplayPayload(args: BuildCustomerDisplayPayloadArg
       grand_total: money(args.latestSale.grand_total),
       cash_received: cashReceived,
       change_due: changeDue,
+      payment_qr: null,
       updated_at: args.latestSale.issued_on ?? null,
     };
   }
 
   const quantity = parseQuantity(args.saleQuantity);
+  if (args.checkoutPaymentSession && args.checkoutPaymentSession.payment_method === 'CASHFREE_UPI_QR') {
+    const subtotal = args.selectedItem && quantity !== null
+      ? money(quantity * args.selectedItem.effective_selling_price)
+      : null;
+    const taxTotal = args.selectedItem && quantity !== null
+      ? money(subtotal! * args.selectedItem.gst_rate / 100)
+      : null;
+    const lineItems = args.selectedItem && quantity !== null
+      ? [
+          {
+            label: args.selectedItem.product_name,
+            quantity,
+            amount: money(args.checkoutPaymentSession.order_amount),
+          },
+        ]
+      : [];
+    const activePaymentState = args.checkoutPaymentSession.lifecycle_status === 'FAILED'
+      || args.checkoutPaymentSession.lifecycle_status === 'EXPIRED'
+      || args.checkoutPaymentSession.lifecycle_status === 'CANCELED'
+      ? 'unavailable'
+      : 'payment_in_progress';
+
+    return {
+      state: activePaymentState,
+      title: activePaymentState === 'unavailable' ? 'QR unavailable' : 'Scan to pay',
+      message: activePaymentState === 'unavailable'
+        ? 'Ask the cashier to retry or switch to a manual payment method.'
+        : 'Scan to pay with any UPI app.',
+      currency_code: args.checkoutPaymentSession.currency_code,
+      line_items: lineItems,
+      subtotal,
+      discount_total: 0,
+      tax_total: taxTotal,
+      grand_total: money(args.checkoutPaymentSession.order_amount),
+      cash_received: null,
+      change_due: null,
+      payment_qr: activePaymentState === 'unavailable'
+        ? null
+        : {
+            format: args.checkoutPaymentSession.qr_payload.format,
+            value: args.checkoutPaymentSession.qr_payload.value,
+            expires_at: args.checkoutPaymentSession.qr_expires_at ?? null,
+          },
+      updated_at: null,
+    };
+  }
+
   if (!args.selectedItem || quantity === null) {
     return buildIdleCustomerDisplayPayload(args.branchName);
   }
@@ -187,6 +264,7 @@ export function buildCustomerDisplayPayload(args: BuildCustomerDisplayPayloadArg
     grand_total: grandTotal,
     cash_received: null,
     change_due: null,
+    payment_qr: null,
     updated_at: null,
   };
 }

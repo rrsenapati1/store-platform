@@ -6,6 +6,7 @@ import type {
   ControlPlaneBranchCatalogItem,
   ControlPlaneBranchRecord,
   ControlPlaneBranchCustomerReport,
+  ControlPlaneCheckoutPaymentSession,
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
   ControlPlaneDeviceRecord,
@@ -403,6 +404,53 @@ export const storeControlPlaneClient = {
       {
         method: 'POST',
         body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  createCheckoutPaymentSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      provider_name: string;
+      payment_method: string;
+      customer_name: string;
+      customer_gstin?: string | null;
+      lines: Array<{ product_id: string; quantity: number }>;
+    },
+  ) {
+    return request<ControlPlaneCheckoutPaymentSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  getCheckoutPaymentSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    checkoutPaymentSessionId: string,
+  ) {
+    return request<ControlPlaneCheckoutPaymentSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions/${checkoutPaymentSessionId}`,
+      undefined,
+      accessToken,
+    );
+  },
+  cancelCheckoutPaymentSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    checkoutPaymentSessionId: string,
+  ) {
+    return request<ControlPlaneCheckoutPaymentSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions/${checkoutPaymentSessionId}/cancel`,
+      {
+        method: 'POST',
       },
       accessToken,
     );

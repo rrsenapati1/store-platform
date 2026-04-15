@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Date, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, TimestampMixin
@@ -74,6 +74,41 @@ class Payment(Base, TimestampMixin):
     sale_id: Mapped[str] = mapped_column(ForeignKey("sales.id", ondelete="CASCADE"), index=True)
     payment_method: Mapped[str] = mapped_column(String(32))
     amount: Mapped[float] = mapped_column(default=0.0)
+
+
+class CheckoutPaymentSession(Base, TimestampMixin):
+    __tablename__ = "checkout_payment_sessions"
+    __table_args__ = (
+        UniqueConstraint("provider_name", "provider_order_id", name="uq_checkout_payment_sessions_provider_order"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    actor_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), default=None, index=True)
+    provider_name: Mapped[str] = mapped_column(String(32), index=True)
+    provider_order_id: Mapped[str] = mapped_column(String(255), index=True)
+    provider_payment_session_id: Mapped[str | None] = mapped_column(String(255), default=None, index=True)
+    provider_payment_id: Mapped[str | None] = mapped_column(String(255), default=None, index=True)
+    payment_method: Mapped[str] = mapped_column(String(64))
+    lifecycle_status: Mapped[str] = mapped_column(String(32), index=True)
+    provider_status: Mapped[str] = mapped_column(String(64), index=True)
+    order_amount: Mapped[float] = mapped_column(default=0.0)
+    currency_code: Mapped[str] = mapped_column(String(8), default="INR")
+    cart_summary_hash: Mapped[str] = mapped_column(String(64), index=True)
+    cart_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    customer_name: Mapped[str] = mapped_column(String(255))
+    customer_gstin: Mapped[str | None] = mapped_column(String(32), default=None)
+    qr_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    qr_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None, index=True)
+    provider_response_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    last_error_message: Mapped[str | None] = mapped_column(String(1024), default=None)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
+    finalized_sale_id: Mapped[str | None] = mapped_column(ForeignKey("sales.id", ondelete="SET NULL"), default=None, index=True)
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None)
 
 
 class SaleReturn(Base, TimestampMixin):

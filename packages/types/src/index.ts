@@ -1224,6 +1224,11 @@ export interface ControlPlanePayment {
   amount: number;
 }
 
+export interface ControlPlaneCheckoutPaymentQrPayload {
+  format: string;
+  value: string;
+}
+
 export interface ControlPlaneSaleLine {
   product_id: string;
   product_name: string;
@@ -1273,6 +1278,24 @@ export interface ControlPlaneSaleRecord {
   payment_method: string;
   grand_total: number;
   issued_on: string;
+}
+
+export interface ControlPlaneCheckoutPaymentSession {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  provider_name: string;
+  provider_order_id: string;
+  provider_payment_session_id?: string | null;
+  provider_payment_id?: string | null;
+  payment_method: string;
+  lifecycle_status: string;
+  provider_status: string;
+  order_amount: number;
+  currency_code: string;
+  qr_payload: ControlPlaneCheckoutPaymentQrPayload;
+  qr_expires_at?: string | null;
+  sale?: ControlPlaneSale | null;
 }
 
 export interface ControlPlaneCustomerDirectoryRecord {

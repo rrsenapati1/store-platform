@@ -1,6 +1,6 @@
 from .audit import AuditEvent
 from .batches import BatchExpiryWriteOff, BatchLot
-from .billing import CreditNote, CreditNoteTaxLine, ExchangeOrder, InvoiceTaxLine, Payment, Sale, SaleLine, SaleReturn, SaleReturnLine, SalesInvoice
+from .billing import CheckoutPaymentSession, CreditNote, CreditNoteTaxLine, ExchangeOrder, InvoiceTaxLine, Payment, Sale, SaleLine, SaleReturn, SaleReturnLine, SalesInvoice
 from .catalog import BranchCatalogItem, CatalogProduct
 from .compliance import BranchIrpProfile, GstExportJob, IrnAttachment
 from .commerce import BillingPlan, SubscriptionWebhookEvent, TenantBillingOverride, TenantEntitlement, TenantSubscription
@@ -29,6 +29,7 @@ __all__ = [
     "BranchCatalogItem",
     "BranchMembership",
     "CatalogProduct",
+    "CheckoutPaymentSession",
     "CreditNote",
     "CreditNoteTaxLine",
     "CustomerExchangeSnapshot",

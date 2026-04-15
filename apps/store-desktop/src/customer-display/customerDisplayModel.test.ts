@@ -9,6 +9,7 @@ describe('customer display payload model', () => {
       saleQuantity: '1',
       paymentMethod: 'Cash',
       latestSale: null,
+      checkoutPaymentSession: null,
       isBusy: false,
     });
 
@@ -29,6 +30,7 @@ describe('customer display payload model', () => {
       saleQuantity: '2',
       paymentMethod: 'UPI',
       latestSale: null,
+      checkoutPaymentSession: null,
       isBusy: false,
     });
 
@@ -76,6 +78,7 @@ describe('customer display payload model', () => {
         grand_total: 388.5,
         invoice_number: 'SINV-BLRFLAGSHIP-0001',
       },
+      checkoutPaymentSession: null,
       isBusy: false,
     });
 

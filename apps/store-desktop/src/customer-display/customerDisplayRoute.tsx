@@ -151,6 +151,30 @@ export function CustomerDisplayRoute() {
           <ToneBar label="Subtotal" value={formatAmount(payload.subtotal)} />
           <ToneBar label="Tax" value={formatAmount(payload.tax_total)} />
           <ToneBar label="Total" value={formatAmount(payload.grand_total)} />
+          {payload.payment_qr ? (
+            <div
+              style={{
+                display: 'grid',
+                gap: '10px',
+                padding: '16px',
+                borderRadius: '20px',
+                background: 'rgba(122, 224, 255, 0.12)',
+                border: '1px solid rgba(122, 224, 255, 0.2)',
+              }}
+            >
+              <span style={{ fontSize: '12px', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#d1d8f0' }}>
+                Dynamic UPI QR
+              </span>
+              <strong style={{ fontSize: '18px', lineHeight: 1.4, wordBreak: 'break-all', color: '#f5f7ff' }}>
+                {payload.payment_qr.value}
+              </strong>
+              {payload.payment_qr.expires_at ? (
+                <span style={{ fontSize: '14px', color: '#dbe3ff' }}>
+                  Expires {payload.payment_qr.expires_at}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           {payload.cash_received !== null ? <ToneBar label="Cash received" value={formatAmount(payload.cash_received)} /> : null}
           {payload.change_due !== null ? <ToneBar label="Change due" value={formatAmount(payload.change_due)} /> : null}
         </div>

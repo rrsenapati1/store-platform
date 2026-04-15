@@ -53,6 +53,7 @@ function buildPayload(overrides: Partial<CustomerDisplayPayload> = {}): Customer
     grand_total: 194.25,
     cash_received: null,
     change_due: null,
+    payment_qr: null,
     updated_at: '2026-04-15T12:00:00.000Z',
     ...overrides,
   };

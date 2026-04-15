@@ -42,6 +42,16 @@ export function useCustomerDisplayController(workspace: StoreRuntimeWorkspaceSta
     saleQuantity: workspace.saleQuantity,
     paymentMethod: workspace.paymentMethod,
     latestSale,
+    checkoutPaymentSession: workspace.checkoutPaymentSession
+      ? {
+          payment_method: workspace.checkoutPaymentSession.payment_method,
+          lifecycle_status: workspace.checkoutPaymentSession.lifecycle_status,
+          order_amount: workspace.checkoutPaymentSession.order_amount,
+          currency_code: workspace.checkoutPaymentSession.currency_code,
+          qr_payload: workspace.checkoutPaymentSession.qr_payload,
+          qr_expires_at: workspace.checkoutPaymentSession.qr_expires_at,
+        }
+      : null,
     isBusy: workspace.isBusy,
   });
   const payloadSignature = JSON.stringify(payload);
@@ -56,10 +66,11 @@ export function useCustomerDisplayController(workspace: StoreRuntimeWorkspaceSta
   async function openDisplay() {
     setErrorMessage('');
     try {
+      setIsOpen(true);
       saveCustomerDisplayPayload(payload);
       await adapterRef.current.open();
-      setIsOpen(true);
     } catch (error) {
+      setIsOpen(false);
       setErrorMessage(error instanceof Error ? error.message : 'Unable to open the customer display.');
     }
   }

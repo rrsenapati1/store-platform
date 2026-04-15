@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,43 @@ class SaleCreateRequest(BaseModel):
     customer_gstin: str | None = None
     payment_method: str
     lines: list[SaleLineCreateRequest]
+
+
+class CheckoutPaymentSessionCreateRequest(BaseModel):
+    provider_name: str
+    payment_method: str
+    customer_name: str
+    customer_gstin: str | None = None
+    lines: list[SaleLineCreateRequest]
+
+
+class CheckoutPaymentQrPayloadResponse(BaseModel):
+    format: str
+    value: str
+
+
+class CheckoutPaymentSessionResponse(BaseModel):
+    id: str
+    tenant_id: str
+    branch_id: str
+    provider_name: str
+    provider_order_id: str
+    provider_payment_session_id: str | None = None
+    provider_payment_id: str | None = None
+    payment_method: str
+    lifecycle_status: str
+    provider_status: str
+    order_amount: float
+    currency_code: str
+    qr_payload: CheckoutPaymentQrPayloadResponse
+    qr_expires_at: datetime | None = None
+    sale: "SaleResponse | None" = None
+
+
+class CheckoutPaymentWebhookResponse(BaseModel):
+    status: str
+    checkout_payment_session_id: str | None = None
+    lifecycle_status: str | None = None
 
 
 class PaymentResponse(BaseModel):
@@ -151,3 +188,6 @@ class SaleReturnRecord(BaseModel):
 
 class SaleReturnListResponse(BaseModel):
     records: list[SaleReturnRecord]
+
+
+CheckoutPaymentSessionResponse.model_rebuild()

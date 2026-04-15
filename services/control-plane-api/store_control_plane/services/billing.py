@@ -24,11 +24,12 @@ class BillingService:
         *,
         tenant_id: str,
         branch_id: str,
-        actor_user_id: str,
+        actor_user_id: str | None,
         customer_name: str,
         customer_gstin: str | None,
         payment_method: str,
         lines: list[dict[str, float | str]],
+        auto_commit: bool = True,
     ) -> dict[str, object]:
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
         if branch is None:
@@ -137,13 +138,31 @@ class BillingService:
             entity_id=persisted.sale.id,
             payload={"invoice_number": persisted.invoice.invoice_number, "grand_total": persisted.sale.grand_total},
         )
-        await self._session.commit()
+        if auto_commit:
+            await self._session.commit()
         return self._serialize_sale_bundle(
             sale=persisted.sale,
             invoice=persisted.invoice,
             payments=persisted.payments,
             sale_lines=persisted.lines,
             tax_lines=persisted.tax_lines,
+            products_by_id=products,
+        )
+
+    async def get_sale(self, *, tenant_id: str, branch_id: str, sale_id: str) -> dict[str, object]:
+        sale_bundle = await self._billing_repo.get_sale_bundle(tenant_id=tenant_id, branch_id=branch_id, sale_id=sale_id)
+        if sale_bundle is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
+        products = {
+            product.id: product
+            for product in await self._catalog_repo.list_products(tenant_id=tenant_id)
+        }
+        return self._serialize_sale_bundle(
+            sale=sale_bundle.sale,
+            invoice=sale_bundle.invoice,
+            payments=sale_bundle.payments,
+            sale_lines=sale_bundle.lines,
+            tax_lines=sale_bundle.tax_lines,
             products_by_id=products,
         )
 

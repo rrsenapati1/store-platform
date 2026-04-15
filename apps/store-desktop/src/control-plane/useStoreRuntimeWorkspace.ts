@@ -68,6 +68,7 @@ import { ensureStoreRuntimeHubIdentity } from './runtimeHubIdentity';
 import { loadStoreRuntimeShellStatus, useStoreRuntimeShellStatus } from './useStoreRuntimeShellStatus';
 import { ControlPlaneRequestError, storeControlPlaneClient } from './client';
 import { useStoreRuntimeBarcodeScanner } from './useStoreRuntimeBarcodeScanner';
+import { useStoreRuntimeCheckoutPayment } from './useStoreRuntimeCheckoutPayment';
 import { useStoreRuntimeHardwareIntegration } from './useStoreRuntimeHardwareIntegration';
 import { useStoreRuntimeOfflineContinuity } from './useStoreRuntimeOfflineContinuity';
 type CacheStatus = 'EMPTY' | 'HYDRATED' | 'SYNCED';
@@ -150,6 +151,7 @@ export function useStoreRuntimeWorkspace() {
 
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? actor?.branch_memberships[0]?.tenant_id ?? '';
   const branchId = actor?.branch_memberships[0]?.branch_id ?? branches[0]?.branch_id ?? '';
+  const selectedCatalogItem = branchCatalogItems[0] ?? null;
   const runtimeHardware = useStoreRuntimeHardwareIntegration({
     runtimeShellKind: runtimeShellStatus?.runtime_kind ?? null,
     accessToken,
@@ -211,6 +213,39 @@ export function useStoreRuntimeWorkspace() {
     onSalesChange(nextSales) {
       applyStateTransition(() => {
         setSales(nextSales);
+      });
+    },
+  });
+  const runtimeCheckoutPayment = useStoreRuntimeCheckoutPayment({
+    accessToken,
+    tenantId,
+    branchId,
+    selectedCatalogItem,
+    customerName,
+    customerGstin,
+    saleQuantity,
+    paymentMethod,
+    isSessionLive,
+    onError(message) {
+      applyStateTransition(() => {
+        setErrorMessage(message);
+      });
+    },
+    onFinalized({ sale, sales: nextSales, inventorySnapshot: nextInventorySnapshot }) {
+      applyStateTransition(() => {
+        setLatestSale(sale);
+        setSales(nextSales);
+        setInventorySnapshot(nextInventorySnapshot);
+        setLatestPrintJob(null);
+        setCustomerName('');
+        setCustomerGstin('');
+        setSaleQuantity('1');
+        setReturnQuantity('1');
+        setRefundAmount(String(sale.payment.amount));
+        setRefundMethod(sale.payment.payment_method);
+        setExchangeReturnQuantity('1');
+        setReplacementQuantity('1');
+        setExchangeSettlementMethod('Cash');
       });
     },
   });
@@ -888,8 +923,15 @@ export function useStoreRuntimeWorkspace() {
   }
 
   async function createSalesInvoice() {
-    const catalogItem = branchCatalogItems[0];
+    const catalogItem = selectedCatalogItem;
     if (!catalogItem || !actor) {
+      return;
+    }
+    if (paymentMethod === 'CASHFREE_UPI_QR') {
+      applyStateTransition(() => {
+        setErrorMessage('');
+      });
+      await runtimeCheckoutPayment.startCheckoutPaymentSession();
       return;
     }
     setIsBusy(true);
@@ -907,6 +949,7 @@ export function useStoreRuntimeWorkspace() {
           return;
         }
         const offlineSale = await offlineContinuity.createOfflineSale(draftPayload);
+        runtimeCheckoutPayment.clearCheckoutPaymentSession();
         applyStateTransition(() => {
           setLatestPrintJob(null);
           setCustomerName('');
@@ -933,6 +976,7 @@ export function useStoreRuntimeWorkspace() {
           storeControlPlaneClient.listSales(accessToken, tenantId, branchId),
           storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId),
         ]);
+        runtimeCheckoutPayment.clearCheckoutPaymentSession();
         applyStateTransition(() => {
           setLatestSale(sale);
           setSales(salesResponse.records);
@@ -953,6 +997,7 @@ export function useStoreRuntimeWorkspace() {
           throw error;
         }
         const offlineSale = await offlineContinuity.createOfflineSale(draftPayload);
+        runtimeCheckoutPayment.clearCheckoutPaymentSession();
         applyStateTransition(() => {
           setLatestPrintJob(null);
           setCustomerName('');
@@ -971,6 +1016,35 @@ export function useStoreRuntimeWorkspace() {
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function retryCheckoutPaymentSession() {
+    applyStateTransition(() => {
+      setErrorMessage('');
+    });
+    await runtimeCheckoutPayment.retryCheckoutPaymentSession();
+  }
+
+  async function cancelCheckoutPaymentSession() {
+    applyStateTransition(() => {
+      setErrorMessage('');
+    });
+    await runtimeCheckoutPayment.cancelCheckoutPaymentSession();
+  }
+
+  async function useManualCheckoutFallback() {
+    if (runtimeCheckoutPayment.checkoutPaymentSession
+      && runtimeCheckoutPayment.checkoutPaymentSession.lifecycle_status !== 'FAILED'
+      && runtimeCheckoutPayment.checkoutPaymentSession.lifecycle_status !== 'EXPIRED'
+      && runtimeCheckoutPayment.checkoutPaymentSession.lifecycle_status !== 'CANCELED'
+      && runtimeCheckoutPayment.checkoutPaymentSession.lifecycle_status !== 'FINALIZED') {
+      await runtimeCheckoutPayment.cancelCheckoutPaymentSession();
+    }
+    runtimeCheckoutPayment.clearCheckoutPaymentSession();
+    applyStateTransition(() => {
+      setPaymentMethod('UPI');
+      setErrorMessage('');
+    });
   }
 
   async function lookupScannedBarcode(barcodeOverride?: string) {
@@ -1305,6 +1379,8 @@ export function useStoreRuntimeWorkspace() {
     createBatchExpiryWriteOff,
     createSaleReturn,
     createSalesInvoice,
+    cancelCheckoutPaymentSession,
+    checkoutPaymentSession: runtimeCheckoutPayment.checkoutPaymentSession,
     customerGstin,
     customerName,
     errorMessage,
@@ -1317,6 +1393,7 @@ export function useStoreRuntimeWorkspace() {
     inventorySnapshot,
     isSessionLive,
     isBusy,
+    isCheckoutPaymentBusy: runtimeCheckoutPayment.isBusy,
     isOfflineContinuityActive: offlineContinuity.isContinuityModeActive,
     hasLoadedLocalAuth,
     korsenexToken,
@@ -1417,6 +1494,7 @@ export function useStoreRuntimeWorkspace() {
     refundAmount,
     refundMethod,
     refreshRuntimeSession,
+    retryCheckoutPaymentSession,
     returnQuantity,
     saleQuantity,
     sales,
@@ -1450,6 +1528,7 @@ export function useStoreRuntimeWorkspace() {
     newPin,
     unlockPin,
     unlockRuntimeWithPin,
+    useManualCheckoutFallback,
   };
 }
 
