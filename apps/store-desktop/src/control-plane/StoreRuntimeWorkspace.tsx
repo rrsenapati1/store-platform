@@ -4,6 +4,7 @@ import { StoreBarcodeLookupSection } from './StoreBarcodeLookupSection';
 import type { WorkspaceMetric } from '@store/types';
 import { StoreBillingSection } from './StoreBillingSection';
 import { StoreCustomerInsightsSection } from './StoreCustomerInsightsSection';
+import { StoreCustomerDisplaySection } from './StoreCustomerDisplaySection';
 import { StoreOfflineContinuitySection } from './StoreOfflineContinuitySection';
 import { StoreRuntimeCacheSection } from './StoreRuntimeCacheSection';
 import { StoreRuntimeOutboxSection } from './StoreRuntimeOutboxSection';
@@ -255,6 +256,7 @@ export function StoreRuntimeWorkspace() {
       </SectionCard>
 
       {!isLocalAuthGateActive ? <StoreOfflineContinuitySection workspace={workspace} /> : null}
+      {!isLocalAuthGateActive ? <StoreCustomerDisplaySection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBillingSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBarcodeLookupSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBatchExpirySection workspace={workspace} /> : null}

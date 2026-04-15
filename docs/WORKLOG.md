@@ -2,6 +2,17 @@
 
 ## 2026-04-15
 
+- Expanded `V2-001` with the first customer-display runtime slice:
+  - kept customer display inside `apps/store-desktop` as a terminal-owned second-window surface instead of introducing a separate paired device too early
+  - added a dedicated customer-display payload model, browser-safe state transport, and a customer-facing route that renders idle, active-cart, payment-progress, and sale-complete posture from cashier-owned state
+  - added packaged-runtime window controls through the Tauri shell so Store Desktop can open or close a dedicated customer-display window while keeping the display fully read-only
+  - added a cashier-side customer-display section so branch operators can manage the display directly from Store Desktop and mirror checkout transitions into the second screen
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- customerDisplayModel.test.ts customerDisplayRoute.test.tsx nativeStoreCustomerDisplay.test.ts StoreRuntimeWorkspace.customer-display.test.tsx`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml runtime_customer_display --lib`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+
 - Expanded V2-001 within the shared Android runtime:
   - added `inventory_tablet` activation support on the control plane so approved tablet devices redeem into `inventory_tablet_spoke` instead of falling back to desktop posture
   - kept one Android app and split runtime shells by paired profile so `mobile_store_spoke` stays cashier-assist-first while `inventory_tablet_spoke` gets a tablet-first inventory shell

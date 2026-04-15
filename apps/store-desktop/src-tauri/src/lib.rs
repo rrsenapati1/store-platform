@@ -2,6 +2,7 @@ mod runtime_paths;
 mod runtime_cache;
 mod runtime_continuity;
 mod runtime_control_plane_origin;
+mod runtime_customer_display;
 mod runtime_hardware;
 mod runtime_hub_identity;
 mod runtime_hub_service;
@@ -20,6 +21,9 @@ use runtime_cache::{
 use runtime_continuity::{
     cmd_clear_store_runtime_continuity, cmd_get_store_runtime_continuity_status,
     cmd_load_store_runtime_continuity, cmd_save_store_runtime_continuity,
+};
+use runtime_customer_display::{
+    cmd_close_store_customer_display, cmd_open_store_customer_display,
 };
 use runtime_hardware::{
     cmd_clear_store_runtime_hardware_profile, cmd_dispatch_store_runtime_print_job,
@@ -52,6 +56,8 @@ pub fn run() {
             cmd_save_store_runtime_continuity,
             cmd_clear_store_runtime_continuity,
             cmd_get_store_runtime_continuity_status,
+            cmd_open_store_customer_display,
+            cmd_close_store_customer_display,
             cmd_load_store_runtime_session,
             cmd_save_store_runtime_session,
             cmd_clear_store_runtime_session,
