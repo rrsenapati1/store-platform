@@ -10,6 +10,15 @@ const { tauriState, dispatches, mockInvoke } = vi.hoisted(() => ({
   tauriState: {
     hardwareStatus: {
       bridge_state: 'ready',
+      scales: [
+        {
+          id: 'scale-com3',
+          label: 'Serial scale (COM3)',
+          transport: 'serial_com',
+          port_name: 'COM3',
+          is_connected: true,
+        },
+      ],
       scanners: [
         {
           id: 'scanner-zebra-1',
@@ -33,10 +42,12 @@ const { tauriState, dispatches, mockInvoke } = vi.hoisted(() => ({
         receipt_printer_name: 'Thermal-01',
         label_printer_name: 'Label-01',
         cash_drawer_printer_name: 'Thermal-01',
+        preferred_scale_id: 'scale-com3',
         preferred_scanner_id: 'scanner-zebra-1',
         updated_at: '2026-04-14T16:00:00.000Z',
       },
       diagnostics: {
+        scale_capture_state: 'ready',
         scanner_capture_state: 'ready',
         scanner_transport: 'usb_hid',
         last_print_status: null,
@@ -45,8 +56,15 @@ const { tauriState, dispatches, mockInvoke } = vi.hoisted(() => ({
         last_cash_drawer_status: null,
         last_cash_drawer_message: null,
         last_cash_drawer_opened_at: null,
+        last_weight_value: 0.5,
+        last_weight_unit: 'kg',
+        last_weight_status: 'captured',
+        last_weight_message: 'Captured 0.500 kg from Serial scale (COM3)',
+        last_weight_read_at: '2026-04-15T12:10:00.000Z',
         last_scan_at: null,
         last_scan_barcode_preview: null,
+        scale_status_message: 'Preferred scale ready: Serial scale (COM3).',
+        scale_setup_hint: 'Connect a local serial/COM scale and assign it before requesting a live read.',
         cash_drawer_status_message: 'Cash drawer is assigned to Thermal-01.',
         cash_drawer_setup_hint: 'Open the assigned cash drawer only after a cashier confirms the sale state.',
         scanner_status_message: 'Preferred HID scanner connected: Zebra DS2208',
@@ -136,6 +154,15 @@ describe('packaged runtime hardware integration', () => {
     dispatches.length = 0;
     tauriState.hardwareStatus = {
       bridge_state: 'ready',
+      scales: [
+        {
+          id: 'scale-com3',
+          label: 'Serial scale (COM3)',
+          transport: 'serial_com',
+          port_name: 'COM3',
+          is_connected: true,
+        },
+      ],
       scanners: [
         {
           id: 'scanner-zebra-1',
@@ -159,10 +186,12 @@ describe('packaged runtime hardware integration', () => {
         receipt_printer_name: 'Thermal-01',
         label_printer_name: 'Label-01',
         cash_drawer_printer_name: 'Thermal-01',
+        preferred_scale_id: 'scale-com3',
         preferred_scanner_id: 'scanner-zebra-1',
         updated_at: '2026-04-14T16:00:00.000Z',
       },
       diagnostics: {
+        scale_capture_state: 'ready',
         scanner_capture_state: 'ready',
         scanner_transport: 'usb_hid',
         last_print_status: null,
@@ -171,8 +200,15 @@ describe('packaged runtime hardware integration', () => {
         last_cash_drawer_status: null,
         last_cash_drawer_message: null,
         last_cash_drawer_opened_at: null,
+        last_weight_value: 0.5,
+        last_weight_unit: 'kg',
+        last_weight_status: 'captured',
+        last_weight_message: 'Captured 0.500 kg from Serial scale (COM3)',
+        last_weight_read_at: '2026-04-15T12:10:00.000Z',
         last_scan_at: null,
         last_scan_barcode_preview: null,
+        scale_status_message: 'Preferred scale ready: Serial scale (COM3).',
+        scale_setup_hint: 'Connect a local serial/COM scale and assign it before requesting a live read.',
         cash_drawer_status_message: 'Cash drawer is assigned to Thermal-01.',
         cash_drawer_setup_hint: 'Open the assigned cash drawer only after a cashier confirms the sale state.',
         scanner_status_message: 'Preferred HID scanner connected: Zebra DS2208',

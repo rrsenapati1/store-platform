@@ -26,6 +26,8 @@ function shouldFallbackToBrowserHardware(error: unknown) {
     error.message,
   ) || /Unexpected command:\s*cmd_open_store_runtime_cash_drawer/i.test(
     error.message,
+  ) || /Unexpected command:\s*cmd_read_store_runtime_scale_weight/i.test(
+    error.message,
   );
 }
 
@@ -57,6 +59,7 @@ export function createNativeStoreRuntimeHardware(options: NativeStoreRuntimeHard
           receipt_printer_name: profile.receipt_printer_name,
           label_printer_name: profile.label_printer_name,
           cash_drawer_printer_name: profile.cash_drawer_printer_name,
+          preferred_scale_id: profile.preferred_scale_id,
           preferred_scanner_id: profile.preferred_scanner_id,
         }));
       } catch (error) {
@@ -84,6 +87,16 @@ export function createNativeStoreRuntimeHardware(options: NativeStoreRuntimeHard
       } catch (error) {
         if (shouldFallbackToBrowserHardware(error)) {
           return browserFallback.openCashDrawer();
+        }
+        throw error;
+      }
+    },
+    async readScaleWeight() {
+      try {
+        return toHardwareStatus(await invoke('cmd_read_store_runtime_scale_weight'));
+      } catch (error) {
+        if (shouldFallbackToBrowserHardware(error)) {
+          return browserFallback.readScaleWeight();
         }
         throw error;
       }

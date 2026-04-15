@@ -1245,6 +1245,18 @@ export function useStoreRuntimeWorkspace() {
     }
   }
 
+  async function readRuntimeScaleWeight() {
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      await runtimeHardware.readScaleWeight();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to read from the assigned weighing scale');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function completeFirstPrintJob() {
     const firstJob = printJobs[0];
     if (!accessToken || !tenantId || !branchId || !selectedRuntimeDeviceId || !firstJob) {
@@ -1336,9 +1348,11 @@ export function useStoreRuntimeWorkspace() {
     refreshPrintQueue,
     assignRuntimeLabelPrinter: runtimeHardware.assignLabelPrinter,
     assignRuntimeCashDrawerPrinter: runtimeHardware.assignCashDrawerPrinter,
+    assignRuntimePreferredScale: runtimeHardware.assignPreferredScale,
     assignRuntimePreferredScanner: runtimeHardware.assignPreferredScanner,
     assignRuntimeReceiptPrinter: runtimeHardware.assignReceiptPrinter,
     openRuntimeCashDrawer,
+    readRuntimeScaleWeight,
     runtimeAppVersion: runtimeShellStatus?.app_version ?? null,
     runtimeArchitecture: runtimeShellStatus?.architecture ?? null,
     runtimeCacheDatabasePath: runtimeShellStatus?.cache_db_path ?? null,
@@ -1351,16 +1365,27 @@ export function useStoreRuntimeWorkspace() {
     runtimeHardwareLastCashDrawerMessage: runtimeHardware.hardwareStatus?.diagnostics.last_cash_drawer_message ?? null,
     runtimeHardwareLastCashDrawerOpenedAt: runtimeHardware.hardwareStatus?.diagnostics.last_cash_drawer_opened_at ?? null,
     runtimeHardwareLastCashDrawerStatus: runtimeHardware.hardwareStatus?.diagnostics.last_cash_drawer_status ?? null,
+    runtimeHardwareLastWeightMessage: runtimeHardware.hardwareStatus?.diagnostics.last_weight_message ?? null,
+    runtimeHardwareLastWeightReadAt: runtimeHardware.hardwareStatus?.diagnostics.last_weight_read_at ?? null,
+    runtimeHardwareLastWeightStatus: runtimeHardware.hardwareStatus?.diagnostics.last_weight_status ?? null,
     runtimeHardwareLastScanAt: runtimeHardware.hardwareStatus?.diagnostics.last_scan_at ?? null,
     runtimeHardwareLastScanPreview: runtimeHardware.hardwareStatus?.diagnostics.last_scan_barcode_preview ?? null,
     runtimeHardwarePrinters: runtimeHardware.hardwareStatus?.printers ?? [],
+    runtimeHardwareScales: runtimeHardware.hardwareStatus?.scales ?? [],
     runtimeHardwareScanners: runtimeHardware.hardwareStatus?.scanners ?? [],
     runtimeCashDrawerPrinterName: runtimeHardware.hardwareStatus?.profile.cash_drawer_printer_name ?? null,
     runtimeCashDrawerStatusMessage: runtimeHardware.hardwareStatus?.diagnostics.cash_drawer_status_message ?? null,
     runtimeCashDrawerSetupHint: runtimeHardware.hardwareStatus?.diagnostics.cash_drawer_setup_hint ?? null,
     runtimeLabelPrinterName: runtimeHardware.hardwareStatus?.profile.label_printer_name ?? null,
+    runtimePreferredScaleId: runtimeHardware.hardwareStatus?.profile.preferred_scale_id ?? null,
     runtimePreferredScannerId: runtimeHardware.hardwareStatus?.profile.preferred_scanner_id ?? null,
     runtimeReceiptPrinterName: runtimeHardware.hardwareStatus?.profile.receipt_printer_name ?? null,
+    runtimeScaleCaptureState: runtimeHardware.hardwareStatus?.diagnostics.scale_capture_state ?? null,
+    runtimeScaleLastWeightReadAt: runtimeHardware.hardwareStatus?.diagnostics.last_weight_read_at ?? null,
+    runtimeScaleLastWeightUnit: runtimeHardware.hardwareStatus?.diagnostics.last_weight_unit ?? null,
+    runtimeScaleLastWeightValue: runtimeHardware.hardwareStatus?.diagnostics.last_weight_value ?? null,
+    runtimeScaleSetupHint: runtimeHardware.hardwareStatus?.diagnostics.scale_setup_hint ?? null,
+    runtimeScaleStatusMessage: runtimeHardware.hardwareStatus?.diagnostics.scale_status_message ?? null,
     runtimeScannerCaptureState: runtimeBarcodeScanner.scannerCaptureState,
     runtimeScannerLastScanAt: runtimeBarcodeScanner.lastScanAt,
     runtimeScannerLastScanPreview: runtimeBarcodeScanner.lastScanBarcodePreview,

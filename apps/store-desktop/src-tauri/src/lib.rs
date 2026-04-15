@@ -9,6 +9,7 @@ mod runtime_hub_identity;
 mod runtime_hub_service;
 mod runtime_printer;
 mod runtime_scanner;
+mod runtime_scale;
 mod runtime_release;
 mod runtime_spoke_registry;
 mod runtime_local_auth;
@@ -30,6 +31,7 @@ use runtime_customer_display::{
 use runtime_hardware::{
     cmd_clear_store_runtime_hardware_profile, cmd_dispatch_store_runtime_print_job,
     cmd_get_store_runtime_hardware_status, cmd_open_store_runtime_cash_drawer,
+    cmd_read_store_runtime_scale_weight,
     cmd_record_store_runtime_scanner_activity,
     cmd_save_store_runtime_hardware_profile,
 };
@@ -70,6 +72,7 @@ pub fn run() {
             cmd_clear_store_runtime_hardware_profile,
             cmd_dispatch_store_runtime_print_job,
             cmd_open_store_runtime_cash_drawer,
+            cmd_read_store_runtime_scale_weight,
             cmd_record_store_runtime_scanner_activity,
             cmd_load_store_runtime_hub_identity,
             cmd_save_store_runtime_hub_identity,

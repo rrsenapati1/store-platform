@@ -1,4 +1,6 @@
 export type StoreRuntimeHardwareBridgeState = 'ready' | 'unavailable' | 'browser_fallback';
+export type StoreRuntimeScaleCaptureState = 'ready' | 'unavailable' | 'browser_fallback' | 'attention_required';
+export type StoreRuntimeScaleTransport = 'serial_com';
 export type StoreRuntimeScannerCaptureState = 'ready' | 'unavailable' | 'browser_fallback' | 'attention_required';
 export type StoreRuntimeScannerTransport = 'keyboard_wedge' | 'usb_hid' | 'bluetooth_hid' | 'unknown';
 
@@ -16,6 +18,14 @@ export interface StoreRuntimeBarcodeLabel {
   price_label: string;
 }
 
+export interface StoreRuntimeScaleRecord {
+  id: string;
+  label: string;
+  transport: StoreRuntimeScaleTransport;
+  port_name: string;
+  is_connected: boolean;
+}
+
 export interface StoreRuntimeScannerRecord {
   id: string;
   label: string;
@@ -30,6 +40,7 @@ export interface StoreRuntimeHardwareProfile {
   receipt_printer_name: string | null;
   label_printer_name: string | null;
   cash_drawer_printer_name: string | null;
+  preferred_scale_id: string | null;
   preferred_scanner_id: string | null;
   updated_at: string | null;
 }
@@ -38,10 +49,12 @@ export interface StoreRuntimeHardwareProfileInput {
   receipt_printer_name: string | null;
   label_printer_name: string | null;
   cash_drawer_printer_name: string | null;
+  preferred_scale_id: string | null;
   preferred_scanner_id: string | null;
 }
 
 export interface StoreRuntimeHardwareDiagnostics {
+  scale_capture_state: StoreRuntimeScaleCaptureState;
   scanner_capture_state: StoreRuntimeScannerCaptureState;
   scanner_transport: StoreRuntimeScannerTransport;
   last_print_status: string | null;
@@ -50,8 +63,15 @@ export interface StoreRuntimeHardwareDiagnostics {
   last_cash_drawer_status: string | null;
   last_cash_drawer_message: string | null;
   last_cash_drawer_opened_at: string | null;
+  last_weight_value: number | null;
+  last_weight_unit: string | null;
+  last_weight_status: string | null;
+  last_weight_message: string | null;
+  last_weight_read_at: string | null;
   last_scan_at: string | null;
   last_scan_barcode_preview: string | null;
+  scale_status_message: string | null;
+  scale_setup_hint: string | null;
   cash_drawer_status_message: string | null;
   cash_drawer_setup_hint: string | null;
   scanner_status_message: string | null;
@@ -60,6 +80,7 @@ export interface StoreRuntimeHardwareDiagnostics {
 
 export interface StoreRuntimeHardwareStatus {
   bridge_state: StoreRuntimeHardwareBridgeState;
+  scales: StoreRuntimeScaleRecord[];
   scanners: StoreRuntimeScannerRecord[];
   printers: StoreRuntimePrinterRecord[];
   profile: StoreRuntimeHardwareProfile;
@@ -84,6 +105,7 @@ export interface StoreRuntimeHardwareAdapter {
   saveProfile(profile: StoreRuntimeHardwareProfileInput): Promise<StoreRuntimeHardwareStatus>;
   dispatchPrintJob(job: StoreRuntimeHardwarePrintJobInput): Promise<StoreRuntimeHardwareStatus>;
   openCashDrawer(): Promise<StoreRuntimeHardwareStatus>;
+  readScaleWeight(): Promise<StoreRuntimeHardwareStatus>;
   recordScannerActivity(activity: StoreRuntimeHardwareScannerActivityInput): Promise<StoreRuntimeHardwareStatus>;
 }
 
@@ -106,8 +128,18 @@ function isHardwareProfile(value: unknown): value is StoreRuntimeHardwareProfile
     && (typeof value.receipt_printer_name === 'string' || value.receipt_printer_name === null)
     && (typeof value.label_printer_name === 'string' || value.label_printer_name === null)
     && (typeof value.cash_drawer_printer_name === 'string' || value.cash_drawer_printer_name === null)
+    && (typeof value.preferred_scale_id === 'string' || value.preferred_scale_id === null)
     && (typeof value.preferred_scanner_id === 'string' || value.preferred_scanner_id === null)
     && (typeof value.updated_at === 'string' || value.updated_at === null);
+}
+
+function isScaleRecord(value: unknown): value is StoreRuntimeScaleRecord {
+  return isObject(value)
+    && typeof value.id === 'string'
+    && typeof value.label === 'string'
+    && value.transport === 'serial_com'
+    && typeof value.port_name === 'string'
+    && typeof value.is_connected === 'boolean';
 }
 
 function isScannerRecord(value: unknown): value is StoreRuntimeScannerRecord {
@@ -129,6 +161,12 @@ function isScannerRecord(value: unknown): value is StoreRuntimeScannerRecord {
 function isHardwareDiagnostics(value: unknown): value is StoreRuntimeHardwareDiagnostics {
   return isObject(value)
     && (
+      value.scale_capture_state === 'ready'
+      || value.scale_capture_state === 'unavailable'
+      || value.scale_capture_state === 'browser_fallback'
+      || value.scale_capture_state === 'attention_required'
+    )
+    && (
       value.scanner_capture_state === 'ready'
       || value.scanner_capture_state === 'unavailable'
       || value.scanner_capture_state === 'browser_fallback'
@@ -146,8 +184,15 @@ function isHardwareDiagnostics(value: unknown): value is StoreRuntimeHardwareDia
     && (typeof value.last_cash_drawer_status === 'string' || value.last_cash_drawer_status === null)
     && (typeof value.last_cash_drawer_message === 'string' || value.last_cash_drawer_message === null)
     && (typeof value.last_cash_drawer_opened_at === 'string' || value.last_cash_drawer_opened_at === null)
+    && (typeof value.last_weight_value === 'number' || value.last_weight_value === null)
+    && (typeof value.last_weight_unit === 'string' || value.last_weight_unit === null)
+    && (typeof value.last_weight_status === 'string' || value.last_weight_status === null)
+    && (typeof value.last_weight_message === 'string' || value.last_weight_message === null)
+    && (typeof value.last_weight_read_at === 'string' || value.last_weight_read_at === null)
     && (typeof value.last_scan_at === 'string' || value.last_scan_at === null)
     && (typeof value.last_scan_barcode_preview === 'string' || value.last_scan_barcode_preview === null)
+    && (typeof value.scale_status_message === 'string' || value.scale_status_message === null)
+    && (typeof value.scale_setup_hint === 'string' || value.scale_setup_hint === null)
     && (typeof value.cash_drawer_status_message === 'string' || value.cash_drawer_status_message === null)
     && (typeof value.cash_drawer_setup_hint === 'string' || value.cash_drawer_setup_hint === null)
     && (typeof value.scanner_status_message === 'string' || value.scanner_status_message === null)
@@ -157,6 +202,8 @@ function isHardwareDiagnostics(value: unknown): value is StoreRuntimeHardwareDia
 export function isStoreRuntimeHardwareStatus(value: unknown): value is StoreRuntimeHardwareStatus {
   return isObject(value)
     && (value.bridge_state === 'ready' || value.bridge_state === 'unavailable' || value.bridge_state === 'browser_fallback')
+    && Array.isArray(value.scales)
+    && value.scales.every((scale) => isScaleRecord(scale))
     && Array.isArray(value.scanners)
     && value.scanners.every((scanner) => isScannerRecord(scanner))
     && Array.isArray(value.printers)

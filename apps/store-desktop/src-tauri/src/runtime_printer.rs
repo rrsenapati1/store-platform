@@ -280,6 +280,7 @@ pub mod tests {
             receipt_printer_name: Some("Thermal-01".to_string()),
             label_printer_name: Some("Label-01".to_string()),
             cash_drawer_printer_name: None,
+            preferred_scale_id: None,
             preferred_scanner_id: None,
             updated_at: Some("1".to_string()),
         };
@@ -315,6 +316,7 @@ pub mod tests {
             receipt_printer_name: Some("Thermal-01".to_string()),
             label_printer_name: None,
             cash_drawer_printer_name: None,
+            preferred_scale_id: None,
             preferred_scanner_id: None,
             updated_at: Some("1".to_string()),
         };

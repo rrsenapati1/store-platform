@@ -13,6 +13,12 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     isBusy: false,
     isSessionLive: true,
     runtimeShellKind: 'packaged_desktop',
+    runtimeScaleCaptureState: 'ready',
+    runtimeScaleStatusMessage: 'Preferred scale ready: Serial scale (COM3).',
+    runtimeScaleSetupHint: 'Connect a local serial/COM scale and assign it before requesting a live read.',
+    runtimeScaleLastWeightValue: 0.5,
+    runtimeScaleLastWeightUnit: 'kg',
+    runtimeScaleLastWeightReadAt: '2026-04-15T12:10:00.000Z',
     runtimeScannerCaptureState: 'ready',
     runtimeScannerLastScanAt: '2026-04-15T12:00:00.000Z',
     runtimeScannerTransport: 'keyboard_wedge',
@@ -40,6 +46,25 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
         is_connected: true,
       },
     ],
+    runtimePreferredScaleId: 'scale-com3',
+    runtimeHardwareScales: [
+      {
+        id: 'scale-com3',
+        label: 'Serial scale (COM3)',
+        transport: 'serial_com',
+        port_name: 'COM3',
+        is_connected: true,
+      },
+      {
+        id: 'scale-com4',
+        label: 'Serial scale (COM4)',
+        transport: 'serial_com',
+        port_name: 'COM4',
+        is_connected: true,
+      },
+    ],
+    assignRuntimePreferredScale: vi.fn(async () => {}),
+    readRuntimeScaleWeight: vi.fn(async () => {}),
     assignRuntimePreferredScanner: vi.fn(async () => {}),
     latestScanLookup: null,
     ...overrides,
@@ -47,13 +72,22 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
 }
 
 describe('store barcode lookup section', () => {
-  test('renders compact scanner diagnostics for packaged runtime', () => {
+  test('renders compact scanner and scale diagnostics for packaged runtime', () => {
     render(<StoreBarcodeLookupSection workspace={buildWorkspace()} />);
 
+    expect(screen.getByText('Scale diagnostics')).toBeInTheDocument();
+    expect(screen.getByText('Preferred scale ready: Serial scale (COM3).')).toBeInTheDocument();
+    expect(screen.getByText('0.5 kg')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Read current weight' })).toBeInTheDocument();
     expect(screen.getByText('Scanner diagnostics')).toBeInTheDocument();
     expect(screen.getByText('keyboard_wedge')).toBeInTheDocument();
     expect(screen.getByText('ACMETEA')).toBeInTheDocument();
     expect(screen.getByText('Ready for external scanner input')).toBeInTheDocument();
+    expect(screen.getByText('Discovered local scales')).toBeInTheDocument();
+    expect(screen.getAllByText('Serial scale (COM3)').length).toBeGreaterThan(0);
+    expect(screen.getByText('Serial scale (COM4)')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Use as preferred scale' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Clear preferred scale' })).toBeInTheDocument();
     expect(screen.getByText('Discovered local scanners')).toBeInTheDocument();
     expect(screen.getByText('Zebra DS2208')).toBeInTheDocument();
     expect(screen.getByText('Socket Mobile S740')).toBeInTheDocument();

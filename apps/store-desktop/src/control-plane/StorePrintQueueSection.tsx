@@ -16,6 +16,10 @@ export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeW
   const hasDevice = Boolean(workspace.selectedRuntimeDeviceId);
   const latestJob = workspace.latestPrintJob;
   const isPackagedRuntime = workspace.runtimeShellKind === 'packaged_desktop';
+  const runtimeHardwareScales = workspace.runtimeHardwareScales ?? [];
+  const preferredScaleLabel = runtimeHardwareScales.find(
+    (scale) => scale.id === workspace.runtimePreferredScaleId,
+  )?.label ?? workspace.runtimePreferredScaleId;
 
   return (
     <SectionCard eyebrow="Runtime print desk" title="Print queue and device polling">
@@ -61,6 +65,14 @@ export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeW
             Open assigned cash drawer
           </ActionButton>
         ) : null}
+        {isPackagedRuntime ? (
+          <ActionButton
+            onClick={() => void workspace.readRuntimeScaleWeight()}
+            disabled={workspace.isBusy || !workspace.isSessionLive || !workspace.runtimePreferredScaleId}
+          >
+            Read current weight
+          </ActionButton>
+        ) : null}
         {!isPackagedRuntime ? (
           <ActionButton onClick={() => void workspace.completeFirstPrintJob()} disabled={workspace.isBusy || !workspace.isSessionLive || workspace.printJobs.length === 0 || !hasDevice}>
             Mark first job completed
@@ -76,6 +88,15 @@ export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeW
               { label: 'Receipt printer', value: workspace.runtimeReceiptPrinterName ?? 'Not assigned' },
               { label: 'Label printer', value: workspace.runtimeLabelPrinterName ?? 'Not assigned' },
               { label: 'Cash drawer', value: workspace.runtimeCashDrawerPrinterName ?? 'Not assigned' },
+              { label: 'Weighing scale', value: preferredScaleLabel ?? 'Not assigned' },
+              { label: 'Scale status', value: workspace.runtimeScaleStatusMessage ?? 'No scale diagnostics available' },
+              { label: 'Scale setup hint', value: workspace.runtimeScaleSetupHint ?? 'No scale setup guidance available' },
+              {
+                label: 'Last weight',
+                value: workspace.runtimeScaleLastWeightValue !== null && workspace.runtimeScaleLastWeightUnit
+                  ? `${workspace.runtimeScaleLastWeightValue} ${workspace.runtimeScaleLastWeightUnit}`
+                  : 'No live weight captured yet',
+              },
               { label: 'Cash drawer status', value: workspace.runtimeCashDrawerStatusMessage ?? 'No cash drawer diagnostics available' },
               { label: 'Cash drawer setup hint', value: workspace.runtimeCashDrawerSetupHint ?? 'No cash drawer setup guidance available' },
               { label: 'Last cash drawer action', value: workspace.runtimeHardwareLastCashDrawerMessage ?? 'No cash drawer activity yet' },
@@ -114,6 +135,29 @@ export function StorePrintQueueSection({ workspace }: { workspace: StoreRuntimeW
           {workspace.runtimeHardwareError ? (
             <p style={{ color: '#9d2b19', marginBottom: 0 }}>{workspace.runtimeHardwareError}</p>
           ) : null}
+        </div>
+      ) : null}
+
+      {isPackagedRuntime ? (
+        <div style={{ marginTop: '18px' }}>
+          <h3 style={{ marginBottom: '10px' }}>Discovered local scales</h3>
+          <ul style={{ margin: 0, color: '#4e5871', lineHeight: 1.7 }}>
+            {runtimeHardwareScales.length ? (
+              runtimeHardwareScales.map((scale) => (
+                <li key={scale.id} style={{ marginBottom: '12px' }}>
+                  <strong>{scale.label}</strong>
+                  <span> :: {scale.transport} :: {scale.is_connected ? 'connected' : 'disconnected'}</span>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '8px' }}>
+                    <ActionButton onClick={() => void workspace.assignRuntimePreferredScale(scale.id)} disabled={workspace.isBusy}>
+                      Use for weighing scale
+                    </ActionButton>
+                  </div>
+                </li>
+              ))
+            ) : (
+              <li>No local serial scale candidates discovered yet.</li>
+            )}
+          </ul>
         </div>
       ) : null}
 

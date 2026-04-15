@@ -259,6 +259,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
       receipt_printer_name: printerName,
       label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
       cash_drawer_printer_name: hardwareStatus?.profile.cash_drawer_printer_name ?? null,
+      preferred_scale_id: hardwareStatus?.profile.preferred_scale_id ?? null,
       preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
     });
   }
@@ -268,6 +269,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
       receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
       label_printer_name: printerName,
       cash_drawer_printer_name: hardwareStatus?.profile.cash_drawer_printer_name ?? null,
+      preferred_scale_id: hardwareStatus?.profile.preferred_scale_id ?? null,
       preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
     });
   }
@@ -277,6 +279,17 @@ export function useStoreRuntimeHardwareIntegration(args: {
       receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
       label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
       cash_drawer_printer_name: printerName,
+      preferred_scale_id: hardwareStatus?.profile.preferred_scale_id ?? null,
+      preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
+    });
+  }
+
+  async function assignPreferredScale(scaleId: string | null) {
+    return savePrinterProfile({
+      receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
+      label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
+      cash_drawer_printer_name: hardwareStatus?.profile.cash_drawer_printer_name ?? null,
+      preferred_scale_id: scaleId,
       preferred_scanner_id: hardwareStatus?.profile.preferred_scanner_id ?? null,
     });
   }
@@ -286,6 +299,7 @@ export function useStoreRuntimeHardwareIntegration(args: {
       receipt_printer_name: hardwareStatus?.profile.receipt_printer_name ?? null,
       label_printer_name: hardwareStatus?.profile.label_printer_name ?? null,
       cash_drawer_printer_name: hardwareStatus?.profile.cash_drawer_printer_name ?? null,
+      preferred_scale_id: hardwareStatus?.profile.preferred_scale_id ?? null,
       preferred_scanner_id: scannerId,
     });
   }
@@ -300,6 +314,31 @@ export function useStoreRuntimeHardwareIntegration(args: {
       return nextStatus;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to open the assigned cash drawer';
+      try {
+        const refreshedStatus = await hardwareAdapterRef.current.getStatus();
+        applyStateTransition(() => {
+          setHardwareStatus(refreshedStatus);
+          setHardwareError(message);
+        });
+      } catch {
+        applyStateTransition(() => {
+          setHardwareError(message);
+        });
+      }
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }
+
+  async function readScaleWeight() {
+    try {
+      const nextStatus = await hardwareAdapterRef.current.readScaleWeight();
+      applyStateTransition(() => {
+        setHardwareStatus(nextStatus);
+        setHardwareError(null);
+      });
+      return nextStatus;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to read from the assigned weighing scale';
       try {
         const refreshedStatus = await hardwareAdapterRef.current.getStatus();
         applyStateTransition(() => {
@@ -332,9 +371,11 @@ export function useStoreRuntimeHardwareIntegration(args: {
     refreshHardwareStatus,
     assignLabelPrinter,
     assignCashDrawerPrinter,
+    assignPreferredScale,
     assignReceiptPrinter,
     assignPreferredScanner,
     openCashDrawer,
+    readScaleWeight,
     recordScannerActivity,
   };
 }

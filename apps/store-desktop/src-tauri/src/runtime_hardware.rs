@@ -9,6 +9,10 @@ use crate::runtime_printer::{
 use crate::runtime_scanner::{
     list_scanners_with_backend, ScannerBackend, StoreRuntimeScannerRecord, SystemScannerBackend,
 };
+use crate::runtime_scale::{
+    dispatch_scale_weight_read, list_scales_with_backend, ScaleBackend, StoreRuntimeScaleRecord,
+    SystemScaleBackend,
+};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,6 +33,7 @@ pub struct StoreRuntimeHardwareProfileRecord {
     pub receipt_printer_name: Option<String>,
     pub label_printer_name: Option<String>,
     pub cash_drawer_printer_name: Option<String>,
+    pub preferred_scale_id: Option<String>,
     pub preferred_scanner_id: Option<String>,
     pub updated_at: Option<String>,
 }
@@ -38,11 +43,13 @@ pub struct StoreRuntimeHardwareProfileInput {
     pub receipt_printer_name: Option<String>,
     pub label_printer_name: Option<String>,
     pub cash_drawer_printer_name: Option<String>,
+    pub preferred_scale_id: Option<String>,
     pub preferred_scanner_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StoreRuntimeHardwareDiagnostics {
+    pub scale_capture_state: String,
     pub scanner_capture_state: String,
     pub scanner_transport: Option<String>,
     pub last_print_status: Option<String>,
@@ -51,17 +58,25 @@ pub struct StoreRuntimeHardwareDiagnostics {
     pub last_cash_drawer_status: Option<String>,
     pub last_cash_drawer_message: Option<String>,
     pub last_cash_drawer_opened_at: Option<String>,
+    pub last_weight_value: Option<f64>,
+    pub last_weight_unit: Option<String>,
+    pub last_weight_status: Option<String>,
+    pub last_weight_message: Option<String>,
+    pub last_weight_read_at: Option<String>,
     pub last_scan_at: Option<String>,
     pub last_scan_barcode_preview: Option<String>,
+    pub scale_status_message: Option<String>,
+    pub scale_setup_hint: Option<String>,
     pub cash_drawer_status_message: Option<String>,
     pub cash_drawer_setup_hint: Option<String>,
     pub scanner_status_message: Option<String>,
     pub scanner_setup_hint: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StoreRuntimeHardwareStatus {
     pub bridge_state: String,
+    pub scales: Vec<StoreRuntimeScaleRecord>,
     pub scanners: Vec<StoreRuntimeScannerRecord>,
     pub printers: Vec<StoreRuntimePrinterRecord>,
     pub profile: StoreRuntimeHardwareProfileRecord,
@@ -74,7 +89,7 @@ pub struct StoreRuntimeScannerActivityInput {
     pub scanner_transport: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct StoreRuntimeHardwareStateRecord {
     profile: StoreRuntimeHardwareProfileRecord,
     diagnostics: StoreRuntimeHardwareDiagnostics,
@@ -107,6 +122,22 @@ impl ScannerBackend for EmptyScannerBackend {
     }
 }
 
+#[derive(Default)]
+struct EmptyScaleBackend;
+
+impl ScaleBackend for EmptyScaleBackend {
+    fn list_scales(&self) -> Result<Vec<StoreRuntimeScaleRecord>, String> {
+        Ok(Vec::new())
+    }
+
+    fn read_weight(
+        &mut self,
+        _scale_id: &str,
+    ) -> Result<crate::runtime_scale::StoreRuntimeScaleReadResult, String> {
+        Err("Empty scale backend cannot read weights".to_string())
+    }
+}
+
 fn runtime_hardware_path() -> PathBuf {
     runtime_home_dir().join(STORE_RUNTIME_HARDWARE_FILE_NAME)
 }
@@ -124,6 +155,7 @@ fn default_hardware_profile() -> StoreRuntimeHardwareProfileRecord {
         receipt_printer_name: None,
         label_printer_name: None,
         cash_drawer_printer_name: None,
+        preferred_scale_id: None,
         preferred_scanner_id: None,
         updated_at: None,
     }
@@ -131,6 +163,7 @@ fn default_hardware_profile() -> StoreRuntimeHardwareProfileRecord {
 
 fn default_hardware_diagnostics() -> StoreRuntimeHardwareDiagnostics {
     StoreRuntimeHardwareDiagnostics {
+        scale_capture_state: "ready".to_string(),
         scanner_capture_state: "ready".to_string(),
         scanner_transport: Some("keyboard_wedge".to_string()),
         last_print_status: None,
@@ -139,8 +172,20 @@ fn default_hardware_diagnostics() -> StoreRuntimeHardwareDiagnostics {
         last_cash_drawer_status: None,
         last_cash_drawer_message: None,
         last_cash_drawer_opened_at: None,
+        last_weight_value: None,
+        last_weight_unit: None,
+        last_weight_status: None,
+        last_weight_message: None,
+        last_weight_read_at: None,
         last_scan_at: None,
         last_scan_barcode_preview: None,
+        scale_status_message: Some(
+            "Assign a local serial scale to enable live weight reads.".to_string(),
+        ),
+        scale_setup_hint: Some(
+            "Connect a local serial/COM scale and assign it before requesting a live read."
+                .to_string(),
+        ),
         cash_drawer_status_message: Some(
             "Assign a local receipt printer to enable cash drawer pulses.".to_string(),
         ),
@@ -164,12 +209,14 @@ fn default_hardware_state() -> StoreRuntimeHardwareStateRecord {
 
 fn resolve_hardware_status(
     bridge_state: &str,
+    scales: Vec<StoreRuntimeScaleRecord>,
     scanners: Vec<StoreRuntimeScannerRecord>,
     printers: Vec<StoreRuntimePrinterRecord>,
     state: StoreRuntimeHardwareStateRecord,
 ) -> StoreRuntimeHardwareStatus {
     StoreRuntimeHardwareStatus {
         bridge_state: bridge_state.to_string(),
+        scales,
         scanners,
         printers,
         profile: state.profile,
@@ -213,6 +260,7 @@ fn save_hardware_profile_to_path(
         receipt_printer_name: profile.receipt_printer_name,
         label_printer_name: profile.label_printer_name,
         cash_drawer_printer_name: profile.cash_drawer_printer_name,
+        preferred_scale_id: profile.preferred_scale_id,
         preferred_scanner_id: profile.preferred_scanner_id,
         updated_at: Some(current_timestamp_string()),
     };
@@ -220,22 +268,24 @@ fn save_hardware_profile_to_path(
     load_hardware_status(path)
 }
 
-fn save_hardware_profile_with_backends<P: PrinterBackend, S: ScannerBackend>(
+fn save_hardware_profile_with_backends<P: PrinterBackend, S: ScannerBackend, T: ScaleBackend>(
     path: &Path,
     profile: StoreRuntimeHardwareProfileInput,
     printer_backend: &P,
     scanner_backend: &S,
+    scale_backend: &T,
 ) -> Result<StoreRuntimeHardwareStatus, String> {
     let mut state = load_hardware_state(path)?;
     state.profile = StoreRuntimeHardwareProfileRecord {
         receipt_printer_name: profile.receipt_printer_name,
         label_printer_name: profile.label_printer_name,
         cash_drawer_printer_name: profile.cash_drawer_printer_name,
+        preferred_scale_id: profile.preferred_scale_id,
         preferred_scanner_id: profile.preferred_scanner_id,
         updated_at: Some(current_timestamp_string()),
     };
     save_hardware_state(path, &state)?;
-    load_hardware_status_with_backends(path, printer_backend, scanner_backend)
+    load_hardware_status_with_backends(path, printer_backend, scanner_backend, scale_backend)
 }
 
 fn record_scanner_activity_to_path(
@@ -260,7 +310,98 @@ fn clear_hardware_profile(path: &Path) -> Result<(), String> {
 }
 
 fn load_hardware_status(path: &Path) -> Result<StoreRuntimeHardwareStatus, String> {
-    load_hardware_status_with_backends(path, &EmptyPrinterBackend, &EmptyScannerBackend)
+    load_hardware_status_with_backends(
+        path,
+        &EmptyPrinterBackend,
+        &EmptyScannerBackend,
+        &EmptyScaleBackend,
+    )
+}
+
+fn resolve_scale_diagnostics(
+    state: &mut StoreRuntimeHardwareStateRecord,
+    scales: &[StoreRuntimeScaleRecord],
+    scale_error: Option<&str>,
+) {
+    if let Some(error) = scale_error {
+        state.diagnostics.scale_capture_state = "unavailable".to_string();
+        state.diagnostics.scale_status_message = Some(error.to_string());
+        state.diagnostics.scale_setup_hint = Some(
+            "Reconnect the assigned serial scale or restart the packaged terminal to retry local scale discovery."
+                .to_string(),
+        );
+        return;
+    }
+
+    if let Some(preferred_scale_id) = state.profile.preferred_scale_id.as_deref() {
+        if let Some(scale) = scales
+            .iter()
+            .find(|candidate| candidate.id == preferred_scale_id && candidate.is_connected)
+        {
+            state.diagnostics.scale_capture_state = "ready".to_string();
+
+            if state.diagnostics.last_weight_status.as_deref() == Some("failed") {
+                state.diagnostics.scale_capture_state = "attention_required".to_string();
+                state.diagnostics.scale_status_message =
+                    state.diagnostics.last_weight_message.clone();
+                state.diagnostics.scale_setup_hint = Some(
+                    "Retry after confirming the serial scale power, cable, and port assignment."
+                        .to_string(),
+                );
+                return;
+            }
+
+            if state.diagnostics.last_weight_status.as_deref() == Some("captured") {
+                state.diagnostics.scale_status_message =
+                    Some(format!("Latest weight ready from {}.", scale.label));
+                state.diagnostics.scale_setup_hint = Some(
+                    "Use the hardware desk to refresh the live weight before weighing a loose item."
+                        .to_string(),
+                );
+                return;
+            }
+
+            state.diagnostics.scale_status_message =
+                Some(format!("Preferred scale ready: {}.", scale.label));
+            state.diagnostics.scale_setup_hint = Some(
+                "Use the hardware desk to request a live weight from the assigned serial scale."
+                    .to_string(),
+            );
+            return;
+        }
+
+        state.diagnostics.scale_capture_state = "attention_required".to_string();
+        state.diagnostics.scale_status_message = Some(format!(
+            "Assigned scale not discovered: {}.",
+            preferred_scale_id
+        ));
+        state.diagnostics.scale_setup_hint = Some(
+            "Reconnect the assigned serial scale or choose another discovered COM scale."
+                .to_string(),
+        );
+        return;
+    }
+
+    if !scales.is_empty() {
+        state.diagnostics.scale_capture_state = "ready".to_string();
+        state.diagnostics.scale_status_message = Some(format!(
+            "{} local scale candidate{} discovered. Assign one for live reads.",
+            scales.len(),
+            if scales.len() == 1 { "" } else { "s" }
+        ));
+        state.diagnostics.scale_setup_hint = Some(
+            "Use the hardware desk to choose a preferred local serial scale.".to_string(),
+        );
+        return;
+    }
+
+    state.diagnostics.scale_capture_state = "ready".to_string();
+    state.diagnostics.scale_status_message =
+        Some("Assign a local serial scale to enable live weight reads.".to_string());
+    state.diagnostics.scale_setup_hint = Some(
+        "Connect a local serial/COM scale and assign it before requesting a live read."
+            .to_string(),
+    );
 }
 
 fn resolve_cash_drawer_diagnostics(
@@ -423,14 +564,20 @@ fn resolve_scanner_diagnostics(
     );
 }
 
-fn load_hardware_status_with_backends<B: PrinterBackend, S: ScannerBackend>(
+fn load_hardware_status_with_backends<B: PrinterBackend, S: ScannerBackend, T: ScaleBackend>(
     path: &Path,
     printer_backend: &B,
     scanner_backend: &S,
+    scale_backend: &T,
 ) -> Result<StoreRuntimeHardwareStatus, String> {
     let mut state = load_hardware_state(path)?;
+    let scale_result = list_scales_with_backend(scale_backend);
     let scanner_result = list_scanners_with_backend(scanner_backend);
     let printer_result = list_printers_with_backend(printer_backend);
+    let scales = match scale_result.as_ref() {
+        Ok(records) => records.clone(),
+        Err(_) => Vec::new(),
+    };
     let scanners = match scanner_result.as_ref() {
         Ok(records) => records.clone(),
         Err(_) => Vec::new(),
@@ -439,6 +586,11 @@ fn load_hardware_status_with_backends<B: PrinterBackend, S: ScannerBackend>(
         Ok(records) => records.clone(),
         Err(_) => Vec::new(),
     };
+    resolve_scale_diagnostics(
+        &mut state,
+        &scales,
+        scale_result.as_ref().err().map(|value| value.as_str()),
+    );
     resolve_cash_drawer_diagnostics(
         &mut state,
         &printers,
@@ -450,10 +602,21 @@ fn load_hardware_status_with_backends<B: PrinterBackend, S: ScannerBackend>(
         scanner_result.as_ref().err().map(|value| value.as_str()),
     );
 
+    if scale_result.is_err() {
+        return Ok(resolve_hardware_status(
+            "unavailable",
+            scales,
+            scanners,
+            printers,
+            state,
+        ));
+    }
+
     if let Err(error) = printer_result {
         state.diagnostics.last_print_message = Some(error);
         return Ok(resolve_hardware_status(
             "unavailable",
+            scales,
             scanners,
             printers,
             state,
@@ -463,35 +626,55 @@ fn load_hardware_status_with_backends<B: PrinterBackend, S: ScannerBackend>(
     if scanner_result.is_err() {
         return Ok(resolve_hardware_status(
             "unavailable",
+            scales,
             scanners,
             printers,
             state,
         ));
     }
 
-    Ok(resolve_hardware_status("ready", scanners, printers, state))
+    Ok(resolve_hardware_status(
+        "ready",
+        scales,
+        scanners,
+        printers,
+        state,
+    ))
 }
 
 #[cfg(test)]
-fn load_hardware_status_with_backends_for_tests<B: PrinterBackend, S: ScannerBackend>(
+fn load_hardware_status_with_backends_for_tests<
+    B: PrinterBackend,
+    S: ScannerBackend,
+    T: ScaleBackend,
+>(
     printer_backend: &B,
     scanner_backend: &S,
+    scale_backend: &T,
     state: StoreRuntimeHardwareStateRecord,
 ) -> Result<StoreRuntimeHardwareStatus, String> {
     let mut next_state = state;
+    let scales = list_scales_with_backend(scale_backend)?;
     let scanner_result = list_scanners_with_backend(scanner_backend);
     let scanners = match scanner_result.as_ref() {
         Ok(records) => records.clone(),
         Err(_) => Vec::new(),
     };
     let printers = list_printers_with_backend(printer_backend)?;
+    resolve_scale_diagnostics(&mut next_state, &scales, None);
     resolve_cash_drawer_diagnostics(&mut next_state, &printers, None);
     resolve_scanner_diagnostics(
         &mut next_state,
         &scanners,
         scanner_result.as_ref().err().map(|value| value.as_str()),
     );
-    Ok(resolve_hardware_status("ready", scanners, printers, next_state))
+    Ok(resolve_hardware_status(
+        "ready",
+        scales,
+        scanners,
+        printers,
+        next_state,
+    ))
 }
 
 fn dispatch_print_job_with_backend<B: PrinterBackend>(
@@ -506,7 +689,12 @@ fn dispatch_print_job_with_backend<B: PrinterBackend>(
             state.diagnostics.last_print_message = Some(result.message);
             state.diagnostics.last_printed_at = Some(result.printed_at);
             save_hardware_state(path, &state)?;
-            load_hardware_status_with_backends(path, backend, &SystemScannerBackend)
+            load_hardware_status_with_backends(
+                path,
+                backend,
+                &SystemScannerBackend,
+                &SystemScaleBackend,
+            )
         }
         Err(error) => {
             state.diagnostics.last_print_status = Some("failed".to_string());
@@ -517,11 +705,17 @@ fn dispatch_print_job_with_backend<B: PrinterBackend>(
     }
 }
 
-fn open_cash_drawer_with_backends<D: CashDrawerBackend, P: PrinterBackend, S: ScannerBackend>(
+fn open_cash_drawer_with_backends<
+    D: CashDrawerBackend,
+    P: PrinterBackend,
+    S: ScannerBackend,
+    T: ScaleBackend,
+>(
     path: &Path,
     drawer_backend: &mut D,
     printer_backend: &P,
     scanner_backend: &S,
+    scale_backend: &T,
 ) -> Result<StoreRuntimeHardwareStatus, String> {
     let mut next_state = load_hardware_state(path)?;
     match dispatch_cash_drawer_open(drawer_backend, &next_state.profile) {
@@ -530,13 +724,13 @@ fn open_cash_drawer_with_backends<D: CashDrawerBackend, P: PrinterBackend, S: Sc
             next_state.diagnostics.last_cash_drawer_message = Some(result.message);
             next_state.diagnostics.last_cash_drawer_opened_at = Some(result.opened_at);
             save_hardware_state(path, &next_state)?;
-            load_hardware_status_with_backends(path, printer_backend, scanner_backend)
+            load_hardware_status_with_backends(path, printer_backend, scanner_backend, scale_backend)
         }
         Err(error) => {
             next_state.diagnostics.last_cash_drawer_status = Some("failed".to_string());
             next_state.diagnostics.last_cash_drawer_message = Some(error.clone());
             save_hardware_state(path, &next_state)?;
-            let _ = load_hardware_status_with_backends(path, printer_backend, scanner_backend);
+            let _ = load_hardware_status_with_backends(path, printer_backend, scanner_backend, scale_backend);
             Err(error)
         }
     }
@@ -552,6 +746,57 @@ fn open_cash_drawer_with_backend<D: CashDrawerBackend>(
         drawer_backend,
         &EmptyPrinterBackend,
         &EmptyScannerBackend,
+        &EmptyScaleBackend,
+    )
+}
+
+fn read_scale_weight_with_backends<T: ScaleBackend, P: PrinterBackend, S: ScannerBackend>(
+    path: &Path,
+    scale_backend: &mut T,
+    printer_backend: &P,
+    scanner_backend: &S,
+) -> Result<StoreRuntimeHardwareStatus, String> {
+    let mut next_state = load_hardware_state(path)?;
+    match dispatch_scale_weight_read(scale_backend, &next_state.profile) {
+        Ok(result) => {
+            next_state.diagnostics.last_weight_status = Some("captured".to_string());
+            next_state.diagnostics.last_weight_value = Some(result.value);
+            next_state.diagnostics.last_weight_unit = Some(result.unit);
+            next_state.diagnostics.last_weight_message = Some(result.message);
+            next_state.diagnostics.last_weight_read_at = Some(result.read_at);
+            save_hardware_state(path, &next_state)?;
+            load_hardware_status_with_backends(
+                path,
+                printer_backend,
+                scanner_backend,
+                scale_backend,
+            )
+        }
+        Err(error) => {
+            next_state.diagnostics.last_weight_status = Some("failed".to_string());
+            next_state.diagnostics.last_weight_message = Some(error.clone());
+            save_hardware_state(path, &next_state)?;
+            let _ = load_hardware_status_with_backends(
+                path,
+                printer_backend,
+                scanner_backend,
+                scale_backend,
+            );
+            Err(error)
+        }
+    }
+}
+
+#[cfg(test)]
+fn read_scale_weight_with_backend<T: ScaleBackend>(
+    path: &Path,
+    scale_backend: &mut T,
+) -> Result<StoreRuntimeHardwareStatus, String> {
+    read_scale_weight_with_backends(
+        path,
+        scale_backend,
+        &EmptyPrinterBackend,
+        &EmptyScannerBackend,
     )
 }
 
@@ -561,6 +806,7 @@ pub fn cmd_get_store_runtime_hardware_status() -> Result<StoreRuntimeHardwareSta
         &runtime_hardware_path(),
         &SystemPrinterBackend,
         &SystemScannerBackend,
+        &SystemScaleBackend,
     )
 }
 
@@ -573,6 +819,7 @@ pub fn cmd_save_store_runtime_hardware_profile(
         profile,
         &SystemPrinterBackend,
         &SystemScannerBackend,
+        &SystemScaleBackend,
     )
 }
 
@@ -593,6 +840,17 @@ pub fn cmd_open_store_runtime_cash_drawer() -> Result<StoreRuntimeHardwareStatus
     open_cash_drawer_with_backends(
         &runtime_hardware_path(),
         &mut SystemCashDrawerBackend,
+        &SystemPrinterBackend,
+        &SystemScannerBackend,
+        &SystemScaleBackend,
+    )
+}
+
+#[tauri::command]
+pub fn cmd_read_store_runtime_scale_weight() -> Result<StoreRuntimeHardwareStatus, String> {
+    read_scale_weight_with_backends(
+        &runtime_hardware_path(),
+        &mut SystemScaleBackend,
         &SystemPrinterBackend,
         &SystemScannerBackend,
     )
@@ -665,17 +923,33 @@ mod tests {
         let status = load_hardware_status(&runtime_hardware_path()).expect("load hardware status");
 
         assert_eq!(status.bridge_state, "ready");
+        assert_eq!(status.scales.len(), 0);
         assert_eq!(status.scanners.len(), 0);
         assert_eq!(status.printers.len(), 0);
         assert_eq!(status.profile.receipt_printer_name, None);
         assert_eq!(status.profile.label_printer_name, None);
         assert_eq!(status.profile.cash_drawer_printer_name, None);
+        assert_eq!(status.profile.preferred_scale_id, None);
         assert_eq!(status.profile.preferred_scanner_id, None);
+        assert_eq!(status.diagnostics.scale_capture_state, "ready");
         assert_eq!(status.diagnostics.scanner_capture_state, "ready");
         assert_eq!(status.diagnostics.scanner_transport.as_deref(), Some("keyboard_wedge"));
         assert_eq!(status.diagnostics.last_cash_drawer_status, None);
         assert_eq!(status.diagnostics.last_cash_drawer_message, None);
         assert_eq!(status.diagnostics.last_cash_drawer_opened_at, None);
+        assert_eq!(status.diagnostics.last_weight_value, None);
+        assert_eq!(status.diagnostics.last_weight_unit, None);
+        assert_eq!(status.diagnostics.last_weight_status, None);
+        assert_eq!(status.diagnostics.last_weight_message, None);
+        assert_eq!(status.diagnostics.last_weight_read_at, None);
+        assert_eq!(
+            status.diagnostics.scale_status_message.as_deref(),
+            Some("Assign a local serial scale to enable live weight reads.")
+        );
+        assert_eq!(
+            status.diagnostics.scale_setup_hint.as_deref(),
+            Some("Connect a local serial/COM scale and assign it before requesting a live read.")
+        );
         assert_eq!(
             status.diagnostics.cash_drawer_status_message.as_deref(),
             Some("Assign a local receipt printer to enable cash drawer pulses.")
@@ -724,6 +998,7 @@ mod tests {
                 receipt_printer_name: Some("Thermal-01".to_string()),
                 label_printer_name: Some("Label-01".to_string()),
                 cash_drawer_printer_name: Some("Thermal-01".to_string()),
+                preferred_scale_id: Some("scale-com3".to_string()),
                 preferred_scanner_id: Some("scanner-zebra-1".to_string()),
             },
         )
@@ -733,10 +1008,12 @@ mod tests {
         assert_eq!(saved.profile.receipt_printer_name.as_deref(), Some("Thermal-01"));
         assert_eq!(saved.profile.label_printer_name.as_deref(), Some("Label-01"));
         assert_eq!(saved.profile.cash_drawer_printer_name.as_deref(), Some("Thermal-01"));
+        assert_eq!(saved.profile.preferred_scale_id.as_deref(), Some("scale-com3"));
         assert_eq!(saved.profile.preferred_scanner_id.as_deref(), Some("scanner-zebra-1"));
         assert_eq!(loaded.profile.receipt_printer_name.as_deref(), Some("Thermal-01"));
         assert_eq!(loaded.profile.label_printer_name.as_deref(), Some("Label-01"));
         assert_eq!(loaded.profile.cash_drawer_printer_name.as_deref(), Some("Thermal-01"));
+        assert_eq!(loaded.profile.preferred_scale_id.as_deref(), Some("scale-com3"));
         assert_eq!(loaded.profile.preferred_scanner_id.as_deref(), Some("scanner-zebra-1"));
         assert!(loaded.profile.updated_at.is_some());
 
@@ -780,6 +1057,7 @@ mod tests {
                 receipt_printer_name: Some("Thermal-01".to_string()),
                 label_printer_name: None,
                 cash_drawer_printer_name: Some("Thermal-01".to_string()),
+                preferred_scale_id: None,
                 preferred_scanner_id: None,
             },
         ).expect("save hardware profile");
@@ -818,6 +1096,7 @@ mod tests {
                 receipt_printer_name: None,
                 label_printer_name: None,
                 cash_drawer_printer_name: None,
+                preferred_scale_id: None,
                 preferred_scanner_id: Some("scanner-zebra-1".to_string()),
                 updated_at: Some("1".to_string()),
             },
@@ -836,8 +1115,13 @@ mod tests {
             }],
         };
 
-        let status = load_hardware_status_with_backends_for_tests(&printer_backend, &scanner_backend, state)
-            .expect("load hardware status");
+        let status = load_hardware_status_with_backends_for_tests(
+            &printer_backend,
+            &scanner_backend,
+            &crate::runtime_scale::tests::FakeScaleBackend::default(),
+            state,
+        )
+        .expect("load hardware status");
 
         assert_eq!(status.diagnostics.scanner_capture_state, "attention_required");
         assert_eq!(status.diagnostics.scanner_transport.as_deref(), Some("unknown"));
@@ -914,6 +1198,7 @@ mod tests {
                 receipt_printer_name: Some("Thermal-01".to_string()),
                 label_printer_name: None,
                 cash_drawer_printer_name: Some("Thermal-01".to_string()),
+                preferred_scale_id: None,
                 preferred_scanner_id: None,
             },
         )
@@ -931,6 +1216,64 @@ mod tests {
             Some("Opened cash drawer through Thermal-01")
         );
         assert!(status.diagnostics.last_cash_drawer_opened_at.is_some());
+
+        if let Some(value) = previous_runtime_home {
+            env::set_var("STORE_RUNTIME_HOME", value);
+        } else {
+            env::remove_var("STORE_RUNTIME_HOME");
+        }
+        let _ = fs::remove_dir_all(runtime_home);
+    }
+
+    #[test]
+    fn runtime_hardware_reads_weight_from_the_assigned_scale_and_records_diagnostics() {
+        let _guard = runtime_home_test_guard()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_runtime_home = env::var("STORE_RUNTIME_HOME").ok();
+        let runtime_home = env::temp_dir().join(format!(
+            "store-runtime-hardware-scale-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir_all(&runtime_home).expect("create runtime home");
+        env::set_var(
+            "STORE_RUNTIME_HOME",
+            runtime_home.to_string_lossy().to_string(),
+        );
+
+        let error = read_scale_weight_with_backend(
+            &runtime_hardware_path(),
+            &mut crate::runtime_scale::tests::FakeScaleBackend::default(),
+        )
+        .expect_err("weight read should fail without assignment");
+        assert!(error.contains("scale"));
+
+        save_hardware_profile_to_path(
+            &runtime_hardware_path(),
+            StoreRuntimeHardwareProfileInput {
+                receipt_printer_name: Some("Thermal-01".to_string()),
+                label_printer_name: None,
+                cash_drawer_printer_name: Some("Thermal-01".to_string()),
+                preferred_scale_id: Some("scale-com3".to_string()),
+                preferred_scanner_id: None,
+            },
+        )
+        .expect("save hardware profile");
+
+        let status = read_scale_weight_with_backend(
+            &runtime_hardware_path(),
+            &mut crate::runtime_scale::tests::FakeScaleBackend::default(),
+        )
+        .expect("read scale weight");
+
+        assert_eq!(status.diagnostics.last_weight_status.as_deref(), Some("captured"));
+        assert_eq!(status.diagnostics.last_weight_value, Some(0.5));
+        assert_eq!(status.diagnostics.last_weight_unit.as_deref(), Some("kg"));
+        assert_eq!(
+            status.diagnostics.last_weight_message.as_deref(),
+            Some("Captured 0.500 kg from Serial scale (COM3)")
+        );
+        assert!(status.diagnostics.last_weight_read_at.is_some());
 
         if let Some(value) = previous_runtime_home {
             env::set_var("STORE_RUNTIME_HOME", value);

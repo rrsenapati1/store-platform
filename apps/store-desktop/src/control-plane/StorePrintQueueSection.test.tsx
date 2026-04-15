@@ -30,12 +30,21 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     assignRuntimeReceiptPrinter: vi.fn(async () => {}),
     assignRuntimeLabelPrinter: vi.fn(async () => {}),
     assignRuntimeCashDrawerPrinter: vi.fn(async () => {}),
+    assignRuntimePreferredScale: vi.fn(async () => {}),
     openRuntimeCashDrawer: vi.fn(async () => {}),
+    readRuntimeScaleWeight: vi.fn(async () => {}),
     runtimeShellKind: 'packaged_desktop',
     runtimeHardwareBridgeState: 'ready',
     runtimeReceiptPrinterName: 'Thermal-01',
     runtimeLabelPrinterName: 'Label-01',
     runtimeCashDrawerPrinterName: 'Thermal-01',
+    runtimePreferredScaleId: 'scale-com3',
+    runtimeScaleCaptureState: 'ready',
+    runtimeScaleStatusMessage: 'Preferred scale ready: Serial scale (COM3).',
+    runtimeScaleSetupHint: 'Connect a local serial/COM scale and assign it before requesting a live read.',
+    runtimeScaleLastWeightValue: 0.5,
+    runtimeScaleLastWeightUnit: 'kg',
+    runtimeScaleLastWeightReadAt: '2026-04-15T12:10:00.000Z',
     runtimeCashDrawerStatusMessage: 'Cash drawer is assigned to Thermal-01.',
     runtimeCashDrawerSetupHint: 'Use a receipt printer with a connected RJ11 cash drawer.',
     runtimeHardwareLastCashDrawerMessage: 'Opened cash drawer through Thermal-01',
@@ -55,6 +64,22 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
         is_online: true,
       },
     ],
+    runtimeHardwareScales: [
+      {
+        id: 'scale-com3',
+        label: 'Serial scale (COM3)',
+        transport: 'serial_com',
+        port_name: 'COM3',
+        is_connected: true,
+      },
+      {
+        id: 'scale-com4',
+        label: 'Serial scale (COM4)',
+        transport: 'serial_com',
+        port_name: 'COM4',
+        is_connected: true,
+      },
+    ],
     runtimeHardwareError: null,
     runtimeHeartbeat: null,
     latestPrintJob: null,
@@ -68,7 +93,7 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
 }
 
 describe('store print queue section', () => {
-  test('renders cash drawer assignment and manual open controls for packaged runtime', () => {
+  test('renders cash drawer and scale controls for packaged runtime', () => {
     render(<StorePrintQueueSection workspace={buildWorkspace()} />);
 
     expect(screen.getByText('Cash drawer')).toBeInTheDocument();
@@ -77,5 +102,10 @@ describe('store print queue section', () => {
     expect(screen.getByText('Opened cash drawer through Thermal-01')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open assigned cash drawer' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Use for cash drawer' })).toHaveLength(2);
+    expect(screen.getByText('Weighing scale')).toBeInTheDocument();
+    expect(screen.getByText('Preferred scale ready: Serial scale (COM3).')).toBeInTheDocument();
+    expect(screen.getByText('0.5 kg')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Read current weight' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Use for weighing scale' })).toHaveLength(2);
   });
 });

@@ -2,6 +2,16 @@
 
 ## 2026-04-15
 
+- Expanded `V2-003` on Store Desktop with weighing-scale integration:
+  - added a packaged-runtime serial-scale bridge so the Windows desktop shell can discover local COM-style scale candidates, assign one preferred scale, and manually read a live weight without changing billing authority
+  - extended the desktop hardware contract with scale diagnostics, last-weight posture, and browser-fallback messaging so operators can see scale readiness and latest read results alongside printers, scanners, and cash drawer
+  - surfaced preferred-scale assignment and live-weight actions in the runtime print desk and barcode lookup workflow so the cashier can trigger and inspect weight reads where counter work actually happens
+- Verified:
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml --lib`
+
 - Started `V2-003` with Store Desktop cash-drawer integration:
   - added a packaged-runtime cash-drawer bridge that opens the drawer through the locally assigned printer path instead of introducing a separate device authority model
   - extended the desktop hardware profile and diagnostics contract with cash-drawer assignment, setup hints, last-open posture, and packaged-vs-browser fallback status
