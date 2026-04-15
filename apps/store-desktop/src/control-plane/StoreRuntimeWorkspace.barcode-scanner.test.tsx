@@ -17,6 +17,10 @@ function BarcodeScannerHarness() {
   return (
     <>
       <div data-testid="scanner-state">{scanner.scannerCaptureState}</div>
+      <div data-testid="scanner-transport">{scanner.scannerTransport ?? 'none'}</div>
+      <div data-testid="scanner-status-message">{scanner.scannerStatusMessage ?? 'none'}</div>
+      <div data-testid="scanner-setup-hint">{scanner.scannerSetupHint ?? 'none'}</div>
+      <div data-testid="barcode-preview">{scanner.lastScanBarcodePreview ?? 'none'}</div>
       <div data-testid="last-scan">{scanner.lastScanAt ?? 'none'}</div>
       <div data-testid="barcode">{barcode || 'none'}</div>
     </>
@@ -54,6 +58,9 @@ describe('packaged runtime barcode scanner capture', () => {
 
     expect(screen.getByTestId('barcode')).toHaveTextContent('ACMETEA');
     expect(screen.getByTestId('last-scan')).not.toHaveTextContent('none');
+    expect(screen.getByTestId('scanner-transport')).toHaveTextContent('keyboard_wedge');
+    expect(screen.getByTestId('barcode-preview')).toHaveTextContent('ACMETEA');
+    expect(screen.getByTestId('scanner-status-message')).toHaveTextContent('Ready for external scanner input');
   });
 
   test('ignores ordinary slow typing cadence', async () => {

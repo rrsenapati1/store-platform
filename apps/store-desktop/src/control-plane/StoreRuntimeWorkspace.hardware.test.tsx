@@ -25,10 +25,14 @@ const { tauriState, dispatches, mockInvoke } = vi.hoisted(() => ({
       },
       diagnostics: {
         scanner_capture_state: 'ready',
+        scanner_transport: 'keyboard_wedge',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
         last_scan_at: null,
+        last_scan_barcode_preview: null,
+        scanner_status_message: 'Ready for external scanner input',
+        scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
       },
     } as StoreRuntimeHardwareStatus,
   },
@@ -98,6 +102,8 @@ function HardwareHarness() {
       <div data-testid="print-count">{String(printJobs.length)}</div>
       <div data-testid="latest-status">{latestPrintJob?.status ?? 'none'}</div>
       <div data-testid="last-print-message">{hardware.hardwareStatus?.diagnostics.last_print_message ?? 'none'}</div>
+      <div data-testid="scanner-transport">{hardware.hardwareStatus?.diagnostics.scanner_transport ?? 'none'}</div>
+      <div data-testid="scanner-status-message">{hardware.hardwareStatus?.diagnostics.scanner_status_message ?? 'none'}</div>
       <div data-testid="error-message">{errorMessage || 'none'}</div>
     </>
   );
@@ -127,10 +133,14 @@ describe('packaged runtime hardware integration', () => {
       },
       diagnostics: {
         scanner_capture_state: 'ready',
+        scanner_transport: 'keyboard_wedge',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
         last_scan_at: null,
+        last_scan_barcode_preview: null,
+        scanner_status_message: 'Ready for external scanner input',
+        scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
       },
     };
 
@@ -200,6 +210,8 @@ describe('packaged runtime hardware integration', () => {
       expect(screen.getByTestId('last-print-message')).toHaveTextContent('Printed SALES_INVOICE on Thermal-01');
     });
 
+    expect(screen.getByTestId('scanner-transport')).toHaveTextContent('keyboard_wedge');
+    expect(screen.getByTestId('scanner-status-message')).toHaveTextContent('Ready for external scanner input');
     expect(screen.getByTestId('error-message')).toHaveTextContent('none');
     expect(dispatches).toHaveLength(1);
   });

@@ -22,10 +22,14 @@ describe('resolved store runtime hardware adapter', () => {
           },
           diagnostics: {
             scanner_capture_state: 'ready',
+            scanner_transport: 'keyboard_wedge',
             last_print_status: null,
             last_print_message: null,
             last_printed_at: null,
             last_scan_at: null,
+            last_scan_barcode_preview: null,
+            scanner_status_message: 'Ready for external scanner input',
+            scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
           },
         };
       }
@@ -40,10 +44,14 @@ describe('resolved store runtime hardware adapter', () => {
           },
           diagnostics: {
             scanner_capture_state: 'ready',
+            scanner_transport: 'keyboard_wedge',
             last_print_status: null,
             last_print_message: null,
             last_printed_at: null,
             last_scan_at: null,
+            last_scan_barcode_preview: null,
+            scanner_status_message: 'Ready for external scanner input',
+            scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
           },
         };
       }
@@ -72,10 +80,14 @@ describe('resolved store runtime hardware adapter', () => {
       },
       diagnostics: {
         scanner_capture_state: 'ready',
+        scanner_transport: 'keyboard_wedge',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
         last_scan_at: null,
+        last_scan_barcode_preview: null,
+        scanner_status_message: 'Ready for external scanner input',
+        scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
       },
     });
 
@@ -94,10 +106,14 @@ describe('resolved store runtime hardware adapter', () => {
       },
       diagnostics: {
         scanner_capture_state: 'ready',
+        scanner_transport: 'keyboard_wedge',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
         last_scan_at: null,
+        last_scan_barcode_preview: null,
+        scanner_status_message: 'Ready for external scanner input',
+        scanner_setup_hint: 'Connect a keyboard-wedge scanner and scan into the active packaged terminal.',
       },
     });
 
@@ -123,10 +139,14 @@ describe('resolved store runtime hardware adapter', () => {
       },
       diagnostics: {
         scanner_capture_state: 'browser_fallback',
+        scanner_transport: 'unknown',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
         last_scan_at: null,
+        last_scan_barcode_preview: null,
+        scanner_status_message: 'Scanner capture diagnostics require the packaged desktop runtime.',
+        scanner_setup_hint: 'Open the packaged desktop runtime for wedge-scanner capture.',
       },
     });
   });
@@ -149,10 +169,14 @@ describe('resolved store runtime hardware adapter', () => {
       },
       diagnostics: {
         scanner_capture_state: 'browser_fallback',
+        scanner_transport: 'unknown',
         last_print_status: null,
         last_print_message: null,
         last_printed_at: null,
         last_scan_at: null,
+        last_scan_barcode_preview: null,
+        scanner_status_message: 'Scanner capture diagnostics require the packaged desktop runtime.',
+        scanner_setup_hint: 'Open the packaged desktop runtime for wedge-scanner capture.',
       },
     });
   });

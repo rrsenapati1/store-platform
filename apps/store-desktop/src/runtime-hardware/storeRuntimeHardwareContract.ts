@@ -1,5 +1,6 @@
 export type StoreRuntimeHardwareBridgeState = 'ready' | 'unavailable' | 'browser_fallback';
-export type StoreRuntimeScannerCaptureState = 'ready' | 'unavailable' | 'browser_fallback';
+export type StoreRuntimeScannerCaptureState = 'ready' | 'unavailable' | 'browser_fallback' | 'attention_required';
+export type StoreRuntimeScannerTransport = 'keyboard_wedge' | 'unknown';
 
 export interface StoreRuntimePrinterRecord {
   name: string;
@@ -28,10 +29,14 @@ export interface StoreRuntimeHardwareProfileInput {
 
 export interface StoreRuntimeHardwareDiagnostics {
   scanner_capture_state: StoreRuntimeScannerCaptureState;
+  scanner_transport: StoreRuntimeScannerTransport;
   last_print_status: string | null;
   last_print_message: string | null;
   last_printed_at: string | null;
   last_scan_at: string | null;
+  last_scan_barcode_preview: string | null;
+  scanner_status_message: string | null;
+  scanner_setup_hint: string | null;
 }
 
 export interface StoreRuntimeHardwareStatus {
@@ -78,11 +83,20 @@ function isHardwareProfile(value: unknown): value is StoreRuntimeHardwareProfile
 
 function isHardwareDiagnostics(value: unknown): value is StoreRuntimeHardwareDiagnostics {
   return isObject(value)
-    && (value.scanner_capture_state === 'ready' || value.scanner_capture_state === 'unavailable' || value.scanner_capture_state === 'browser_fallback')
+    && (
+      value.scanner_capture_state === 'ready'
+      || value.scanner_capture_state === 'unavailable'
+      || value.scanner_capture_state === 'browser_fallback'
+      || value.scanner_capture_state === 'attention_required'
+    )
+    && (value.scanner_transport === 'keyboard_wedge' || value.scanner_transport === 'unknown')
     && (typeof value.last_print_status === 'string' || value.last_print_status === null)
     && (typeof value.last_print_message === 'string' || value.last_print_message === null)
     && (typeof value.last_printed_at === 'string' || value.last_printed_at === null)
-    && (typeof value.last_scan_at === 'string' || value.last_scan_at === null);
+    && (typeof value.last_scan_at === 'string' || value.last_scan_at === null)
+    && (typeof value.last_scan_barcode_preview === 'string' || value.last_scan_barcode_preview === null)
+    && (typeof value.scanner_status_message === 'string' || value.scanner_status_message === null)
+    && (typeof value.scanner_setup_hint === 'string' || value.scanner_setup_hint === null);
 }
 
 export function isStoreRuntimeHardwareStatus(value: unknown): value is StoreRuntimeHardwareStatus {

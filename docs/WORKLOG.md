@@ -2,6 +2,14 @@
 
 ## 2026-04-15
 
+- Expanded `V2-002` on Store Desktop scanner hardening:
+  - kept the existing packaged desktop keyboard-wedge scan path, but extended it with richer scanner diagnostics instead of leaving scanner readiness implicit
+  - added scanner transport, status message, setup hint, and last-scan preview to the runtime hardware diagnostics contract across browser fallback, packaged shell, and native persisted hardware state
+  - surfaced the richer scanner posture in both the shell identity section and the counter barcode lookup section so operators can diagnose scanner setup where they actually work
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- src/control-plane/StoreRuntimeWorkspace.barcode-scanner.test.tsx src/control-plane/StoreBarcodeLookupSection.test.tsx src/control-plane/StoreRuntimeWorkspace.hardware.test.tsx src/runtime-hardware/storeRuntimeHardwareAdapter.test.ts`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml runtime_hardware --lib`
+
 - Expanded `V2-002` again with optional Zebra DataWedge provisioning on Android:
   - kept the generic Android + cheap external scanner path as the default posture, while adding a bounded Zebra-only setup lane for supported Zebra devices
   - added a pure Zebra configurator/result parser, one-tap DataWedge profile provisioning from the app, and result-action handling in the Android activity boundary

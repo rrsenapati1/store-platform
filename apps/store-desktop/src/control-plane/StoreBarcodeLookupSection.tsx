@@ -16,10 +16,15 @@ export function StoreBarcodeLookupSection({ workspace }: { workspace: StoreRunti
 
       {isPackagedRuntime ? (
         <div style={{ marginTop: '16px' }}>
+          <h3 style={{ marginBottom: '10px' }}>Scanner diagnostics</h3>
           <DetailList
             items={[
               { label: 'Scanner capture', value: workspace.runtimeScannerCaptureState ?? 'Unavailable' },
+              { label: 'Scanner transport', value: workspace.runtimeScannerTransport ?? 'Unknown' },
               { label: 'Last scan', value: workspace.runtimeScannerLastScanAt ?? 'No scanner activity yet' },
+              { label: 'Last scan preview', value: workspace.runtimeScannerLastScanPreview ?? 'No scanner activity yet' },
+              { label: 'Scanner status', value: workspace.runtimeScannerStatusMessage ?? 'No scanner diagnostics available' },
+              { label: 'Setup hint', value: workspace.runtimeScannerSetupHint ?? 'No scanner setup guidance available' },
             ]}
           />
         </div>

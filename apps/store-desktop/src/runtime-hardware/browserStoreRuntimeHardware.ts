@@ -14,10 +14,14 @@ function buildBrowserFallbackStatus(): StoreRuntimeHardwareStatus {
     },
     diagnostics: {
       scanner_capture_state: 'browser_fallback',
+      scanner_transport: 'unknown',
       last_print_status: null,
       last_print_message: null,
       last_printed_at: null,
       last_scan_at: null,
+      last_scan_barcode_preview: null,
+      scanner_status_message: 'Scanner capture diagnostics require the packaged desktop runtime.',
+      scanner_setup_hint: 'Open the packaged desktop runtime for wedge-scanner capture.',
     },
   };
 }

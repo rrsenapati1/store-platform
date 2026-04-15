@@ -34,10 +34,14 @@ pub struct StoreRuntimeHardwareProfileInput {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StoreRuntimeHardwareDiagnostics {
     pub scanner_capture_state: String,
+    pub scanner_transport: Option<String>,
     pub last_print_status: Option<String>,
     pub last_print_message: Option<String>,
     pub last_printed_at: Option<String>,
     pub last_scan_at: Option<String>,
+    pub last_scan_barcode_preview: Option<String>,
+    pub scanner_status_message: Option<String>,
+    pub scanner_setup_hint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -95,10 +99,17 @@ fn default_hardware_profile() -> StoreRuntimeHardwareProfileRecord {
 fn default_hardware_diagnostics() -> StoreRuntimeHardwareDiagnostics {
     StoreRuntimeHardwareDiagnostics {
         scanner_capture_state: "ready".to_string(),
+        scanner_transport: Some("keyboard_wedge".to_string()),
         last_print_status: None,
         last_print_message: None,
         last_printed_at: None,
         last_scan_at: None,
+        last_scan_barcode_preview: None,
+        scanner_status_message: Some("Ready for external scanner input".to_string()),
+        scanner_setup_hint: Some(
+            "Connect a keyboard-wedge scanner and scan into the active packaged terminal."
+                .to_string(),
+        ),
     }
 }
 
@@ -288,6 +299,16 @@ mod tests {
         assert_eq!(status.profile.receipt_printer_name, None);
         assert_eq!(status.profile.label_printer_name, None);
         assert_eq!(status.diagnostics.scanner_capture_state, "ready");
+        assert_eq!(status.diagnostics.scanner_transport.as_deref(), Some("keyboard_wedge"));
+        assert_eq!(status.diagnostics.last_scan_barcode_preview, None);
+        assert_eq!(
+            status.diagnostics.scanner_status_message.as_deref(),
+            Some("Ready for external scanner input")
+        );
+        assert_eq!(
+            status.diagnostics.scanner_setup_hint.as_deref(),
+            Some("Connect a keyboard-wedge scanner and scan into the active packaged terminal.")
+        );
 
         if let Some(value) = previous_runtime_home {
             env::set_var("STORE_RUNTIME_HOME", value);
