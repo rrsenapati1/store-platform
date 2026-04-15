@@ -51,17 +51,32 @@ export function useStoreRuntimeCheckoutPayment({
   const [checkoutPaymentSession, setCheckoutPaymentSession] = useState<ControlPlaneCheckoutPaymentSession | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const finalizedSessionRef = useRef<string | null>(null);
+  const onErrorRef = useRef(onError);
+  const onFinalizedRef = useRef(onFinalized);
 
-  async function refreshFinalizedSale(session: ControlPlaneCheckoutPaymentSession) {
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
+  useEffect(() => {
+    onFinalizedRef.current = onFinalized;
+  }, [onFinalized]);
+
+  async function refreshFinalizedSale(
+    session: ControlPlaneCheckoutPaymentSession,
+    activeAccessToken: string = accessToken,
+    activeTenantId: string = tenantId,
+    activeBranchId: string = branchId,
+  ) {
     if (!session.sale || finalizedSessionRef.current === session.id) {
       return;
     }
     const [salesResponse, snapshotResponse] = await Promise.all([
-      storeControlPlaneClient.listSales(accessToken, tenantId, branchId),
-      storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId),
+      storeControlPlaneClient.listSales(activeAccessToken, activeTenantId, activeBranchId),
+      storeControlPlaneClient.listInventorySnapshot(activeAccessToken, activeTenantId, activeBranchId),
     ]);
     finalizedSessionRef.current = session.id;
-    onFinalized({
+    onFinalizedRef.current({
       sale: session.sale,
       sales: salesResponse.records,
       inventorySnapshot: snapshotResponse.records,
@@ -136,8 +151,8 @@ export function useStoreRuntimeCheckoutPayment({
   useEffect(() => {
     if (!checkoutPaymentSession || !accessToken || !tenantId || !branchId || isTerminalStatus(checkoutPaymentSession.lifecycle_status)) {
       if (checkoutPaymentSession?.lifecycle_status === 'FINALIZED' && checkoutPaymentSession.sale) {
-        void refreshFinalizedSale(checkoutPaymentSession).catch((error) => {
-          onError(error instanceof Error ? error.message : 'Unable to refresh finalized Cashfree payment sale.');
+        void refreshFinalizedSale(checkoutPaymentSession, accessToken, tenantId, branchId).catch((error) => {
+          onErrorRef.current(error instanceof Error ? error.message : 'Unable to refresh finalized Cashfree payment sale.');
         });
       }
       return;
@@ -154,10 +169,10 @@ export function useStoreRuntimeCheckoutPayment({
           );
           setCheckoutPaymentSession(nextSession);
           if (nextSession.lifecycle_status === 'FINALIZED' && nextSession.sale) {
-            await refreshFinalizedSale(nextSession);
+            await refreshFinalizedSale(nextSession, accessToken, tenantId, branchId);
           }
         } catch (error) {
-          onError(error instanceof Error ? error.message : 'Unable to refresh Cashfree UPI QR payment status.');
+          onErrorRef.current(error instanceof Error ? error.message : 'Unable to refresh Cashfree UPI QR payment status.');
         }
       })();
     }, CASHFREE_POLL_INTERVAL_MS);
@@ -165,7 +180,7 @@ export function useStoreRuntimeCheckoutPayment({
     return () => {
       globalThis.clearTimeout(timeoutId);
     };
-  }, [accessToken, branchId, checkoutPaymentSession, onError, tenantId]);
+  }, [accessToken, branchId, checkoutPaymentSession, tenantId]);
 
   return {
     checkoutPaymentSession,

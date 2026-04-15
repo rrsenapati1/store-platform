@@ -116,4 +116,22 @@ describe('customer display route', () => {
     expect(await screen.findByText('Payment complete')).toBeInTheDocument();
     expect(screen.queryByText('Store Runtime')).not.toBeInTheDocument();
   });
+
+  test('renders a customer-facing QR graphic when a payment QR payload is active', async () => {
+    saveCustomerDisplayPayload(buildPayload({
+      state: 'payment_in_progress',
+      title: 'Scan to pay',
+      message: 'Scan to pay with any UPI app.',
+      payment_qr: {
+        format: 'upi_qr',
+        value: 'upi://pay?tr=cf_order_checkout-1',
+        expires_at: '2026-04-15T12:10:00.000Z',
+      },
+    }));
+
+    render(<CustomerDisplayRoute />);
+
+    expect(await screen.findByRole('img', { name: 'Customer payment QR code' })).toBeInTheDocument();
+    expect(screen.getByText(/Expires in/i)).toBeInTheDocument();
+  });
 });

@@ -87,4 +87,31 @@ describe('store billing section payment session states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Switch to manual payment' }));
     expect(workspace.useManualCheckoutFallback).toHaveBeenCalledTimes(1);
   });
+
+  test('renders a scannable QR preview and expiry for active Cashfree sessions', () => {
+    const workspace = createWorkspace({
+      checkoutPaymentSession: {
+        id: 'checkout-1',
+        tenant_id: 'tenant-acme',
+        branch_id: 'branch-1',
+        provider_name: 'cashfree',
+        provider_order_id: 'cf_order_checkout-1',
+        provider_payment_session_id: 'cf_ps_checkout-1',
+        provider_payment_id: null,
+        payment_method: 'CASHFREE_UPI_QR',
+        lifecycle_status: 'QR_READY',
+        provider_status: 'ACTIVE',
+        order_amount: 388.5,
+        currency_code: 'INR',
+        qr_payload: { format: 'upi_qr', value: 'upi://pay?tr=cf_order_checkout-1' },
+        qr_expires_at: '2026-04-15T12:10:00.000Z',
+        sale: null,
+      },
+    });
+
+    render(<StoreBillingSection workspace={workspace} />);
+
+    expect(screen.getByRole('img', { name: 'Cashfree UPI QR code' })).toBeInTheDocument();
+    expect(screen.getByText(/Expires in/i)).toBeInTheDocument();
+  });
 });

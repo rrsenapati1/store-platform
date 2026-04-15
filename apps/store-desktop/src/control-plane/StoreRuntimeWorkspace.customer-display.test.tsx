@@ -19,23 +19,6 @@ function jsonResponse(body: unknown, status = 200): MockResponse {
   };
 }
 
-async function waitForDisplayPayload(
-  matcher: (payload: ReturnType<typeof loadCustomerDisplayPayload>) => boolean,
-): Promise<ReturnType<typeof loadCustomerDisplayPayload>> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const payload = loadCustomerDisplayPayload();
-    if (matcher(payload)) {
-      return payload;
-    }
-    await Promise.resolve();
-    await Promise.resolve();
-    if (vi.isFakeTimers()) {
-      await vi.advanceTimersByTimeAsync(1);
-    }
-  }
-  return loadCustomerDisplayPayload();
-}
-
 function createMemoryStorage(): Storage {
   const storage = new Map<string, string>();
   return {
@@ -401,22 +384,25 @@ describe('store runtime customer display flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
-    vi.useFakeTimers();
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'CASHFREE_UPI_QR' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open customer display' }));
     fireEvent.click(screen.getByRole('button', { name: 'Start Cashfree UPI QR' }));
-    const activePayload = await waitForDisplayPayload(
-      (payload) => payload?.state === 'payment_in_progress' && payload.payment_qr?.value === 'upi://pay?tr=cf_order_checkout-1',
-    );
-    expect(activePayload?.message).toContain('Scan to pay');
+    await waitFor(() => {
+      const activePayload = loadCustomerDisplayPayload();
+      expect(activePayload?.state).toBe('payment_in_progress');
+      expect(activePayload?.payment_qr?.value).toBe('upi://pay?tr=cf_order_checkout-1');
+      expect(activePayload?.message).toContain('Scan to pay');
+    });
 
-    await vi.advanceTimersByTimeAsync(2500);
-    const completedPayload = await waitForDisplayPayload((payload) => payload?.state === 'sale_complete');
-    expect(completedPayload?.message).toContain('SINV-BLRFLAGSHIP-0001');
-  });
+    await waitFor(() => {
+      const completedPayload = loadCustomerDisplayPayload();
+      expect(completedPayload?.state).toBe('sale_complete');
+      expect(completedPayload?.message).toContain('SINV-BLRFLAGSHIP-0001');
+    }, { timeout: 5000 });
+  }, 10000);
 
   test('publishes cart preview and completed sale posture to the customer display', async () => {
     render(<App />);

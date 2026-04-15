@@ -2,6 +2,16 @@
 
 ## 2026-04-15
 
+- Expanded `V2-003` on Store Desktop with branded Cashfree QR rendering:
+  - replaced the raw `upi://...` payload-only payment presentation with a shared locally rendered QR image component so cashier checkout and customer display both show a real scannable QR
+  - added a shared relative expiry/countdown formatter so active QR sessions communicate `Expires in ...` posture instead of only dumping absolute timestamps
+  - kept the existing payment-session lifecycle intact while improving the cashier billing card and customer display payment experience with the same QR/rendering contract
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- StoreBillingSection.payment-session.test.tsx customerDisplayRoute.test.tsx`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+
 - Expanded `V2-003` on Store Desktop with Cashfree dynamic UPI QR checkout:
   - added a new control-plane checkout payment-session lane for in-store Cashfree QR creation, status polling, cancel/retry, and webhook-driven sale finalization so desktop checkout no longer has to post a sale before payment confirmation
   - extracted Store Desktop QR-session orchestration into a dedicated checkout-payment hook, kept `useStoreRuntimeWorkspace.ts` as orchestration-only wiring, and extended the billing surface with QR state, retry/cancel/manual-fallback controls, and finalized-sale refresh

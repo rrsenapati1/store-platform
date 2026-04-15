@@ -369,21 +369,19 @@ describe('store runtime billing foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
-    vi.useFakeTimers();
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'CASHFREE_UPI_QR' } });
     fireEvent.click(screen.getByRole('button', { name: 'Start Cashfree UPI QR' }));
-    await vi.advanceTimersByTimeAsync(1);
 
-    expect(screen.getByText('Waiting for customer payment')).toBeInTheDocument();
-    expect(screen.getByText('cf_order_checkout-1')).toBeInTheDocument();
+    expect(await screen.findByText('Waiting for customer payment')).toBeInTheDocument();
+    expect(await screen.findByText('cf_order_checkout-1')).toBeInTheDocument();
 
-    await vi.advanceTimersByTimeAsync(2500);
-
-    expect(screen.getAllByText('SINV-BLRFLAGSHIP-0001').length).toBeGreaterThan(0);
-    expect(screen.getByText('Classic Tea -> 20')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByText('SINV-BLRFLAGSHIP-0001').length).toBeGreaterThan(0);
+      expect(screen.getByText('Classic Tea -> 20')).toBeInTheDocument();
+    }, { timeout: 5000 });
   });
 });

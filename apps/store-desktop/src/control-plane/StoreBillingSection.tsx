@@ -1,4 +1,5 @@
 import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@store/ui';
+import { PaymentQrCode, usePaymentQrExpiry } from '../customer-display/paymentQr';
 import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
 
 export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
@@ -24,6 +25,7 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
     || !workspace.saleQuantity
     || !workspace.paymentMethod
     || (isCashfreeQrPayment && !workspace.isSessionLive);
+  const checkoutPaymentExpiry = usePaymentQrExpiry(checkoutPaymentSession?.qr_expires_at ?? null);
 
   return (
     <>
@@ -57,7 +59,7 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                   },
                   { label: 'Provider order', value: checkoutPaymentSession.provider_order_id },
                   { label: 'Amount', value: `${checkoutPaymentSession.currency_code} ${checkoutPaymentSession.order_amount.toFixed(2)}` },
-                  { label: 'QR expires', value: checkoutPaymentSession.qr_expires_at ?? 'Unknown' },
+                  { label: 'QR expires at', value: checkoutPaymentSession.qr_expires_at ?? 'Unknown' },
                 ]}
               />
               {(checkoutPaymentSession.lifecycle_status === 'QR_READY' || checkoutPaymentSession.lifecycle_status === 'PENDING_CUSTOMER_PAYMENT') ? (
@@ -81,10 +83,18 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                     padding: '16px',
                     background: 'rgba(244, 247, 255, 0.9)',
                     color: '#25314f',
+                    display: 'grid',
+                    gap: '14px',
+                    justifyItems: 'center',
                   }}
                 >
-                  <strong style={{ display: 'block', marginBottom: '8px' }}>Dynamic UPI payload</strong>
-                  <span style={{ wordBreak: 'break-all' }}>{checkoutPaymentSession.qr_payload.value}</span>
+                  <strong style={{ display: 'block' }}>Cashfree UPI QR</strong>
+                  <PaymentQrCode
+                    alt="Cashfree UPI QR code"
+                    value={checkoutPaymentSession.qr_payload.value}
+                  />
+                  <span style={{ fontSize: '14px', color: '#4e5871' }}>{checkoutPaymentExpiry}</span>
+                  <span style={{ wordBreak: 'break-all', textAlign: 'center' }}>{checkoutPaymentSession.qr_payload.value}</span>
                 </div>
               ) : null}
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '16px' }}>

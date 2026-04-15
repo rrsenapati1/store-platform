@@ -6,6 +6,7 @@ import {
   loadCustomerDisplayPayload,
   type CustomerDisplayPayload,
 } from './customerDisplayModel';
+import { PaymentQrCode, usePaymentQrExpiry } from './paymentQr';
 
 function formatAmount(value: number | null) {
   if (value === null) {
@@ -61,6 +62,7 @@ export function isCustomerDisplayRoute() {
 
 export function CustomerDisplayRoute() {
   const payload = useCustomerDisplayPayload();
+  const paymentQrExpiry = usePaymentQrExpiry(payload.payment_qr?.expires_at ?? null);
 
   return (
     <main
@@ -155,24 +157,31 @@ export function CustomerDisplayRoute() {
             <div
               style={{
                 display: 'grid',
-                gap: '10px',
-                padding: '16px',
-                borderRadius: '20px',
+                gap: '16px',
+                padding: '18px',
+                borderRadius: '24px',
                 background: 'rgba(122, 224, 255, 0.12)',
                 border: '1px solid rgba(122, 224, 255, 0.2)',
+                justifyItems: 'center',
               }}
             >
               <span style={{ fontSize: '12px', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#d1d8f0' }}>
                 Dynamic UPI QR
               </span>
-              <strong style={{ fontSize: '18px', lineHeight: 1.4, wordBreak: 'break-all', color: '#f5f7ff' }}>
+              <PaymentQrCode
+                alt="Customer payment QR code"
+                size={260}
+                value={payload.payment_qr.value}
+              />
+              <strong style={{ fontSize: '18px', lineHeight: 1.4, textAlign: 'center', color: '#f5f7ff' }}>
+                Scan with any UPI app
+              </strong>
+              <span style={{ fontSize: '16px', color: '#dbe3ff' }}>
+                {paymentQrExpiry}
+              </span>
+              <strong style={{ fontSize: '14px', lineHeight: 1.6, wordBreak: 'break-all', textAlign: 'center', color: '#dbe3ff' }}>
                 {payload.payment_qr.value}
               </strong>
-              {payload.payment_qr.expires_at ? (
-                <span style={{ fontSize: '14px', color: '#dbe3ff' }}>
-                  Expires {payload.payment_qr.expires_at}
-                </span>
-              ) : null}
             </div>
           ) : null}
           {payload.cash_received !== null ? <ToneBar label="Cash received" value={formatAmount(payload.cash_received)} /> : null}
