@@ -2,6 +2,7 @@ package com.store.mobile.ui.scan
 
 import com.store.mobile.scan.CameraBarcodeScanner
 import com.store.mobile.scan.ScanLookupRepository
+import com.store.mobile.scan.ZebraDataWedgeResult
 import java.time.Instant
 
 enum class ScanCameraStatus {
@@ -24,6 +25,14 @@ enum class ScanLookupSource {
     EXTERNAL_SCANNER,
 }
 
+enum class ZebraDataWedgeSetupStatus {
+    UNAVAILABLE,
+    AVAILABLE,
+    APPLYING,
+    CONFIGURED,
+    ERROR,
+}
+
 data class ScanLookupUiState(
     val draftBarcode: String = "",
     val barcode: String = "",
@@ -37,6 +46,8 @@ data class ScanLookupUiState(
     val externalScannerStatus: ScanExternalScannerStatus = ScanExternalScannerStatus.UNCONFIGURED,
     val externalScannerMessage: String? = null,
     val lastExternalScanAt: String? = null,
+    val zebraDataWedgeStatus: ZebraDataWedgeSetupStatus = ZebraDataWedgeSetupStatus.UNAVAILABLE,
+    val zebraDataWedgeMessage: String? = null,
     val lastScanSource: ScanLookupSource = ScanLookupSource.MANUAL,
     val errorMessage: String? = null,
 )
@@ -134,6 +145,49 @@ class ScanLookupViewModel(
                 } else {
                     ScanExternalScannerStatus.UNCONFIGURED
                 },
+            )
+        }
+    }
+
+    fun updateZebraDataWedgeAvailability(isAvailable: Boolean) {
+        state = state.copy(
+            zebraDataWedgeStatus = when {
+                !isAvailable -> ZebraDataWedgeSetupStatus.UNAVAILABLE
+                state.zebraDataWedgeStatus == ZebraDataWedgeSetupStatus.CONFIGURED -> ZebraDataWedgeSetupStatus.CONFIGURED
+                else -> ZebraDataWedgeSetupStatus.AVAILABLE
+            },
+            zebraDataWedgeMessage = if (isAvailable) {
+                if (state.zebraDataWedgeStatus == ZebraDataWedgeSetupStatus.ERROR) {
+                    state.zebraDataWedgeMessage
+                } else {
+                    null
+                }
+            } else {
+                null
+            },
+        )
+    }
+
+    fun beginZebraDataWedgeProvisioning() {
+        if (state.zebraDataWedgeStatus == ZebraDataWedgeSetupStatus.UNAVAILABLE) {
+            return
+        }
+        state = state.copy(
+            zebraDataWedgeStatus = ZebraDataWedgeSetupStatus.APPLYING,
+            zebraDataWedgeMessage = null,
+        )
+    }
+
+    fun applyZebraDataWedgeResult(result: ZebraDataWedgeResult) {
+        state = when (result) {
+            ZebraDataWedgeResult.Configured -> state.copy(
+                zebraDataWedgeStatus = ZebraDataWedgeSetupStatus.CONFIGURED,
+                zebraDataWedgeMessage = null,
+            )
+
+            is ZebraDataWedgeResult.Error -> state.copy(
+                zebraDataWedgeStatus = ZebraDataWedgeSetupStatus.ERROR,
+                zebraDataWedgeMessage = result.message,
             )
         }
     }

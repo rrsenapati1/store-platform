@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 import com.store.mobile.ui.scan.ScanExternalScannerStatus
+import com.store.mobile.ui.scan.ZebraDataWedgeSetupStatus
 
 class RuntimeStatusScreenTest {
     @Test
@@ -33,5 +34,18 @@ class RuntimeStatusScreenTest {
         assertEquals("External scanner: Scanner payload invalid", state.externalScannerTitle)
         assertEquals("Last external scan: 2026-04-15T10:00:00Z", state.externalScannerLastScanLabel)
         assertEquals("External scanner warning: Missing barcode payload.", state.externalScannerDetail)
+    }
+
+    @Test
+    fun includesZebraSetupDiagnostics() {
+        val state = buildRuntimeStatusState(
+            connected = true,
+            pendingSyncCount = 2,
+            zebraDataWedgeStatus = ZebraDataWedgeSetupStatus.ERROR,
+            zebraDataWedgeMessage = "PLUGIN_BUNDLE_INVALID",
+        )
+
+        assertEquals("Zebra DataWedge setup failed", state.zebraDataWedgeTitle)
+        assertEquals("Zebra setup warning: PLUGIN_BUNDLE_INVALID", state.zebraDataWedgeDetail)
     }
 }

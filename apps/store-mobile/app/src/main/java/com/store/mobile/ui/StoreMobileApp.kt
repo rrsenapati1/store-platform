@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.store.mobile.StoreMobileApplication
+import com.store.mobile.MainActivity
 import com.store.mobile.operations.InMemoryExpiryRepository
 import com.store.mobile.operations.InMemoryReceivingRepository
 import com.store.mobile.operations.InMemoryStockCountRepository
@@ -28,6 +29,7 @@ import com.store.mobile.runtime.StoreMobilePairingRepository
 import com.store.mobile.runtime.StoreMobileSessionRepository
 import com.store.mobile.scan.ExternalScannerEvent
 import com.store.mobile.scan.InMemoryScanLookupRepository
+import com.store.mobile.scan.ZebraDataWedgeResult
 import com.store.mobile.ui.handheld.HandheldStoreShell
 import com.store.mobile.ui.operations.MobileOperationsSection
 import com.store.mobile.ui.pairing.PairingScreen
@@ -40,6 +42,7 @@ import com.store.mobile.ui.tablet.InventoryTabletShell
 fun StoreMobileApp() {
     val context = LocalContext.current
     val application = remember(context) { context.applicationContext as? StoreMobileApplication }
+    val activity = remember(context) { context as? MainActivity }
     val pairingRepository: StoreMobilePairingRepository = remember { InMemoryStoreMobilePairingRepository() }
     val sessionRepository: StoreMobileSessionRepository = remember { InMemoryStoreMobileSessionRepository() }
     val pairingViewModel = remember {
@@ -94,6 +97,26 @@ fun StoreMobileApp() {
                 }
             }
             onDispose { removeListener() }
+        }
+    }
+
+    DisposableEffect(application) {
+        val mobileApp = application
+        if (mobileApp == null) {
+            onDispose { }
+        } else {
+            val removeAvailabilityListener = mobileApp.addZebraAvailabilityListener { isAvailable ->
+                scanLookupViewModel.updateZebraDataWedgeAvailability(isAvailable)
+                scanLookupState = scanLookupViewModel.state
+            }
+            val removeResultListener = mobileApp.addZebraResultListener { result ->
+                scanLookupViewModel.applyZebraDataWedgeResult(result)
+                scanLookupState = scanLookupViewModel.state
+            }
+            onDispose {
+                removeAvailabilityListener()
+                removeResultListener()
+            }
         }
     }
 
@@ -156,6 +179,8 @@ fun StoreMobileApp() {
                         externalScannerStatus = scanLookupState.externalScannerStatus,
                         lastExternalScanAt = scanLookupState.lastExternalScanAt,
                         externalScannerMessage = scanLookupState.externalScannerMessage,
+                        zebraDataWedgeStatus = scanLookupState.zebraDataWedgeStatus,
+                        zebraDataWedgeMessage = scanLookupState.zebraDataWedgeMessage,
                     )
 
                     if (shellMode == StoreMobileShellMode.TABLET) {
@@ -170,6 +195,18 @@ fun StoreMobileApp() {
                             onLookupBarcode = {
                                 scanLookupViewModel.lookupDraftBarcode()
                                 scanLookupState = scanLookupViewModel.state
+                            },
+                            onConfigureZebraDataWedge = {
+                                scanLookupViewModel.beginZebraDataWedgeProvisioning()
+                                scanLookupState = scanLookupViewModel.state
+                                if (activity == null) {
+                                    scanLookupViewModel.applyZebraDataWedgeResult(
+                                        ZebraDataWedgeResult.Error("Zebra setup host is unavailable."),
+                                    )
+                                    scanLookupState = scanLookupViewModel.state
+                                } else {
+                                    activity.configureZebraDataWedge()
+                                }
                             },
                             onCameraPermissionResolved = { granted ->
                                 scanLookupViewModel.setCameraPermission(granted)
@@ -203,6 +240,18 @@ fun StoreMobileApp() {
                             onLookupBarcode = {
                                 scanLookupViewModel.lookupDraftBarcode()
                                 scanLookupState = scanLookupViewModel.state
+                            },
+                            onConfigureZebraDataWedge = {
+                                scanLookupViewModel.beginZebraDataWedgeProvisioning()
+                                scanLookupState = scanLookupViewModel.state
+                                if (activity == null) {
+                                    scanLookupViewModel.applyZebraDataWedgeResult(
+                                        ZebraDataWedgeResult.Error("Zebra setup host is unavailable."),
+                                    )
+                                    scanLookupState = scanLookupViewModel.state
+                                } else {
+                                    activity.configureZebraDataWedge()
+                                }
                             },
                             onCameraPermissionResolved = { granted ->
                                 scanLookupViewModel.setCameraPermission(granted)

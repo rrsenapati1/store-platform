@@ -4,6 +4,7 @@ import com.store.mobile.ui.scan.ScanCameraStatus
 import com.store.mobile.ui.scan.ScanExternalScannerStatus
 import com.store.mobile.ui.scan.ScanLookupSource
 import com.store.mobile.ui.scan.ScanLookupViewModel
+import com.store.mobile.ui.scan.ZebraDataWedgeSetupStatus
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -137,5 +138,34 @@ class ScanLookupViewModelTest {
 
         assertEquals(ScanCameraStatus.UNAVAILABLE, viewModel.state.cameraStatus)
         assertEquals("Camera binding failed.", viewModel.state.cameraMessage)
+    }
+
+    @Test
+    fun zebraAvailabilityAndProvisioningSuccessMoveThroughExpectedStates() {
+        val viewModel = ScanLookupViewModel(InMemoryScanLookupRepository())
+
+        viewModel.updateZebraDataWedgeAvailability(isAvailable = true)
+        viewModel.beginZebraDataWedgeProvisioning()
+        viewModel.applyZebraDataWedgeResult(ZebraDataWedgeResult.Configured)
+
+        assertEquals(ZebraDataWedgeSetupStatus.CONFIGURED, viewModel.state.zebraDataWedgeStatus)
+        assertEquals(null, viewModel.state.zebraDataWedgeMessage)
+    }
+
+    @Test
+    fun zebraProvisioningFailureMovesStateToError() {
+        val viewModel = ScanLookupViewModel(InMemoryScanLookupRepository())
+
+        viewModel.updateZebraDataWedgeAvailability(isAvailable = true)
+        viewModel.beginZebraDataWedgeProvisioning()
+        viewModel.applyZebraDataWedgeResult(
+            ZebraDataWedgeResult.Error(
+                message = "DataWedge rejected the profile bundle.",
+                resultCode = "PLUGIN_BUNDLE_INVALID",
+            ),
+        )
+
+        assertEquals(ZebraDataWedgeSetupStatus.ERROR, viewModel.state.zebraDataWedgeStatus)
+        assertEquals("DataWedge rejected the profile bundle.", viewModel.state.zebraDataWedgeMessage)
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.store.mobile.ui.scan.ScanExternalScannerStatus
+import com.store.mobile.ui.scan.ZebraDataWedgeSetupStatus
 
 data class RuntimeStatusUiState(
     val connected: Boolean,
@@ -22,6 +23,8 @@ data class RuntimeStatusUiState(
     val externalScannerTitle: String,
     val externalScannerDetail: String,
     val externalScannerLastScanLabel: String,
+    val zebraDataWedgeTitle: String,
+    val zebraDataWedgeDetail: String,
 )
 
 fun buildRuntimeStatusState(
@@ -33,6 +36,8 @@ fun buildRuntimeStatusState(
     externalScannerStatus: ScanExternalScannerStatus = ScanExternalScannerStatus.UNCONFIGURED,
     lastExternalScanAt: String? = null,
     externalScannerMessage: String? = null,
+    zebraDataWedgeStatus: ZebraDataWedgeSetupStatus = ZebraDataWedgeSetupStatus.UNAVAILABLE,
+    zebraDataWedgeMessage: String? = null,
 ): RuntimeStatusUiState {
     val normalizedPendingSyncCount = pendingSyncCount.coerceAtLeast(0)
     val deviceLabel = deviceId ?: "Awaiting paired device"
@@ -51,6 +56,20 @@ fun buildRuntimeStatusState(
         ScanExternalScannerStatus.PAYLOAD_ERROR -> "External scanner warning: ${externalScannerMessage ?: "A rugged-device broadcast was received without a usable barcode payload."}"
     }
     val lastScanLabel = "Last external scan: ${lastExternalScanAt ?: "No external scan received yet"}"
+    val zebraTitle = when (zebraDataWedgeStatus) {
+        ZebraDataWedgeSetupStatus.UNAVAILABLE -> "Zebra scanner setup unavailable"
+        ZebraDataWedgeSetupStatus.AVAILABLE -> "Zebra DataWedge available"
+        ZebraDataWedgeSetupStatus.APPLYING -> "Zebra DataWedge setup in progress"
+        ZebraDataWedgeSetupStatus.CONFIGURED -> "Zebra DataWedge configured"
+        ZebraDataWedgeSetupStatus.ERROR -> "Zebra DataWedge setup failed"
+    }
+    val zebraDetail = when (zebraDataWedgeStatus) {
+        ZebraDataWedgeSetupStatus.UNAVAILABLE -> "This device does not expose Zebra DataWedge. Use camera, HID/USB, or generic external-scanner setup instead."
+        ZebraDataWedgeSetupStatus.AVAILABLE -> "Zebra DataWedge is available on this device and can be configured for Store Mobile broadcast scanning."
+        ZebraDataWedgeSetupStatus.APPLYING -> "Store Mobile is sending a Zebra DataWedge profile configuration request."
+        ZebraDataWedgeSetupStatus.CONFIGURED -> "The Zebra-managed profile is configured for broadcast output and keystroke injection is disabled for this app."
+        ZebraDataWedgeSetupStatus.ERROR -> "Zebra setup warning: ${zebraDataWedgeMessage ?: "DataWedge rejected the latest configuration request."}"
+    }
 
     return RuntimeStatusUiState(
         connected = connected,
@@ -71,6 +90,8 @@ fun buildRuntimeStatusState(
         externalScannerTitle = scannerTitle,
         externalScannerDetail = scannerDetail,
         externalScannerLastScanLabel = lastScanLabel,
+        zebraDataWedgeTitle = zebraTitle,
+        zebraDataWedgeDetail = zebraDetail,
     )
 }
 
@@ -91,5 +112,7 @@ fun RuntimeStatusScreen(state: RuntimeStatusUiState) {
         Text(text = state.externalScannerTitle, style = MaterialTheme.typography.bodyMedium)
         Text(text = state.externalScannerDetail, style = MaterialTheme.typography.bodyMedium)
         Text(text = state.externalScannerLastScanLabel, style = MaterialTheme.typography.bodyMedium)
+        Text(text = state.zebraDataWedgeTitle, style = MaterialTheme.typography.bodyMedium)
+        Text(text = state.zebraDataWedgeDetail, style = MaterialTheme.typography.bodyMedium)
     }
 }

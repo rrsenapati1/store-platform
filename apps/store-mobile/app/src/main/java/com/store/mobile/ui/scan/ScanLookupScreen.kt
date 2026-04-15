@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +45,7 @@ fun ScanLookupScreen(
     isTabletLayout: Boolean,
     onDraftBarcodeChange: (String) -> Unit,
     onLookupBarcode: () -> Unit,
+    onConfigureZebraDataWedge: () -> Unit,
     onCameraPermissionResolved: (Boolean) -> Unit,
     onCameraPreviewFailure: (String) -> Unit,
     onCameraBarcodeDetected: (String) -> Unit,
@@ -88,6 +90,7 @@ fun ScanLookupScreen(
                 focusRequester = barcodeFieldFocusRequester,
                 onDraftBarcodeChange = onDraftBarcodeChange,
                 onLookupBarcode = onLookupBarcode,
+                onConfigureZebraDataWedge = onConfigureZebraDataWedge,
             )
         }
     } else {
@@ -111,6 +114,7 @@ fun ScanLookupScreen(
                 focusRequester = barcodeFieldFocusRequester,
                 onDraftBarcodeChange = onDraftBarcodeChange,
                 onLookupBarcode = onLookupBarcode,
+                onConfigureZebraDataWedge = onConfigureZebraDataWedge,
             )
         }
     }
@@ -191,6 +195,7 @@ private fun ScanLookupDetailsPanel(
     focusRequester: FocusRequester,
     onDraftBarcodeChange: (String) -> Unit,
     onLookupBarcode: () -> Unit,
+    onConfigureZebraDataWedge: () -> Unit,
 ) {
     Column(
         modifier = modifier,
@@ -226,6 +231,10 @@ private fun ScanLookupDetailsPanel(
             Text("Lookup barcode")
         }
         ExternalScannerStatusCard(state = state)
+        ZebraDataWedgeStatusCard(
+            state = state,
+            onConfigureZebraDataWedge = onConfigureZebraDataWedge,
+        )
         if (state.productName.isNotBlank()) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -292,6 +301,57 @@ private fun ExternalScannerStatusCard(state: ScanLookupUiState) {
                 text = "Last external scan: ${state.lastExternalScanAt ?: "No external scan received yet"}",
                 style = MaterialTheme.typography.bodySmall,
             )
+        }
+    }
+}
+
+@Composable
+private fun ZebraDataWedgeStatusCard(
+    state: ScanLookupUiState,
+    onConfigureZebraDataWedge: () -> Unit,
+) {
+    if (state.zebraDataWedgeStatus == ZebraDataWedgeSetupStatus.UNAVAILABLE) {
+        return
+    }
+
+    val title = when (state.zebraDataWedgeStatus) {
+        ZebraDataWedgeSetupStatus.UNAVAILABLE -> ""
+        ZebraDataWedgeSetupStatus.AVAILABLE -> "Zebra DataWedge available"
+        ZebraDataWedgeSetupStatus.APPLYING -> "Configuring Zebra DataWedge"
+        ZebraDataWedgeSetupStatus.CONFIGURED -> "Zebra DataWedge configured"
+        ZebraDataWedgeSetupStatus.ERROR -> "Zebra DataWedge setup failed"
+    }
+    val detail = when (state.zebraDataWedgeStatus) {
+        ZebraDataWedgeSetupStatus.UNAVAILABLE -> ""
+        ZebraDataWedgeSetupStatus.AVAILABLE -> "This Zebra device can configure a Store Mobile broadcast profile with one tap."
+        ZebraDataWedgeSetupStatus.APPLYING -> "Waiting for the Zebra DataWedge result action from the latest setup request."
+        ZebraDataWedgeSetupStatus.CONFIGURED -> "The Zebra-managed profile is configured for broadcast output and keystroke injection is disabled for this app."
+        ZebraDataWedgeSetupStatus.ERROR -> state.zebraDataWedgeMessage
+            ?: "DataWedge rejected the latest Store Mobile setup request."
+    }
+    val actionLabel = when (state.zebraDataWedgeStatus) {
+        ZebraDataWedgeSetupStatus.AVAILABLE -> "Configure Zebra DataWedge"
+        ZebraDataWedgeSetupStatus.ERROR -> "Retry Zebra setup"
+        ZebraDataWedgeSetupStatus.CONFIGURED -> "Reconfigure Zebra DataWedge"
+        ZebraDataWedgeSetupStatus.APPLYING,
+        ZebraDataWedgeSetupStatus.UNAVAILABLE,
+        -> null
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(text = detail, style = MaterialTheme.typography.bodyMedium)
+            if (actionLabel != null) {
+                OutlinedButton(onClick = onConfigureZebraDataWedge) {
+                    Text(actionLabel)
+                }
+            }
         }
     }
 }
