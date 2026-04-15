@@ -2,6 +2,15 @@
 
 ## 2026-04-15
 
+- Expanded `V2-002` on Android external scanner support:
+  - added a bounded external-scanner parser and app-level event bus for rugged-device broadcast scans instead of creating a second scan stack outside the existing lookup view-model
+  - wired Store Mobile to consume `DataWedge`-style broadcast payloads and route them through the same scan lookup path used by manual and live camera input
+  - made the scan screen wedge-friendly by auto-focusing the barcode field, handling hardware `Enter` submission, and exposing external-scanner posture in both handheld and tablet scan layouts
+- Verified:
+  - `cd apps/store-mobile && .\\gradlew.bat testDebugUnitTest --tests com.store.mobile.scan.ExternalBarcodeScanParserTest --tests com.store.mobile.scan.ScanLookupViewModelTest`
+  - `cd apps/store-mobile && .\\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+
 - Started `V2-002` and effectively closed the remaining `V2-001` runtime-surface gap:
   - replaced the Android app's manual-entry-only scan placeholder with a real live camera preview pipeline using CameraX and on-device ML Kit barcode detection
   - kept one shared scanner/session layer for both `mobile_store_spoke` handheld mode and `inventory_tablet_spoke` tablet mode, while preserving different layouts in each shell

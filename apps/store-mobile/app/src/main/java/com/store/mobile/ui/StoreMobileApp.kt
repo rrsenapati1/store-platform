@@ -7,13 +7,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.store.mobile.StoreMobileApplication
 import com.store.mobile.operations.InMemoryExpiryRepository
 import com.store.mobile.operations.InMemoryReceivingRepository
 import com.store.mobile.operations.InMemoryStockCountRepository
@@ -33,6 +36,8 @@ import com.store.mobile.ui.tablet.InventoryTabletShell
 
 @Composable
 fun StoreMobileApp() {
+    val context = LocalContext.current
+    val application = remember(context) { context.applicationContext as? StoreMobileApplication }
     val pairingRepository: StoreMobilePairingRepository = remember { InMemoryStoreMobilePairingRepository() }
     val sessionRepository: StoreMobileSessionRepository = remember { InMemoryStoreMobileSessionRepository() }
     val pairingViewModel = remember {
@@ -52,6 +57,32 @@ fun StoreMobileApp() {
     var scanLookupState by remember { mutableStateOf(scanLookupViewModel.state) }
     var handheldSection by remember { mutableStateOf(MobileOperationsSection.SCAN) }
     var tabletSection by remember { mutableStateOf(MobileOperationsSection.RECEIVING) }
+
+    DisposableEffect(application, pairingState.pairedDevice?.deviceId, handheldSection, tabletSection) {
+        val mobileApp = application
+        if (mobileApp == null || pairingState.pairedDevice == null) {
+            onDispose { }
+        } else {
+            val removeListener = mobileApp.addExternalBarcodeListener { barcode ->
+                val shellMode = resolveStoreMobileShellMode(pairingState.pairedDevice?.runtimeProfile)
+                val isScanSectionActive = if (shellMode == StoreMobileShellMode.TABLET) {
+                    tabletSection == MobileOperationsSection.SCAN
+                } else {
+                    handheldSection == MobileOperationsSection.SCAN
+                }
+                if (!isScanSectionActive) {
+                    return@addExternalBarcodeListener
+                }
+
+                scanLookupViewModel.onExternalScannerDetected(
+                    rawBarcode = barcode,
+                    detectedAtMillis = System.currentTimeMillis(),
+                )
+                scanLookupState = scanLookupViewModel.state
+            }
+            onDispose { removeListener() }
+        }
+    }
 
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {

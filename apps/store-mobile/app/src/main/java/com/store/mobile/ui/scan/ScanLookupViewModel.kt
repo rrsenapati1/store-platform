@@ -13,6 +13,7 @@ enum class ScanCameraStatus {
 enum class ScanLookupSource {
     MANUAL,
     CAMERA,
+    EXTERNAL_SCANNER,
 }
 
 data class ScanLookupUiState(
@@ -77,6 +78,14 @@ class ScanLookupViewModel(
         lookupResolvedBarcode(
             normalizedBarcode = normalizedBarcode,
             source = ScanLookupSource.CAMERA,
+        )
+    }
+
+    fun onExternalScannerDetected(rawBarcode: String, detectedAtMillis: Long) {
+        val normalizedBarcode = scanner.consumeDetectedValue(rawBarcode, detectedAtMillis) ?: return
+        lookupResolvedBarcode(
+            normalizedBarcode = normalizedBarcode,
+            source = ScanLookupSource.EXTERNAL_SCANNER,
         )
     }
 

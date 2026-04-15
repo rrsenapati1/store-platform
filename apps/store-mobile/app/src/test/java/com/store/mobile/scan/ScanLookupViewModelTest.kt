@@ -61,6 +61,30 @@ class ScanLookupViewModelTest {
     }
 
     @Test
+    fun externalScannerDetectionResolvesLookupState() {
+        val repository = InMemoryScanLookupRepository(
+            records = listOf(
+                ScanLookupRecord(
+                    productId = "prod-1",
+                    productName = "ACME TEA",
+                    skuCode = "TEA-001",
+                    barcode = "1234567890123",
+                    sellingPrice = 125.0,
+                    stockOnHand = 18.0,
+                    availabilityStatus = "IN_STOCK",
+                ),
+            ),
+        )
+        val viewModel = ScanLookupViewModel(repository)
+
+        viewModel.onExternalScannerDetected(" 1234 5678 90123 ", detectedAtMillis = 7_500L)
+
+        assertEquals("1234567890123", viewModel.state.draftBarcode)
+        assertEquals("ACME TEA", viewModel.state.productName)
+        assertEquals(ScanLookupSource.EXTERNAL_SCANNER, viewModel.state.lastScanSource)
+    }
+
+    @Test
     fun deniedCameraPermissionMovesStateToPermissionRequired() {
         val viewModel = ScanLookupViewModel(InMemoryScanLookupRepository())
 

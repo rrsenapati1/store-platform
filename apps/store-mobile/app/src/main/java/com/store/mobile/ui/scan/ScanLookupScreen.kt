@@ -21,11 +21,22 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 
 @Composable
 fun ScanLookupScreen(
@@ -46,9 +57,14 @@ fun ScanLookupScreen(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = onCameraPermissionResolved,
     )
+    val barcodeFieldFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(permissionGranted) {
         onCameraPermissionResolved(permissionGranted)
+    }
+
+    LaunchedEffect(Unit) {
+        barcodeFieldFocusRequester.requestFocus()
     }
 
     if (isTabletLayout) {
@@ -69,6 +85,7 @@ fun ScanLookupScreen(
             ScanLookupDetailsPanel(
                 modifier = Modifier.weight(0.44f),
                 state = state,
+                focusRequester = barcodeFieldFocusRequester,
                 onDraftBarcodeChange = onDraftBarcodeChange,
                 onLookupBarcode = onLookupBarcode,
             )
@@ -91,6 +108,7 @@ fun ScanLookupScreen(
             ScanLookupDetailsPanel(
                 modifier = Modifier.fillMaxWidth(),
                 state = state,
+                focusRequester = barcodeFieldFocusRequester,
                 onDraftBarcodeChange = onDraftBarcodeChange,
                 onLookupBarcode = onLookupBarcode,
             )
@@ -170,6 +188,7 @@ private fun ScanCameraPanel(
 private fun ScanLookupDetailsPanel(
     modifier: Modifier,
     state: ScanLookupUiState,
+    focusRequester: FocusRequester,
     onDraftBarcodeChange: (String) -> Unit,
     onLookupBarcode: () -> Unit,
 ) {
@@ -181,8 +200,24 @@ private fun ScanLookupDetailsPanel(
             value = state.draftBarcode,
             onValueChange = onDraftBarcodeChange,
             label = { Text("Barcode") },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester)
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
+                        onLookupBarcode()
+                        true
+                    } else {
+                        false
+                    }
+                },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(
+                onSearch = {
+                    onLookupBarcode()
+                },
+            ),
         )
         Button(
             onClick = onLookupBarcode,
@@ -200,11 +235,7 @@ private fun ScanLookupDetailsPanel(
                 ) {
                     Text(text = state.productName, style = MaterialTheme.typography.titleLarge)
                     Text(
-                        text = if (state.lastScanSource == ScanLookupSource.CAMERA) {
-                            "Live camera scan"
-                        } else {
-                            "Manual lookup"
-                        },
+                        text = scanSourceLabel(state.lastScanSource),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -225,10 +256,18 @@ private fun ScanLookupDetailsPanel(
         }
         if (state.cameraStatus == ScanCameraStatus.READY) {
             Text(
-                text = "Point the camera at a barcode. Repeated detections are throttled to keep lookup stable.",
+                text = "Point the camera at a barcode, or use a DataWedge/HID/USB external scanner. Repeated detections are throttled to keep lookup stable.",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+    }
+}
+
+private fun scanSourceLabel(source: ScanLookupSource): String {
+    return when (source) {
+        ScanLookupSource.MANUAL -> "Manual lookup"
+        ScanLookupSource.CAMERA -> "Live camera scan"
+        ScanLookupSource.EXTERNAL_SCANNER -> "External scanner"
     }
 }
 
