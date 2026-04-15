@@ -1,6 +1,7 @@
 package com.store.mobile.scan
 
 import com.store.mobile.ui.scan.ScanCameraStatus
+import com.store.mobile.ui.scan.ScanExternalScannerStatus
 import com.store.mobile.ui.scan.ScanLookupSource
 import com.store.mobile.ui.scan.ScanLookupViewModel
 import org.junit.Assert.assertEquals
@@ -82,6 +83,41 @@ class ScanLookupViewModelTest {
         assertEquals("1234567890123", viewModel.state.draftBarcode)
         assertEquals("ACME TEA", viewModel.state.productName)
         assertEquals(ScanLookupSource.EXTERNAL_SCANNER, viewModel.state.lastScanSource)
+        assertEquals(ScanExternalScannerStatus.RECENT_SCAN, viewModel.state.externalScannerStatus)
+        assertEquals("1970-01-01T00:00:07.500Z", viewModel.state.lastExternalScanAt)
+    }
+
+    @Test
+    fun malformedExternalScannerPayloadMovesStateToPayloadError() {
+        val viewModel = ScanLookupViewModel(InMemoryScanLookupRepository())
+
+        viewModel.reportExternalScannerPayloadError("Missing barcode payload.")
+
+        assertEquals(ScanExternalScannerStatus.PAYLOAD_ERROR, viewModel.state.externalScannerStatus)
+        assertEquals("Missing barcode payload.", viewModel.state.externalScannerMessage)
+    }
+
+    @Test
+    fun recognizedScannerCanReturnToReadyAfterRecentWindowExpires() {
+        val repository = InMemoryScanLookupRepository(
+            records = listOf(
+                ScanLookupRecord(
+                    productId = "prod-1",
+                    productName = "ACME TEA",
+                    skuCode = "TEA-001",
+                    barcode = "1234567890123",
+                    sellingPrice = 125.0,
+                    stockOnHand = 18.0,
+                    availabilityStatus = "IN_STOCK",
+                ),
+            ),
+        )
+        val viewModel = ScanLookupViewModel(repository)
+
+        viewModel.onExternalScannerDetected("1234567890123", detectedAtMillis = 7_500L)
+        viewModel.refreshExternalScannerStatus(referenceTimeMillis = 7_500L + 301_000L)
+
+        assertEquals(ScanExternalScannerStatus.READY, viewModel.state.externalScannerStatus)
     }
 
     @Test

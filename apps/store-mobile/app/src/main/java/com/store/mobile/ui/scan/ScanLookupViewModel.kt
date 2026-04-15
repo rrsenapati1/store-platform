@@ -2,12 +2,20 @@ package com.store.mobile.ui.scan
 
 import com.store.mobile.scan.CameraBarcodeScanner
 import com.store.mobile.scan.ScanLookupRepository
+import java.time.Instant
 
 enum class ScanCameraStatus {
     CHECKING,
     PERMISSION_REQUIRED,
     READY,
     UNAVAILABLE,
+}
+
+enum class ScanExternalScannerStatus {
+    UNCONFIGURED,
+    READY,
+    RECENT_SCAN,
+    PAYLOAD_ERROR,
 }
 
 enum class ScanLookupSource {
@@ -26,6 +34,9 @@ data class ScanLookupUiState(
     val availabilityStatus: String = "",
     val cameraStatus: ScanCameraStatus = ScanCameraStatus.CHECKING,
     val cameraMessage: String? = null,
+    val externalScannerStatus: ScanExternalScannerStatus = ScanExternalScannerStatus.UNCONFIGURED,
+    val externalScannerMessage: String? = null,
+    val lastExternalScanAt: String? = null,
     val lastScanSource: ScanLookupSource = ScanLookupSource.MANUAL,
     val errorMessage: String? = null,
 )
@@ -34,6 +45,9 @@ class ScanLookupViewModel(
     private val repository: ScanLookupRepository,
     private val scanner: CameraBarcodeScanner = CameraBarcodeScanner(),
 ) {
+    private var hasValidatedExternalScanner = false
+    private var lastExternalScanAtMillis: Long? = null
+
     var state: ScanLookupUiState = ScanLookupUiState()
         private set
 
@@ -83,10 +97,45 @@ class ScanLookupViewModel(
 
     fun onExternalScannerDetected(rawBarcode: String, detectedAtMillis: Long) {
         val normalizedBarcode = scanner.consumeDetectedValue(rawBarcode, detectedAtMillis) ?: return
+        hasValidatedExternalScanner = true
+        lastExternalScanAtMillis = detectedAtMillis
         lookupResolvedBarcode(
             normalizedBarcode = normalizedBarcode,
             source = ScanLookupSource.EXTERNAL_SCANNER,
         )
+        state = state.copy(
+            externalScannerStatus = ScanExternalScannerStatus.RECENT_SCAN,
+            externalScannerMessage = null,
+            lastExternalScanAt = Instant.ofEpochMilli(detectedAtMillis).toString(),
+        )
+    }
+
+    fun reportExternalScannerPayloadError(message: String, detectedAtMillis: Long = System.currentTimeMillis()) {
+        state = state.copy(
+            externalScannerStatus = ScanExternalScannerStatus.PAYLOAD_ERROR,
+            externalScannerMessage = message,
+            lastExternalScanAt = state.lastExternalScanAt,
+        )
+        if (lastExternalScanAtMillis == null) {
+            lastExternalScanAtMillis = detectedAtMillis
+        }
+    }
+
+    fun refreshExternalScannerStatus(referenceTimeMillis: Long) {
+        val lastScan = lastExternalScanAtMillis
+        if (
+            state.externalScannerStatus == ScanExternalScannerStatus.RECENT_SCAN &&
+            lastScan != null &&
+            referenceTimeMillis - lastScan >= EXTERNAL_SCANNER_RECENT_WINDOW_MS
+        ) {
+            state = state.copy(
+                externalScannerStatus = if (hasValidatedExternalScanner) {
+                    ScanExternalScannerStatus.READY
+                } else {
+                    ScanExternalScannerStatus.UNCONFIGURED
+                },
+            )
+        }
     }
 
     private fun lookupNormalizedBarcode(rawBarcode: String, source: ScanLookupSource) {
@@ -136,5 +185,9 @@ class ScanLookupViewModel(
             lastScanSource = source,
             errorMessage = null,
         )
+    }
+
+    companion object {
+        private const val EXTERNAL_SCANNER_RECENT_WINDOW_MS = 5 * 60 * 1000L
     }
 }

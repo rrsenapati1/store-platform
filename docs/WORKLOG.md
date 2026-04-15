@@ -2,6 +2,15 @@
 
 ## 2026-04-15
 
+- Expanded `V2-002` again with rugged-scanner diagnostics on Android:
+  - upgraded the external scanner path from plain barcode strings to typed rugged-scanner events so valid payloads and malformed payloads are handled differently
+  - added shared external-scanner diagnostics state to the mobile scan/runtime layer, including unconfigured/ready/recent-scan/payload-error posture, last external scan timestamp, and the latest scanner warning
+  - surfaced that posture in both the scan screen and the runtime status screen, and documented the expected `DataWedge` action/payload contract in the mobile README
+- Verified:
+  - `cd apps/store-mobile && .\\gradlew.bat testDebugUnitTest --tests com.store.mobile.scan.ExternalBarcodeScanParserTest --tests com.store.mobile.scan.ScanLookupViewModelTest --tests com.store.mobile.ui.runtime.RuntimeStatusScreenTest`
+  - `cd apps/store-mobile && .\\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+
 - Expanded `V2-002` on Android external scanner support:
   - added a bounded external-scanner parser and app-level event bus for rugged-device broadcast scans instead of creating a second scan stack outside the existing lookup view-model
   - wired Store Mobile to consume `DataWedge`-style broadcast payloads and route them through the same scan lookup path used by manual and live camera input

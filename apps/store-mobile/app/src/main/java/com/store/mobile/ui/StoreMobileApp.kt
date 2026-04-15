@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import com.store.mobile.runtime.InMemoryStoreMobilePairingRepository
 import com.store.mobile.runtime.InMemoryStoreMobileSessionRepository
 import com.store.mobile.runtime.StoreMobilePairingRepository
 import com.store.mobile.runtime.StoreMobileSessionRepository
+import com.store.mobile.scan.ExternalScannerEvent
 import com.store.mobile.scan.InMemoryScanLookupRepository
 import com.store.mobile.ui.handheld.HandheldStoreShell
 import com.store.mobile.ui.operations.MobileOperationsSection
@@ -70,17 +72,36 @@ fun StoreMobileApp() {
                 } else {
                     handheldSection == MobileOperationsSection.SCAN
                 }
-                if (!isScanSectionActive) {
-                    return@addExternalBarcodeListener
-                }
+                when (barcode) {
+                    is ExternalScannerEvent.BarcodeDetected -> {
+                        if (!isScanSectionActive) {
+                            return@addExternalBarcodeListener
+                        }
+                        scanLookupViewModel.onExternalScannerDetected(
+                            rawBarcode = barcode.barcode,
+                            detectedAtMillis = barcode.detectedAtMillis,
+                        )
+                        scanLookupState = scanLookupViewModel.state
+                    }
 
-                scanLookupViewModel.onExternalScannerDetected(
-                    rawBarcode = barcode,
-                    detectedAtMillis = System.currentTimeMillis(),
-                )
-                scanLookupState = scanLookupViewModel.state
+                    is ExternalScannerEvent.PayloadError -> {
+                        scanLookupViewModel.reportExternalScannerPayloadError(
+                            message = barcode.message,
+                            detectedAtMillis = barcode.detectedAtMillis,
+                        )
+                        scanLookupState = scanLookupViewModel.state
+                    }
+                }
             }
             onDispose { removeListener() }
+        }
+    }
+
+    LaunchedEffect(scanLookupState.externalScannerStatus, scanLookupState.lastExternalScanAt) {
+        if (scanLookupState.externalScannerStatus == com.store.mobile.ui.scan.ScanExternalScannerStatus.RECENT_SCAN) {
+            kotlinx.coroutines.delay(5 * 60 * 1000L + 1_000L)
+            scanLookupViewModel.refreshExternalScannerStatus(System.currentTimeMillis())
+            scanLookupState = scanLookupViewModel.state
         }
     }
 
@@ -132,6 +153,9 @@ fun StoreMobileApp() {
                         deviceId = pairingState.pairedDevice?.deviceId,
                         hubBaseUrl = pairingState.pairedDevice?.hubBaseUrl,
                         sessionExpiresAt = sessionRepository.loadSession()?.expiresAt,
+                        externalScannerStatus = scanLookupState.externalScannerStatus,
+                        lastExternalScanAt = scanLookupState.lastExternalScanAt,
+                        externalScannerMessage = scanLookupState.externalScannerMessage,
                     )
 
                     if (shellMode == StoreMobileShellMode.TABLET) {

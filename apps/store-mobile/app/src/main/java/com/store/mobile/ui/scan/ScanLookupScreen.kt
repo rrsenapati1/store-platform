@@ -225,6 +225,7 @@ private fun ScanLookupDetailsPanel(
         ) {
             Text("Lookup barcode")
         }
+        ExternalScannerStatusCard(state = state)
         if (state.productName.isNotBlank()) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -258,6 +259,38 @@ private fun ScanLookupDetailsPanel(
             Text(
                 text = "Point the camera at a barcode, or use a DataWedge/HID/USB external scanner. Repeated detections are throttled to keep lookup stable.",
                 style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExternalScannerStatusCard(state: ScanLookupUiState) {
+    val title = when (state.externalScannerStatus) {
+        ScanExternalScannerStatus.UNCONFIGURED -> "External scanner not configured"
+        ScanExternalScannerStatus.READY -> "Ready for external scanner input"
+        ScanExternalScannerStatus.RECENT_SCAN -> "Last external scan received"
+        ScanExternalScannerStatus.PAYLOAD_ERROR -> "Scanner payload invalid"
+    }
+    val detail = when (state.externalScannerStatus) {
+        ScanExternalScannerStatus.UNCONFIGURED -> "Waiting for the first rugged-device scanner payload in this session. Camera and manual fallback are still available."
+        ScanExternalScannerStatus.READY -> "A rugged-device scanner has already been validated in this session and the app is listening for the next scan."
+        ScanExternalScannerStatus.RECENT_SCAN -> "External scanner traffic is flowing into the shared lookup path."
+        ScanExternalScannerStatus.PAYLOAD_ERROR -> state.externalScannerMessage
+            ?: "The latest rugged-device scanner broadcast did not include a usable barcode."
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(text = detail, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = "Last external scan: ${state.lastExternalScanAt ?: "No external scan received yet"}",
+                style = MaterialTheme.typography.bodySmall,
             )
         }
     }
