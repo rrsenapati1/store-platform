@@ -39,6 +39,9 @@ import type {
   ControlPlaneSupplierSettlementBlockerReport,
   ControlPlaneSupplierSettlementReport,
   ControlPlaneSupplierStatementReport,
+  ControlPlaneStockCountApproval,
+  ControlPlaneStockCountBoard,
+  ControlPlaneStockCountReviewSession,
   ControlPlaneSyncConflictRecord,
   ControlPlaneSyncEnvelopeRecord,
   ControlPlaneSyncSpokeRecord,
@@ -660,6 +663,76 @@ export const storeControlPlaneClient = {
       `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions/${checkoutPaymentSessionId}/cancel`,
       {
         method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  getStockCountBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneStockCountBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  createStockCountSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: { product_id: string; note?: string | null },
+  ) {
+    return request<ControlPlaneStockCountReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-sessions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  recordStockCountSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    stockCountSessionId: string,
+    payload: { counted_quantity: number; note?: string | null },
+  ) {
+    return request<ControlPlaneStockCountReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-sessions/${stockCountSessionId}/record`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  approveStockCountSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    stockCountSessionId: string,
+    payload: { review_note?: string | null },
+  ) {
+    return request<ControlPlaneStockCountApproval>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-sessions/${stockCountSessionId}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  cancelStockCountSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    stockCountSessionId: string,
+    payload: { review_note?: string | null },
+  ) {
+    return request<ControlPlaneStockCountReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-sessions/${stockCountSessionId}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
       },
       accessToken,
     );
