@@ -141,6 +141,7 @@ def _payment_session_payload(
     handoff_surface: str | None = None,
     provider_payment_mode: str | None = None,
     customer_profile_id: str | None = None,
+    promotion_code: str | None = None,
     loyalty_points_to_redeem: int = 0,
 ) -> dict[str, object]:
     return {
@@ -149,6 +150,7 @@ def _payment_session_payload(
         "handoff_surface": handoff_surface,
         "provider_payment_mode": provider_payment_mode,
         "customer_profile_id": customer_profile_id,
+        "promotion_code": promotion_code,
         "customer_name": "Acme Traders",
         "customer_gstin": "29AAEPM0111C1Z3",
         "loyalty_points_to_redeem": loyalty_points_to_redeem,
@@ -497,6 +499,83 @@ def test_checkout_payment_session_applies_loyalty_redemption_before_provider_fin
     )
     assert loyalty_summary.status_code == 200
     assert loyalty_summary.json()["available_points"] == 468
+
+
+def test_checkout_payment_session_applies_promotion_code_to_order_amount(monkeypatch) -> None:
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", "cashfree-secret")
+    database_url = sqlite_test_database_url("checkout-payment-session-promotions")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+
+    campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Checkout QR Discount",
+            "status": "ACTIVE",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 20.0,
+            "minimum_order_amount": 100.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": 500,
+        },
+    )
+    assert campaign.status_code == 200
+    campaign_id = campaign.json()["id"]
+
+    code = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns/{campaign_id}/codes",
+        headers=context["owner_headers"],
+        json={"code": "CHECKOUT20", "status": "ACTIVE", "redemption_limit_per_code": 100},
+    )
+    assert code.status_code == 200
+
+    create_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            promotion_code="CHECKOUT20",
+        ),
+    )
+    assert create_response.status_code == 200
+    assert create_response.json()["order_amount"] == 368.5
+    assert create_response.json()["sale"]["promotion_campaign_id"] == campaign_id
+    assert create_response.json()["sale"]["promotion_code"] == "CHECKOUT20"
+    assert create_response.json()["sale"]["promotion_discount_amount"] == 20.0
+
+
+def test_checkout_payment_session_rejects_invalid_promotion_code(monkeypatch) -> None:
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", "cashfree-secret")
+    database_url = sqlite_test_database_url("checkout-payment-session-promotions-invalid")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+    create_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            promotion_code="UNKNOWN20",
+        ),
+    )
+    assert create_response.status_code == 400
+    assert create_response.json()["detail"] == "Promotion code is invalid"
 
 
 def test_confirmed_checkout_payment_session_can_be_recovered_and_history_lists_recent_records(monkeypatch) -> None:
