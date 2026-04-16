@@ -1429,6 +1429,7 @@ export interface ControlPlaneSale {
   id: string;
   tenant_id: string;
   branch_id: string;
+  customer_profile_id?: string | null;
   customer_name: string;
   customer_gstin?: string | null;
   invoice_kind: string;
@@ -1447,6 +1448,7 @@ export interface ControlPlaneSale {
 
 export interface ControlPlaneSaleRecord {
   sale_id: string;
+  customer_profile_id?: string | null;
   invoice_number: string;
   customer_name: string;
   invoice_kind: string;
@@ -1460,6 +1462,7 @@ export interface ControlPlaneCheckoutPaymentSession {
   id: string;
   tenant_id: string;
   branch_id: string;
+  customer_profile_id?: string | null;
   provider_name: string;
   provider_order_id: string;
   provider_payment_session_id?: string | null;
@@ -1485,8 +1488,23 @@ export interface ControlPlaneCheckoutPaymentSessionListResponse {
   records: ControlPlaneCheckoutPaymentSession[];
 }
 
+export interface ControlPlaneCustomerProfile {
+  id: string;
+  tenant_id: string;
+  full_name: string;
+  phone?: string | null;
+  email?: string | null;
+  gstin?: string | null;
+  default_note?: string | null;
+  tags: string[];
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ControlPlaneCustomerDirectoryRecord {
   customer_id: string;
+  customer_profile_id?: string | null;
   name: string;
   phone?: string | null;
   email?: string | null;
@@ -1500,6 +1518,7 @@ export interface ControlPlaneCustomerDirectoryRecord {
 
 export interface ControlPlaneCustomerHistoryCustomer {
   customer_id: string;
+  customer_profile_id?: string | null;
   name: string;
   phone?: string | null;
   email?: string | null;
@@ -1557,6 +1576,7 @@ export interface ControlPlaneCustomerHistoryResponse {
 
 export interface ControlPlaneBranchCustomerTopRecord {
   customer_id: string;
+  customer_profile_id?: string | null;
   customer_name: string;
   sales_count: number;
   sales_total: number;
@@ -1565,6 +1585,7 @@ export interface ControlPlaneBranchCustomerTopRecord {
 
 export interface ControlPlaneBranchCustomerReturnRecord {
   customer_id: string;
+  customer_profile_id?: string | null;
   customer_name: string;
   return_count: number;
   credit_note_total: number;

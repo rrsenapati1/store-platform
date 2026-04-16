@@ -16,6 +16,7 @@ import type {
   ControlPlaneCatalogProduct,
   ControlPlaneCatalogProductRecord,
   ControlPlaneCustomerDirectoryRecord,
+  ControlPlaneCustomerProfile,
   ControlPlaneCustomerHistoryResponse,
   ControlPlaneComplianceProviderProfile,
   ControlPlaneDeviceClaimApproval,
@@ -699,6 +700,89 @@ export const ownerControlPlaneClient = {
     return request<{ records: ControlPlaneCustomerDirectoryRecord[] }>(
       `/v1/tenants/${tenantId}/customers${queryParam}`,
       undefined,
+      accessToken,
+    );
+  },
+  listCustomerProfiles(accessToken: string, tenantId: string, query?: string, status?: string) {
+    const search = new URLSearchParams();
+    if (query) {
+      search.set('query', query);
+    }
+    if (status) {
+      search.set('status', status);
+    }
+    const suffix = search.size ? `?${search.toString()}` : '';
+    return request<{ records: ControlPlaneCustomerProfile[] }>(
+      `/v1/tenants/${tenantId}/customer-profiles${suffix}`,
+      undefined,
+      accessToken,
+    );
+  },
+  getCustomerProfile(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<ControlPlaneCustomerProfile>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}`,
+      undefined,
+      accessToken,
+    );
+  },
+  createCustomerProfile(
+    accessToken: string,
+    tenantId: string,
+    payload: {
+      full_name: string;
+      phone?: string | null;
+      email?: string | null;
+      gstin?: string | null;
+      default_note?: string | null;
+      tags?: string[];
+    },
+  ) {
+    return request<ControlPlaneCustomerProfile>(
+      `/v1/tenants/${tenantId}/customer-profiles`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  updateCustomerProfile(
+    accessToken: string,
+    tenantId: string,
+    customerProfileId: string,
+    payload: {
+      full_name?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      gstin?: string | null;
+      default_note?: string | null;
+      tags?: string[];
+    },
+  ) {
+    return request<ControlPlaneCustomerProfile>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  archiveCustomerProfile(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<ControlPlaneCustomerProfile>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/archive`,
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  reactivateCustomerProfile(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<ControlPlaneCustomerProfile>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/reactivate`,
+      {
+        method: 'POST',
+      },
       accessToken,
     );
   },
