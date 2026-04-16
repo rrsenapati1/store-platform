@@ -157,13 +157,10 @@ class PromotionService:
         await self._session.flush()
 
     async def _require_code_by_id(self, *, tenant_id: str, promotion_code_id: str):
-        campaigns = await self._promotion_repo.list_campaigns(tenant_id=tenant_id)
-        for campaign in campaigns:
-            codes = await self._promotion_repo.list_codes_for_campaign(tenant_id=tenant_id, campaign_id=campaign.id)
-            for code in codes:
-                if code.id == promotion_code_id:
-                    return code
+        record = await self._promotion_repo.get_code_by_id(tenant_id=tenant_id, promotion_code_id=promotion_code_id)
+        if record is None:
             raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Promotion code not found")
+        return record
 
     async def _require_tenant(self, tenant_id: str) -> None:
         tenant = await self._tenant_repo.get_tenant(tenant_id)

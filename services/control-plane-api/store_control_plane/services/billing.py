@@ -9,6 +9,7 @@ from .billing_policy import build_sale_draft, ensure_sale_stock_available, sale_
 from .customer_profiles import CustomerProfileService
 from .exchange_policy import build_exchange_settlement
 from .loyalty import LoyaltyService
+from .promotions import PromotionService
 from .returns_policy import build_sale_return_draft, credit_note_number, ensure_refund_amount_allowed
 from .store_credit import StoreCreditService
 
@@ -23,6 +24,7 @@ class BillingService:
         self._audit_repo = AuditRepository(session)
         self._customer_profile_service = CustomerProfileService(session)
         self._loyalty_service = LoyaltyService(session)
+        self._promotion_service = PromotionService(session)
         self._store_credit_service = StoreCreditService(session)
 
     async def create_sale(
@@ -35,6 +37,8 @@ class BillingService:
         customer_name: str,
         customer_gstin: str | None,
         payment_method: str,
+        promotion_code: str | None = None,
+        promotion_snapshot: dict[str, object] | None = None,
         store_credit_amount: float = 0.0,
         loyalty_points_to_redeem: int = 0,
         lines: list[dict[str, float | str]],
@@ -83,6 +87,15 @@ class BillingService:
         except ValueError as error:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
+        promotion_application = await self._resolve_promotion_application(
+            tenant_id=tenant_id,
+            sale_total=draft.grand_total,
+            promotion_code=promotion_code,
+            promotion_snapshot=promotion_snapshot,
+        )
+        promotion_discount_amount = round(float(promotion_application["promotion_discount_amount"]), 2)
+        discounted_sale_total = round(draft.grand_total - promotion_discount_amount, 2)
+
         loyalty_points_to_redeem = int(loyalty_points_to_redeem or 0)
         loyalty_points_redeemed = 0
         loyalty_discount_amount = 0.0
@@ -96,12 +109,12 @@ class BillingService:
                 tenant_id=tenant_id,
                 customer_profile_id=customer_profile_id,
                 points_to_redeem=loyalty_points_to_redeem,
-                sale_total=draft.grand_total,
+                sale_total=discounted_sale_total,
             )
             loyalty_points_redeemed = int(loyalty_redemption["points_to_redeem"])
             loyalty_discount_amount = round(float(loyalty_redemption["discount_amount"]), 2)
 
-        net_sale_total = round(draft.grand_total - loyalty_discount_amount, 2)
+        net_sale_total = round(discounted_sale_total - loyalty_discount_amount, 2)
         store_credit_amount = round(float(store_credit_amount or 0.0), 2)
         if store_credit_amount > 0:
             if customer_profile_id is None:
@@ -156,6 +169,10 @@ class BillingService:
             customer_profile_id=customer_profile_id,
             customer_name=draft.customer_name,
             customer_gstin=draft.customer_gstin,
+            promotion_campaign_id=promotion_application["promotion_campaign_id"],
+            promotion_code_id=promotion_application["promotion_code_id"],
+            promotion_code=promotion_application["promotion_code"],
+            promotion_discount_amount=promotion_discount_amount,
             invoice_kind=draft.invoice_kind,
             irn_status=draft.irn_status,
             issued_on=utc_now().date(),
@@ -193,6 +210,11 @@ class BillingService:
                 for line in draft.tax_lines
             ],
         )
+        if promotion_application["promotion_code_id"] is not None:
+            await self._promotion_service.mark_code_redeemed(
+                tenant_id=tenant_id,
+                promotion_code_id=str(promotion_application["promotion_code_id"]),
+            )
         if store_credit_amount > 0:
             await self._store_credit_service.redeem_customer_store_credit(
                 tenant_id=tenant_id,
@@ -286,6 +308,10 @@ class BillingService:
                 "irn_status": sale.irn_status,
                 "payment_method": self._payment_summary(payments)["payment_method"],
                 "grand_total": sale.grand_total,
+                "promotion_campaign_id": sale.promotion_campaign_id,
+                "promotion_code_id": sale.promotion_code_id,
+                "promotion_code": sale.promotion_code,
+                "promotion_discount_amount": sale.promotion_discount_amount,
                 "store_credit_amount": round(
                     sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
                     2,
@@ -640,6 +666,10 @@ class BillingService:
             customer_profile_id=sale_bundle.sale.customer_profile_id,
             customer_name=replacement_draft.customer_name,
             customer_gstin=replacement_draft.customer_gstin,
+            promotion_campaign_id=None,
+            promotion_code_id=None,
+            promotion_code=None,
+            promotion_discount_amount=0.0,
             invoice_kind=replacement_draft.invoice_kind,
             irn_status=replacement_draft.irn_status,
             issued_on=utc_now().date(),
@@ -880,6 +910,10 @@ class BillingService:
             "sgst_total": invoice.sgst_total,
             "igst_total": invoice.igst_total,
             "grand_total": invoice.grand_total,
+            "promotion_campaign_id": sale.promotion_campaign_id,
+            "promotion_code_id": sale.promotion_code_id,
+            "promotion_code": sale.promotion_code,
+            "promotion_discount_amount": sale.promotion_discount_amount,
             "store_credit_amount": round(
                 sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
                 2,
@@ -912,6 +946,50 @@ class BillingService:
                 }
                 for line in tax_lines
             ],
+        }
+
+    async def _resolve_promotion_application(
+        self,
+        *,
+        tenant_id: str,
+        sale_total: float,
+        promotion_code: str | None,
+        promotion_snapshot: dict[str, object] | None,
+    ) -> dict[str, object]:
+        if promotion_code and promotion_snapshot:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Promotion code and promotion snapshot cannot both be supplied",
+            )
+        if promotion_snapshot is not None:
+            discount_amount = round(float(promotion_snapshot.get("promotion_discount_amount", 0.0) or 0.0), 2)
+            if discount_amount < 0:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion discount amount must be non-negative")
+            if discount_amount > round(float(sale_total), 2):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion discount amount cannot exceed sale total")
+            return {
+                "promotion_campaign_id": promotion_snapshot.get("promotion_campaign_id"),
+                "promotion_code_id": promotion_snapshot.get("promotion_code_id"),
+                "promotion_code": promotion_snapshot.get("promotion_code"),
+                "promotion_discount_amount": discount_amount,
+            }
+        if not promotion_code:
+            return {
+                "promotion_campaign_id": None,
+                "promotion_code_id": None,
+                "promotion_code": None,
+                "promotion_discount_amount": 0.0,
+            }
+        validated = await self._promotion_service.validate_promotion_code(
+            tenant_id=tenant_id,
+            promotion_code=promotion_code,
+            sale_total=sale_total,
+        )
+        return {
+            "promotion_campaign_id": validated["campaign"].id,
+            "promotion_code_id": validated["code"].id,
+            "promotion_code": validated["code"].code,
+            "promotion_discount_amount": round(float(validated["discount_amount"]), 2),
         }
 
     def _payment_summary(self, payments) -> dict[str, object]:

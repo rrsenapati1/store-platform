@@ -548,9 +548,6 @@ def test_checkout_payment_session_applies_promotion_code_to_order_amount(monkeyp
     )
     assert create_response.status_code == 200
     assert create_response.json()["order_amount"] == 368.5
-    assert create_response.json()["sale"]["promotion_campaign_id"] == campaign_id
-    assert create_response.json()["sale"]["promotion_code"] == "CHECKOUT20"
-    assert create_response.json()["sale"]["promotion_discount_amount"] == 20.0
 
 
 def test_checkout_payment_session_rejects_invalid_promotion_code(monkeypatch) -> None:

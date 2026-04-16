@@ -15,6 +15,7 @@ class SaleCreateRequest(BaseModel):
     customer_name: str
     customer_gstin: str | None = None
     payment_method: str
+    promotion_code: str | None = None
     store_credit_amount: float = Field(default=0, ge=0)
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
@@ -28,6 +29,7 @@ class CheckoutPaymentSessionCreateRequest(BaseModel):
     customer_profile_id: str | None = None
     customer_name: str
     customer_gstin: str | None = None
+    promotion_code: str | None = None
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
 
@@ -60,6 +62,8 @@ class CheckoutPaymentSessionResponse(BaseModel):
     provider_status: str
     order_amount: float
     currency_code: str
+    promotion_code: str | None = None
+    promotion_discount_amount: float = 0
     action_payload: CheckoutPaymentActionPayloadResponse
     action_expires_at: datetime | None = None
     qr_payload: CheckoutPaymentQrPayloadResponse | None = None
@@ -121,6 +125,10 @@ class SaleResponse(BaseModel):
     sgst_total: float
     igst_total: float
     grand_total: float
+    promotion_campaign_id: str | None = None
+    promotion_code_id: str | None = None
+    promotion_code: str | None = None
+    promotion_discount_amount: float = 0
     store_credit_amount: float = 0
     loyalty_points_redeemed: int = 0
     loyalty_discount_amount: float = 0
@@ -139,6 +147,10 @@ class SaleRecord(BaseModel):
     irn_status: str
     payment_method: str
     grand_total: float
+    promotion_campaign_id: str | None = None
+    promotion_code_id: str | None = None
+    promotion_code: str | None = None
+    promotion_discount_amount: float = 0
     store_credit_amount: float = 0
     loyalty_points_redeemed: int = 0
     loyalty_discount_amount: float = 0

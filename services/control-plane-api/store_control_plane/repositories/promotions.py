@@ -72,6 +72,13 @@ class PromotionRepository:
         )
         return await self._session.scalar(statement)
 
+    async def get_code_by_id(self, *, tenant_id: str, promotion_code_id: str) -> PromotionCode | None:
+        statement = select(PromotionCode).where(
+            PromotionCode.tenant_id == tenant_id,
+            PromotionCode.id == promotion_code_id,
+        )
+        return await self._session.scalar(statement)
+
     async def create_code(
         self,
         *,

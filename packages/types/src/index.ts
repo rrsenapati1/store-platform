@@ -1441,6 +1441,10 @@ export interface ControlPlaneSale {
   sgst_total: number;
   igst_total: number;
   grand_total: number;
+  promotion_campaign_id?: string | null;
+  promotion_code_id?: string | null;
+  promotion_code?: string | null;
+  promotion_discount_amount: number;
   store_credit_amount: number;
   loyalty_points_redeemed: number;
   loyalty_discount_amount: number;
@@ -1459,6 +1463,10 @@ export interface ControlPlaneSaleRecord {
   irn_status: string;
   payment_method: string;
   grand_total: number;
+  promotion_campaign_id?: string | null;
+  promotion_code_id?: string | null;
+  promotion_code?: string | null;
+  promotion_discount_amount: number;
   store_credit_amount: number;
   loyalty_points_redeemed: number;
   loyalty_discount_amount: number;
@@ -1482,6 +1490,8 @@ export interface ControlPlaneCheckoutPaymentSession {
   provider_status: string;
   order_amount: number;
   currency_code: string;
+  promotion_code?: string | null;
+  promotion_discount_amount: number;
   action_payload: ControlPlaneCheckoutPaymentActionPayload;
   action_expires_at?: string | null;
   qr_payload?: ControlPlaneCheckoutPaymentQrPayload | null;
@@ -1494,6 +1504,38 @@ export interface ControlPlaneCheckoutPaymentSession {
 
 export interface ControlPlaneCheckoutPaymentSessionListResponse {
   records: ControlPlaneCheckoutPaymentSession[];
+}
+
+export interface ControlPlanePromotionCode {
+  id: string;
+  tenant_id: string;
+  campaign_id: string;
+  code: string;
+  status: string;
+  redemption_limit_per_code?: number | null;
+  redemption_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ControlPlanePromotionCampaign {
+  id: string;
+  tenant_id: string;
+  name: string;
+  status: string;
+  discount_type: string;
+  discount_value: number;
+  minimum_order_amount?: number | null;
+  maximum_discount_amount?: number | null;
+  redemption_limit_total?: number | null;
+  redemption_count: number;
+  created_at: string;
+  updated_at: string;
+  codes: ControlPlanePromotionCode[];
+}
+
+export interface ControlPlanePromotionCampaignListResponse {
+  records: ControlPlanePromotionCampaign[];
 }
 
 export interface ControlPlaneCustomerProfile {

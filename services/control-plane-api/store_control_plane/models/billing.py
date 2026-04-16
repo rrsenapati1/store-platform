@@ -17,6 +17,18 @@ class Sale(Base, TimestampMixin):
     customer_profile_id: Mapped[str | None] = mapped_column(ForeignKey("customer_profiles.id", ondelete="SET NULL"), default=None, index=True)
     customer_name: Mapped[str] = mapped_column(String(255))
     customer_gstin: Mapped[str | None] = mapped_column(String(32), default=None)
+    promotion_campaign_id: Mapped[str | None] = mapped_column(
+        ForeignKey("promotion_campaigns.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
+    promotion_code_id: Mapped[str | None] = mapped_column(
+        ForeignKey("promotion_codes.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
+    promotion_code: Mapped[str | None] = mapped_column(String(64), default=None)
+    promotion_discount_amount: Mapped[float] = mapped_column(default=0.0)
     invoice_kind: Mapped[str] = mapped_column(String(16))
     irn_status: Mapped[str] = mapped_column(String(32), default="NOT_REQUIRED")
     loyalty_points_redeemed: Mapped[int] = mapped_column(default=0)

@@ -14,6 +14,7 @@ from .billing_policy import build_sale_draft, ensure_sale_stock_available
 from .checkout_payment_providers import build_checkout_payment_provider
 from .customer_profiles import CustomerProfileService
 from .loyalty import LoyaltyService
+from .promotions import PromotionService
 
 
 class CheckoutPaymentsService:
@@ -28,6 +29,7 @@ class CheckoutPaymentsService:
         self._billing_service = BillingService(session)
         self._customer_profile_service = CustomerProfileService(session)
         self._loyalty_service = LoyaltyService(session)
+        self._promotion_service = PromotionService(session)
 
     async def create_checkout_payment_session(
         self,
@@ -42,6 +44,7 @@ class CheckoutPaymentsService:
         customer_profile_id: str | None,
         customer_name: str,
         customer_gstin: str | None,
+        promotion_code: str | None,
         loyalty_points_to_redeem: int,
         lines: list[dict[str, object]],
     ) -> dict[str, object]:
@@ -59,6 +62,7 @@ class CheckoutPaymentsService:
             customer_profile_id=customer_profile_id,
             customer_name=customer_name,
             customer_gstin=customer_gstin,
+            promotion_code=promotion_code,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
             lines=lines,
         )
@@ -225,6 +229,7 @@ class CheckoutPaymentsService:
             customer_profile_id=record.customer_profile_id,
             customer_name=record.customer_name,
             customer_gstin=record.customer_gstin,
+            promotion_code=record.cart_snapshot.get("promotion_code"),
             loyalty_points_to_redeem=int(record.cart_snapshot.get("loyalty_points_to_redeem", 0)),
             lines=lines,
         )
@@ -310,6 +315,7 @@ class CheckoutPaymentsService:
         customer_profile_id: str | None,
         customer_name: str,
         customer_gstin: str | None,
+        promotion_code: str | None,
         loyalty_points_to_redeem: int,
         lines: list[dict[str, object]],
     ):
@@ -353,6 +359,25 @@ class CheckoutPaymentsService:
         except ValueError as error:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
+        promotion_snapshot = {
+            "promotion_campaign_id": None,
+            "promotion_code_id": None,
+            "promotion_code": None,
+            "promotion_discount_amount": 0.0,
+        }
+        if promotion_code:
+            validated = await self._promotion_service.validate_promotion_code(
+                tenant_id=tenant_id,
+                promotion_code=promotion_code,
+                sale_total=draft.grand_total,
+            )
+            promotion_snapshot = {
+                "promotion_campaign_id": validated["campaign"].id,
+                "promotion_code_id": validated["code"].id,
+                "promotion_code": validated["code"].code,
+                "promotion_discount_amount": round(float(validated["discount_amount"]), 2),
+            }
+
         for line in draft.lines:
             available_quantity = await self._inventory_repo.stock_on_hand(
                 tenant_id=tenant_id,
@@ -368,6 +393,10 @@ class CheckoutPaymentsService:
             "points_to_redeem": 0,
             "discount_amount": 0.0,
         }
+        discounted_order_amount = round(
+            draft.grand_total - float(promotion_snapshot["promotion_discount_amount"]),
+            2,
+        )
         if loyalty_points_to_redeem > 0:
             if customer_profile_id is None:
                 raise HTTPException(
@@ -378,14 +407,17 @@ class CheckoutPaymentsService:
                 tenant_id=tenant_id,
                 customer_profile_id=customer_profile_id,
                 points_to_redeem=loyalty_points_to_redeem,
-                sale_total=draft.grand_total,
+                sale_total=discounted_order_amount,
             )
 
-        net_order_amount = round(draft.grand_total - float(loyalty_redemption["discount_amount"]), 2)
+        net_order_amount = round(discounted_order_amount - float(loyalty_redemption["discount_amount"]), 2)
         cart_snapshot = {
             "customer_profile_id": customer_profile_id,
             "customer_name": draft.customer_name,
             "customer_gstin": draft.customer_gstin,
+            "promotion_code": promotion_snapshot["promotion_code"],
+            "promotion_discount_amount": float(promotion_snapshot["promotion_discount_amount"]),
+            "promotion": promotion_snapshot,
             "loyalty_points_to_redeem": int(loyalty_redemption["points_to_redeem"]),
             "loyalty_discount_amount": float(loyalty_redemption["discount_amount"]),
             "net_order_amount": net_order_amount,
@@ -502,6 +534,7 @@ class CheckoutPaymentsService:
                 customer_name=record.customer_name,
                 customer_gstin=record.customer_gstin,
                 payment_method=record.payment_method,
+                promotion_snapshot=record.cart_snapshot.get("promotion"),
                 loyalty_points_to_redeem=int(record.cart_snapshot.get("loyalty_points_to_redeem", 0)),
                 lines=list(record.cart_snapshot.get("lines", [])),
                 auto_commit=False,
@@ -595,6 +628,8 @@ class CheckoutPaymentsService:
             "provider_status": record.provider_status,
             "order_amount": record.order_amount,
             "currency_code": record.currency_code,
+            "promotion_code": record.cart_snapshot.get("promotion_code"),
+            "promotion_discount_amount": float(record.cart_snapshot.get("promotion_discount_amount", 0.0)),
             "action_payload": record.action_payload,
             "action_expires_at": record.action_expires_at,
             "qr_payload": qr_payload,
