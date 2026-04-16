@@ -4,8 +4,10 @@ import type {
   ControlPlaneBranchCustomerReport,
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
+  ControlPlaneCustomerLoyalty,
   ControlPlaneCustomerProfile,
   ControlPlaneCustomerStoreCredit,
+  ControlPlaneLoyaltyProgram,
 } from '@store/types';
 import { ownerControlPlaneClient } from './client';
 
@@ -24,6 +26,24 @@ type CustomerProfileDraft = {
   tags: string;
 };
 
+type LoyaltyProgramDraft = {
+  status: string;
+  earnPointsPerCurrencyUnit: string;
+  redeemStepPoints: string;
+  redeemValuePerStep: string;
+  minimumRedeemPoints: string;
+};
+
+function defaultLoyaltyProgramDraft(): LoyaltyProgramDraft {
+  return {
+    status: 'DISABLED',
+    earnPointsPerCurrencyUnit: '0',
+    redeemStepPoints: '100',
+    redeemValuePerStep: '0',
+    minimumRedeemPoints: '0',
+  };
+}
+
 function buildProfileDraft(profile: ControlPlaneCustomerProfile): CustomerProfileDraft {
   return {
     fullName: profile.full_name,
@@ -32,6 +52,16 @@ function buildProfileDraft(profile: ControlPlaneCustomerProfile): CustomerProfil
     gstin: profile.gstin ?? '',
     defaultNote: profile.default_note ?? '',
     tags: profile.tags.join(', '),
+  };
+}
+
+function buildLoyaltyProgramDraft(program: ControlPlaneLoyaltyProgram): LoyaltyProgramDraft {
+  return {
+    status: program.status,
+    earnPointsPerCurrencyUnit: String(program.earn_points_per_currency_unit),
+    redeemStepPoints: String(program.redeem_step_points),
+    redeemValuePerStep: String(program.redeem_value_per_step),
+    minimumRedeemPoints: String(program.minimum_redeem_points),
   };
 }
 
@@ -52,6 +82,9 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<ControlPlaneCustomerProfile | null>(null);
   const [selectedStoreCredit, setSelectedStoreCredit] = useState<ControlPlaneCustomerStoreCredit | null>(null);
+  const [selectedCustomerLoyalty, setSelectedCustomerLoyalty] = useState<ControlPlaneCustomerLoyalty | null>(null);
+  const [loyaltyProgram, setLoyaltyProgram] = useState<ControlPlaneLoyaltyProgram | null>(null);
+  const [loyaltyProgramDraft, setLoyaltyProgramDraft] = useState<LoyaltyProgramDraft>(defaultLoyaltyProgramDraft());
   const [profileDraft, setProfileDraft] = useState<CustomerProfileDraft>({
     fullName: '',
     phone: '',
@@ -60,6 +93,8 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     defaultNote: '',
     tags: '',
   });
+  const [loyaltyAdjustmentDelta, setLoyaltyAdjustmentDelta] = useState('');
+  const [loyaltyAdjustmentNote, setLoyaltyAdjustmentNote] = useState('');
   const [issueAmount, setIssueAmount] = useState('');
   const [issueNote, setIssueNote] = useState('');
   const [adjustmentDelta, setAdjustmentDelta] = useState('');
@@ -75,11 +110,18 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setAdjustmentNote('');
   }
 
+  function clearLoyaltyDrafts() {
+    setLoyaltyAdjustmentDelta('');
+    setLoyaltyAdjustmentNote('');
+  }
+
   function applySelectedProfile(profile: ControlPlaneCustomerProfile | null) {
     setSelectedProfile(profile);
     setSelectedCustomerId(profile?.id ?? '');
     setSelectedStoreCredit(null);
+    setSelectedCustomerLoyalty(null);
     clearStoreCreditDrafts();
+    clearLoyaltyDrafts();
     setProfileDraft(
       profile
         ? buildProfileDraft(profile)
@@ -107,10 +149,12 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
         branchId ? ownerControlPlaneClient.getBranchCustomerReport(accessToken, tenantId, branchId) : Promise.resolve(null),
       ]);
       const nextProfileId = profilesResponse.records[0]?.id ?? '';
-      const [profile, history, storeCredit] = await Promise.all([
+      const [profile, history, storeCredit, customerLoyalty, tenantLoyaltyProgram] = await Promise.all([
         nextProfileId ? ownerControlPlaneClient.getCustomerProfile(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
         nextProfileId ? ownerControlPlaneClient.getCustomerHistory(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
         nextProfileId ? ownerControlPlaneClient.getCustomerStoreCredit(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
+        nextProfileId ? ownerControlPlaneClient.getCustomerLoyalty(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
+        ownerControlPlaneClient.getLoyaltyProgram(accessToken, tenantId),
       ]);
       startTransition(() => {
         setCustomerProfiles(profilesResponse.records);
@@ -119,6 +163,9 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
         applySelectedProfile(profile);
         setCustomerHistory(history);
         setSelectedStoreCredit(storeCredit);
+        setSelectedCustomerLoyalty(customerLoyalty);
+        setLoyaltyProgram(tenantLoyaltyProgram);
+        setLoyaltyProgramDraft(buildLoyaltyProgramDraft(tenantLoyaltyProgram));
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer insights');
@@ -134,15 +181,17 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const [profile, history, storeCredit] = await Promise.all([
+      const [profile, history, storeCredit, customerLoyalty] = await Promise.all([
         ownerControlPlaneClient.getCustomerProfile(accessToken, tenantId, customerProfileId),
         ownerControlPlaneClient.getCustomerHistory(accessToken, tenantId, customerProfileId),
         ownerControlPlaneClient.getCustomerStoreCredit(accessToken, tenantId, customerProfileId),
+        ownerControlPlaneClient.getCustomerLoyalty(accessToken, tenantId, customerProfileId),
       ]);
       startTransition(() => {
         applySelectedProfile(profile);
         setCustomerHistory(history);
         setSelectedStoreCredit(storeCredit);
+        setSelectedCustomerLoyalty(customerLoyalty);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer profile');
@@ -159,6 +208,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setErrorMessage('');
     try {
       const currentStoreCredit = selectedStoreCredit;
+      const currentCustomerLoyalty = selectedCustomerLoyalty;
       const updated = await ownerControlPlaneClient.updateCustomerProfile(accessToken, tenantId, selectedProfile.id, {
         full_name: profileDraft.fullName,
         phone: profileDraft.phone || null,
@@ -174,6 +224,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
         setCustomerProfiles((current) => current.map((record) => (record.id === updated.id ? updated : record)));
         applySelectedProfile(updated);
         setSelectedStoreCredit(currentStoreCredit);
+        setSelectedCustomerLoyalty(currentCustomerLoyalty);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to save customer profile');
@@ -190,11 +241,13 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setErrorMessage('');
     try {
       const currentStoreCredit = selectedStoreCredit;
+      const currentCustomerLoyalty = selectedCustomerLoyalty;
       const updated = await ownerControlPlaneClient.archiveCustomerProfile(accessToken, tenantId, selectedProfile.id);
       startTransition(() => {
         setCustomerProfiles((current) => current.map((record) => (record.id === updated.id ? updated : record)));
         applySelectedProfile(updated);
         setSelectedStoreCredit(currentStoreCredit);
+        setSelectedCustomerLoyalty(currentCustomerLoyalty);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to archive customer profile');
@@ -211,14 +264,79 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setErrorMessage('');
     try {
       const currentStoreCredit = selectedStoreCredit;
+      const currentCustomerLoyalty = selectedCustomerLoyalty;
       const updated = await ownerControlPlaneClient.reactivateCustomerProfile(accessToken, tenantId, selectedProfile.id);
       startTransition(() => {
         setCustomerProfiles((current) => current.map((record) => (record.id === updated.id ? updated : record)));
         applySelectedProfile(updated);
         setSelectedStoreCredit(currentStoreCredit);
+        setSelectedCustomerLoyalty(currentCustomerLoyalty);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to reactivate customer profile');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function saveLoyaltyProgram() {
+    if (!accessToken || !tenantId) {
+      return;
+    }
+    const earnPointsPerCurrencyUnit = Number(loyaltyProgramDraft.earnPointsPerCurrencyUnit);
+    const redeemStepPoints = Number(loyaltyProgramDraft.redeemStepPoints);
+    const redeemValuePerStep = Number(loyaltyProgramDraft.redeemValuePerStep);
+    const minimumRedeemPoints = Number(loyaltyProgramDraft.minimumRedeemPoints);
+    if (
+      !Number.isFinite(earnPointsPerCurrencyUnit) ||
+      !Number.isFinite(redeemStepPoints) ||
+      !Number.isFinite(redeemValuePerStep) ||
+      !Number.isFinite(minimumRedeemPoints)
+    ) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const updated = await ownerControlPlaneClient.updateLoyaltyProgram(accessToken, tenantId, {
+        status: loyaltyProgramDraft.status || 'DISABLED',
+        earn_points_per_currency_unit: earnPointsPerCurrencyUnit,
+        redeem_step_points: redeemStepPoints,
+        redeem_value_per_step: redeemValuePerStep,
+        minimum_redeem_points: minimumRedeemPoints,
+      });
+      startTransition(() => {
+        setLoyaltyProgram(updated);
+        setLoyaltyProgramDraft(buildLoyaltyProgramDraft(updated));
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to save loyalty program');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function adjustSelectedCustomerLoyalty() {
+    if (!accessToken || !tenantId || !selectedProfile) {
+      return;
+    }
+    const pointsDelta = Number(loyaltyAdjustmentDelta);
+    if (!Number.isFinite(pointsDelta) || pointsDelta === 0) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const nextCustomerLoyalty = await ownerControlPlaneClient.adjustCustomerLoyalty(accessToken, tenantId, selectedProfile.id, {
+        points_delta: pointsDelta,
+        note: loyaltyAdjustmentNote || null,
+      });
+      startTransition(() => {
+        setSelectedCustomerLoyalty(nextCustomerLoyalty);
+        clearLoyaltyDrafts();
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to adjust loyalty');
     } finally {
       setIsBusy(false);
     }
@@ -312,6 +430,66 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
           />
         </div>
       ) : null}
+
+      <div style={{ marginTop: '20px' }}>
+        <h3 style={{ marginBottom: '10px' }}>Loyalty program</h3>
+        <FormField
+          id="loyalty-program-status"
+          label="Loyalty program status"
+          value={loyaltyProgramDraft.status}
+          onChange={(value) => setLoyaltyProgramDraft((current) => ({ ...current, status: value.toUpperCase() }))}
+        />
+        <FormField
+          id="loyalty-earn-rate"
+          label="Earn points per currency unit"
+          value={loyaltyProgramDraft.earnPointsPerCurrencyUnit}
+          onChange={(value) =>
+            setLoyaltyProgramDraft((current) => ({ ...current, earnPointsPerCurrencyUnit: value }))
+          }
+        />
+        <FormField
+          id="loyalty-redeem-step-points"
+          label="Redeem step points"
+          value={loyaltyProgramDraft.redeemStepPoints}
+          onChange={(value) => setLoyaltyProgramDraft((current) => ({ ...current, redeemStepPoints: value }))}
+        />
+        <FormField
+          id="loyalty-redeem-value"
+          label="Redeem value per step"
+          value={loyaltyProgramDraft.redeemValuePerStep}
+          onChange={(value) => setLoyaltyProgramDraft((current) => ({ ...current, redeemValuePerStep: value }))}
+        />
+        <FormField
+          id="loyalty-minimum-redeem-points"
+          label="Minimum redeem points"
+          value={loyaltyProgramDraft.minimumRedeemPoints}
+          onChange={(value) => setLoyaltyProgramDraft((current) => ({ ...current, minimumRedeemPoints: value }))}
+        />
+        <ActionButton onClick={() => void saveLoyaltyProgram()} disabled={isBusy || !accessToken || !tenantId}>
+          Save loyalty program
+        </ActionButton>
+        {loyaltyProgram ? (
+          <div style={{ marginTop: '12px' }}>
+            <DetailList
+              items={[
+                { label: 'Current loyalty status', value: loyaltyProgram.status },
+                {
+                  label: 'Current earn rate',
+                  value: String(loyaltyProgram.earn_points_per_currency_unit),
+                },
+                {
+                  label: 'Current redeem step',
+                  value: `${loyaltyProgram.redeem_step_points} -> ${loyaltyProgram.redeem_value_per_step}`,
+                },
+                {
+                  label: 'Current minimum redeem points',
+                  value: String(loyaltyProgram.minimum_redeem_points),
+                },
+              ]}
+            />
+          </div>
+        ) : null}
+      </div>
 
       <div style={{ marginTop: '16px' }}>
         <FormField
@@ -437,6 +615,48 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
                   {selectedStoreCredit.ledger_entries.map((entry) => (
                     <li key={entry.id}>
                       {entry.entry_type} {entry.source_type} {entry.amount} {entry.note ? `- ${entry.note}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          {selectedCustomerLoyalty ? (
+            <div style={{ marginTop: '20px' }}>
+              <h3 style={{ marginBottom: '10px' }}>Loyalty points</h3>
+              <DetailList
+                items={[
+                  { label: 'Available loyalty points', value: String(selectedCustomerLoyalty.available_points) },
+                  { label: 'Earned total', value: String(selectedCustomerLoyalty.earned_total) },
+                  { label: 'Redeemed total', value: String(selectedCustomerLoyalty.redeemed_total) },
+                  { label: 'Adjusted total', value: String(selectedCustomerLoyalty.adjusted_total) },
+                ]}
+              />
+
+              <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
+                <FormField
+                  id="adjust-loyalty-delta"
+                  label="Adjust loyalty points delta"
+                  value={loyaltyAdjustmentDelta}
+                  onChange={setLoyaltyAdjustmentDelta}
+                />
+                <FormField
+                  id="adjust-loyalty-note"
+                  label="Adjust loyalty note"
+                  value={loyaltyAdjustmentNote}
+                  onChange={setLoyaltyAdjustmentNote}
+                />
+                <ActionButton onClick={() => void adjustSelectedCustomerLoyalty()} disabled={isBusy || !selectedProfile}>
+                  Adjust loyalty points
+                </ActionButton>
+              </div>
+
+              {selectedCustomerLoyalty.ledger_entries.length ? (
+                <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
+                  {selectedCustomerLoyalty.ledger_entries.map((entry) => (
+                    <li key={entry.id}>
+                      {entry.entry_type} {entry.source_type} {entry.points_delta} {entry.note ? `- ${entry.note}` : ''}
                     </li>
                   ))}
                 </ul>

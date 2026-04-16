@@ -1442,6 +1442,9 @@ export interface ControlPlaneSale {
   igst_total: number;
   grand_total: number;
   store_credit_amount: number;
+  loyalty_points_redeemed: number;
+  loyalty_discount_amount: number;
+  loyalty_points_earned: number;
   payment: ControlPlanePayment;
   lines: ControlPlaneSaleLine[];
   tax_lines: ControlPlaneInvoiceTaxLine[];
@@ -1457,6 +1460,9 @@ export interface ControlPlaneSaleRecord {
   payment_method: string;
   grand_total: number;
   store_credit_amount: number;
+  loyalty_points_redeemed: number;
+  loyalty_discount_amount: number;
+  loyalty_points_earned: number;
   issued_on: string;
 }
 
@@ -1504,6 +1510,14 @@ export interface ControlPlaneCustomerProfile {
   updated_at: string;
 }
 
+export interface ControlPlaneLoyaltyProgram {
+  status: string;
+  earn_points_per_currency_unit: number;
+  redeem_step_points: number;
+  redeem_value_per_step: number;
+  minimum_redeem_points: number;
+}
+
 export interface ControlPlaneCustomerStoreCreditLot {
   id: string;
   source_type: string;
@@ -1536,6 +1550,27 @@ export interface ControlPlaneCustomerStoreCredit {
   adjusted_total: number;
   lots: ControlPlaneCustomerStoreCreditLot[];
   ledger_entries: ControlPlaneCustomerStoreCreditLedgerEntry[];
+}
+
+export interface ControlPlaneCustomerLoyaltyLedgerEntry {
+  id: string;
+  entry_type: string;
+  source_type: string;
+  source_reference_id?: string | null;
+  points_delta: number;
+  balance_after: number;
+  note?: string | null;
+  branch_id?: string | null;
+  created_at: string;
+}
+
+export interface ControlPlaneCustomerLoyalty {
+  customer_profile_id: string;
+  available_points: number;
+  earned_total: number;
+  redeemed_total: number;
+  adjusted_total: number;
+  ledger_entries: ControlPlaneCustomerLoyaltyLedgerEntry[];
 }
 
 export interface ControlPlaneCustomerDirectoryRecord {

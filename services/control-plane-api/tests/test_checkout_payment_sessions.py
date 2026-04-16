@@ -140,14 +140,18 @@ def _payment_session_payload(
     payment_method: str = "CASHFREE_UPI_QR",
     handoff_surface: str | None = None,
     provider_payment_mode: str | None = None,
+    customer_profile_id: str | None = None,
+    loyalty_points_to_redeem: int = 0,
 ) -> dict[str, object]:
     return {
         "provider_name": "cashfree",
         "payment_method": payment_method,
         "handoff_surface": handoff_surface,
         "provider_payment_mode": provider_payment_mode,
+        "customer_profile_id": customer_profile_id,
         "customer_name": "Acme Traders",
         "customer_gstin": "29AAEPM0111C1Z3",
+        "loyalty_points_to_redeem": loyalty_points_to_redeem,
         "lines": [{"product_id": product_id, "quantity": 4}],
     }
 
@@ -396,6 +400,103 @@ def test_confirmed_cashfree_checkout_session_finalizes_single_sale_and_decrement
     )
     assert inventory_snapshot.status_code == 200
     assert inventory_snapshot.json()["records"][0]["stock_on_hand"] == 20.0
+
+
+def test_checkout_payment_session_applies_loyalty_redemption_before_provider_finalization(monkeypatch) -> None:
+    secret = "cashfree-secret"
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", secret)
+    database_url = sqlite_test_database_url("checkout-payment-session-loyalty")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+    customer_profile = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles",
+        headers=context["owner_headers"],
+        json={
+            "full_name": "Acme Traders",
+            "phone": "+919999999999",
+            "email": "billing@acme.example",
+            "gstin": "29AAEPM0111C1Z3",
+            "default_note": "Wholesale customer",
+            "tags": ["wholesale"],
+        },
+    )
+    assert customer_profile.status_code == 200
+    customer_profile_id = customer_profile.json()["id"]
+
+    loyalty_program = client.put(
+        f"/v1/tenants/{context['tenant_id']}/loyalty-program",
+        headers=context["owner_headers"],
+        json={
+            "status": "ACTIVE",
+            "earn_points_per_currency_unit": 1.0,
+            "redeem_step_points": 100,
+            "redeem_value_per_step": 10.0,
+            "minimum_redeem_points": 200,
+        },
+    )
+    assert loyalty_program.status_code == 200
+
+    loyalty_adjustment = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/loyalty/adjust",
+        headers=context["owner_headers"],
+        json={"points_delta": 300, "note": "Welcome points"},
+    )
+    assert loyalty_adjustment.status_code == 200
+
+    create_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            customer_profile_id=customer_profile_id,
+            loyalty_points_to_redeem=200,
+        ),
+    )
+    assert create_response.status_code == 200
+    assert create_response.json()["order_amount"] == 368.5
+    session_id = create_response.json()["id"]
+    provider_order_id = create_response.json()["provider_order_id"]
+
+    payload = _cashfree_success_webhook(provider_order_id=provider_order_id)
+    payload_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    timestamp = "1744699200001"
+    signature = _cashfree_signature(secret, payload_bytes, timestamp)
+
+    webhook = client.post(
+        "/v1/billing/webhooks/cashfree/payments",
+        headers={
+            "x-webhook-signature": signature,
+            "x-webhook-timestamp": timestamp,
+            "x-webhook-version": "2023-08-01",
+            "content-type": "application/json",
+        },
+        content=payload_bytes,
+    )
+    assert webhook.status_code == 200
+
+    session_response = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions/{session_id}",
+        headers=context["cashier_headers"],
+    )
+    assert session_response.status_code == 200
+    assert session_response.json()["sale"]["loyalty_points_redeemed"] == 200
+    assert session_response.json()["sale"]["loyalty_discount_amount"] == 20.0
+    assert session_response.json()["sale"]["loyalty_points_earned"] == 368
+
+    loyalty_summary = client.get(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/loyalty",
+        headers=context["owner_headers"],
+    )
+    assert loyalty_summary.status_code == 200
+    assert loyalty_summary.json()["available_points"] == 468
 
 
 def test_confirmed_checkout_payment_session_can_be_recovered_and_history_lists_recent_records(monkeypatch) -> None:

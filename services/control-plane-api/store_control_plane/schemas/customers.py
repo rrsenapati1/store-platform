@@ -85,6 +85,48 @@ class CustomerStoreCreditResponse(BaseModel):
     ledger_entries: list[CustomerStoreCreditLedgerEntryResponse]
 
 
+class LoyaltyProgramUpsertRequest(BaseModel):
+    status: str
+    earn_points_per_currency_unit: float
+    redeem_step_points: int
+    redeem_value_per_step: float
+    minimum_redeem_points: int
+
+
+class LoyaltyProgramResponse(BaseModel):
+    status: str
+    earn_points_per_currency_unit: float
+    redeem_step_points: int
+    redeem_value_per_step: float
+    minimum_redeem_points: int
+
+
+class CustomerLoyaltyAdjustmentRequest(BaseModel):
+    points_delta: int
+    note: str | None = None
+
+
+class CustomerLoyaltyLedgerEntryResponse(BaseModel):
+    id: str
+    entry_type: str
+    source_type: str
+    source_reference_id: str | None = None
+    points_delta: int
+    balance_after: int
+    note: str | None = None
+    branch_id: str | None = None
+    created_at: datetime
+
+
+class CustomerLoyaltyResponse(BaseModel):
+    customer_profile_id: str
+    available_points: int
+    earned_total: int
+    redeemed_total: int
+    adjusted_total: int
+    ledger_entries: list[CustomerLoyaltyLedgerEntryResponse]
+
+
 class CustomerDirectoryRecord(BaseModel):
     customer_id: str
     customer_profile_id: str | None = None

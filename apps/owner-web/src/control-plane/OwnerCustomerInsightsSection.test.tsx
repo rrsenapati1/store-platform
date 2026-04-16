@@ -48,6 +48,26 @@ describe('owner customer insights section', () => {
     branch_id?: string | null;
     created_at: string;
   }>;
+  let loyaltyProgramStatus: 'ACTIVE' | 'DISABLED';
+  let loyaltyEarnRate: number;
+  let loyaltyRedeemStepPoints: number;
+  let loyaltyRedeemValuePerStep: number;
+  let loyaltyMinimumRedeemPoints: number;
+  let loyaltyAvailablePoints: number;
+  let loyaltyEarnedTotal: number;
+  let loyaltyRedeemedTotal: number;
+  let loyaltyAdjustedTotal: number;
+  let loyaltyLedgerEntries: Array<{
+    id: string;
+    entry_type: string;
+    source_type: string;
+    source_reference_id?: string | null;
+    points_delta: number;
+    balance_after: number;
+    note?: string | null;
+    branch_id?: string | null;
+    created_at: string;
+  }>;
 
   function buildStoreCreditResponse() {
     return {
@@ -58,6 +78,27 @@ describe('owner customer insights section', () => {
       adjusted_total: storeCreditAdjustedTotal,
       lots: storeCreditLots,
       ledger_entries: storeCreditLedgerEntries,
+    };
+  }
+
+  function buildLoyaltyProgramResponse() {
+    return {
+      status: loyaltyProgramStatus,
+      earn_points_per_currency_unit: loyaltyEarnRate,
+      redeem_step_points: loyaltyRedeemStepPoints,
+      redeem_value_per_step: loyaltyRedeemValuePerStep,
+      minimum_redeem_points: loyaltyMinimumRedeemPoints,
+    };
+  }
+
+  function buildCustomerLoyaltyResponse() {
+    return {
+      customer_profile_id: 'profile-1',
+      available_points: loyaltyAvailablePoints,
+      earned_total: loyaltyEarnedTotal,
+      redeemed_total: loyaltyRedeemedTotal,
+      adjusted_total: loyaltyAdjustedTotal,
+      ledger_entries: loyaltyLedgerEntries,
     };
   }
 
@@ -94,10 +135,66 @@ describe('owner customer insights section', () => {
         created_at: '2026-04-16T09:20:00Z',
       },
     ];
+    loyaltyProgramStatus = 'ACTIVE';
+    loyaltyEarnRate = 1;
+    loyaltyRedeemStepPoints = 100;
+    loyaltyRedeemValuePerStep = 10;
+    loyaltyMinimumRedeemPoints = 200;
+    loyaltyAvailablePoints = 300;
+    loyaltyEarnedTotal = 120;
+    loyaltyRedeemedTotal = 20;
+    loyaltyAdjustedTotal = 200;
+    loyaltyLedgerEntries = [
+      {
+        id: 'loyalty-ledger-1',
+        entry_type: 'ADJUSTED',
+        source_type: 'MANUAL_ADJUSTMENT',
+        source_reference_id: null,
+        points_delta: 200,
+        balance_after: 200,
+        note: 'Opening points',
+        branch_id: null,
+        created_at: '2026-04-16T09:10:00Z',
+      },
+      {
+        id: 'loyalty-ledger-2',
+        entry_type: 'EARNED',
+        source_type: 'SALE_EARN',
+        source_reference_id: 'sale-2',
+        points_delta: 120,
+        balance_after: 320,
+        note: 'Sale SINV-BLRFLAGSHIP-0002',
+        branch_id: 'branch-1',
+        created_at: '2026-04-16T09:35:00Z',
+      },
+      {
+        id: 'loyalty-ledger-3',
+        entry_type: 'REDEEMED',
+        source_type: 'SALE_REDEMPTION',
+        source_reference_id: 'sale-3',
+        points_delta: -20,
+        balance_after: 300,
+        note: 'Sale SINV-BLRFLAGSHIP-0003',
+        branch_id: 'branch-1',
+        created_at: '2026-04-16T09:45:00Z',
+      },
+    ];
 
     globalThis.fetch = vi.fn(async (input, init) => {
       const url = String(input);
       const method = init?.method ?? 'GET';
+      if (url.endsWith('/loyalty-program') && method === 'GET') {
+        return jsonResponse(buildLoyaltyProgramResponse()) as never;
+      }
+      if (url.endsWith('/loyalty-program') && method === 'PUT') {
+        const payload = JSON.parse(String(init?.body ?? '{}'));
+        loyaltyProgramStatus = payload.status ?? loyaltyProgramStatus;
+        loyaltyEarnRate = Number(payload.earn_points_per_currency_unit ?? loyaltyEarnRate);
+        loyaltyRedeemStepPoints = Number(payload.redeem_step_points ?? loyaltyRedeemStepPoints);
+        loyaltyRedeemValuePerStep = Number(payload.redeem_value_per_step ?? loyaltyRedeemValuePerStep);
+        loyaltyMinimumRedeemPoints = Number(payload.minimum_redeem_points ?? loyaltyMinimumRedeemPoints);
+        return jsonResponse(buildLoyaltyProgramResponse()) as never;
+      }
       if (url.endsWith('/customer-profiles') && method === 'GET') {
         return jsonResponse({
           records: [
@@ -183,6 +280,30 @@ describe('owner customer insights section', () => {
       }
       if (url.endsWith('/customer-profiles/profile-1/store-credit') && method === 'GET') {
         return jsonResponse(buildStoreCreditResponse()) as never;
+      }
+      if (url.endsWith('/customer-profiles/profile-1/loyalty') && method === 'GET') {
+        return jsonResponse(buildCustomerLoyaltyResponse()) as never;
+      }
+      if (url.endsWith('/customer-profiles/profile-1/loyalty/adjust') && method === 'POST') {
+        const payload = JSON.parse(String(init?.body ?? '{}'));
+        const pointsDelta = Number(payload.points_delta ?? 0);
+        loyaltyAvailablePoints += pointsDelta;
+        loyaltyAdjustedTotal += pointsDelta;
+        loyaltyLedgerEntries = [
+          {
+            id: 'loyalty-ledger-4',
+            entry_type: 'ADJUSTED',
+            source_type: 'MANUAL_ADJUSTMENT',
+            source_reference_id: null,
+            points_delta: pointsDelta,
+            balance_after: loyaltyAvailablePoints,
+            note: payload.note ?? null,
+            branch_id: null,
+            created_at: '2026-04-16T09:55:00Z',
+          },
+          ...loyaltyLedgerEntries,
+        ];
+        return jsonResponse(buildCustomerLoyaltyResponse()) as never;
       }
       if (url.endsWith('/customer-profiles/profile-1/store-credit/issue') && method === 'POST') {
         const payload = JSON.parse(String(init?.body ?? '{}'));
@@ -462,9 +583,70 @@ describe('owner customer insights section', () => {
       });
     });
 
+    expect(
+      await screen.findByText((content) =>
+        content.includes('ADJUSTED')
+        && content.includes('MANUAL_ADJUSTMENT')
+        && content.includes('-25')
+        && content.includes('Counter correction'),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test('loads and manages loyalty program and customer loyalty points', async () => {
+    render(
+      <OwnerCustomerInsightsSection
+        accessToken="session-owner"
+        tenantId="tenant-acme"
+        branchId="branch-1"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load customer insights' }));
+
+    expect(await screen.findByText('Loyalty program')).toBeInTheDocument();
+    expect(await screen.findByText('Available loyalty points')).toBeInTheDocument();
+    expect(screen.getAllByText('300').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Opening points/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Earn points per currency unit'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Minimum redeem points'), { target: { value: '500' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save loyalty program' }));
+
     await waitFor(() => {
-      expect(screen.getAllByText('300').length).toBeGreaterThan(0);
+      const programCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) => String(url).endsWith('/v1/tenants/tenant-acme/loyalty-program') && init?.method === 'PUT',
+      );
+      expect(programCall).toBeDefined();
+      expect(JSON.parse(String(programCall?.[1]?.body ?? '{}'))).toEqual({
+        status: 'ACTIVE',
+        earn_points_per_currency_unit: 2,
+        redeem_step_points: 100,
+        redeem_value_per_step: 10,
+        minimum_redeem_points: 500,
+      });
     });
-    expect(screen.getByText(/Counter correction/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Adjust loyalty points delta'), { target: { value: '50' } });
+    fireEvent.change(screen.getByLabelText('Adjust loyalty note'), { target: { value: 'Festival bonus' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust loyalty points' }));
+
+    await waitFor(() => {
+      const adjustCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) =>
+          String(url).includes('/v1/tenants/tenant-acme/customer-profiles/profile-1/loyalty/adjust') &&
+          init?.method === 'POST',
+      );
+      expect(adjustCall).toBeDefined();
+      expect(JSON.parse(String(adjustCall?.[1]?.body ?? '{}'))).toEqual({
+        points_delta: 50,
+        note: 'Festival bonus',
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('350').length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText(/Festival bonus/)).toBeInTheDocument();
   });
 });

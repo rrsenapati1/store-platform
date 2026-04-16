@@ -16,9 +16,11 @@ import type {
   ControlPlaneCatalogProduct,
   ControlPlaneCatalogProductRecord,
   ControlPlaneCustomerDirectoryRecord,
+  ControlPlaneCustomerLoyalty,
   ControlPlaneCustomerProfile,
   ControlPlaneCustomerHistoryResponse,
   ControlPlaneCustomerStoreCredit,
+  ControlPlaneLoyaltyProgram,
   ControlPlaneComplianceProviderProfile,
   ControlPlaneDeviceClaimApproval,
   ControlPlaneDeviceClaimRecord,
@@ -791,6 +793,54 @@ export const ownerControlPlaneClient = {
     return request<ControlPlaneCustomerStoreCredit>(
       `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/store-credit`,
       undefined,
+      accessToken,
+    );
+  },
+  getLoyaltyProgram(accessToken: string, tenantId: string) {
+    return request<ControlPlaneLoyaltyProgram>(`/v1/tenants/${tenantId}/loyalty-program`, undefined, accessToken);
+  },
+  updateLoyaltyProgram(
+    accessToken: string,
+    tenantId: string,
+    payload: {
+      status: string;
+      earn_points_per_currency_unit: number;
+      redeem_step_points: number;
+      redeem_value_per_step: number;
+      minimum_redeem_points: number;
+    },
+  ) {
+    return request<ControlPlaneLoyaltyProgram>(
+      `/v1/tenants/${tenantId}/loyalty-program`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  getCustomerLoyalty(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<ControlPlaneCustomerLoyalty>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/loyalty`,
+      undefined,
+      accessToken,
+    );
+  },
+  adjustCustomerLoyalty(
+    accessToken: string,
+    tenantId: string,
+    customerProfileId: string,
+    payload: {
+      points_delta: number;
+      note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneCustomerLoyalty>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/loyalty/adjust`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
       accessToken,
     );
   },

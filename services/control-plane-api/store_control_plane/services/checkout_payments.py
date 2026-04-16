@@ -13,6 +13,7 @@ from .billing import BillingService
 from .billing_policy import build_sale_draft, ensure_sale_stock_available
 from .checkout_payment_providers import build_checkout_payment_provider
 from .customer_profiles import CustomerProfileService
+from .loyalty import LoyaltyService
 
 
 class CheckoutPaymentsService:
@@ -26,6 +27,7 @@ class CheckoutPaymentsService:
         self._audit_repo = AuditRepository(session)
         self._billing_service = BillingService(session)
         self._customer_profile_service = CustomerProfileService(session)
+        self._loyalty_service = LoyaltyService(session)
 
     async def create_checkout_payment_session(
         self,
@@ -40,6 +42,7 @@ class CheckoutPaymentsService:
         customer_profile_id: str | None,
         customer_name: str,
         customer_gstin: str | None,
+        loyalty_points_to_redeem: int,
         lines: list[dict[str, object]],
     ) -> dict[str, object]:
         (
@@ -56,6 +59,7 @@ class CheckoutPaymentsService:
             customer_profile_id=customer_profile_id,
             customer_name=customer_name,
             customer_gstin=customer_gstin,
+            loyalty_points_to_redeem=loyalty_points_to_redeem,
             lines=lines,
         )
         record = await self._create_payment_session_record(
@@ -221,6 +225,7 @@ class CheckoutPaymentsService:
             customer_profile_id=record.customer_profile_id,
             customer_name=record.customer_name,
             customer_gstin=record.customer_gstin,
+            loyalty_points_to_redeem=int(record.cart_snapshot.get("loyalty_points_to_redeem", 0)),
             lines=lines,
         )
         await self._audit_repo.record(
@@ -305,6 +310,7 @@ class CheckoutPaymentsService:
         customer_profile_id: str | None,
         customer_name: str,
         customer_gstin: str | None,
+        loyalty_points_to_redeem: int,
         lines: list[dict[str, object]],
     ):
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
@@ -358,10 +364,31 @@ class CheckoutPaymentsService:
             except ValueError as error:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
+        loyalty_redemption = {
+            "points_to_redeem": 0,
+            "discount_amount": 0.0,
+        }
+        if loyalty_points_to_redeem > 0:
+            if customer_profile_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Customer profile is required for loyalty redemption",
+                )
+            loyalty_redemption = await self._loyalty_service.calculate_sale_redemption(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+                points_to_redeem=loyalty_points_to_redeem,
+                sale_total=draft.grand_total,
+            )
+
+        net_order_amount = round(draft.grand_total - float(loyalty_redemption["discount_amount"]), 2)
         cart_snapshot = {
             "customer_profile_id": customer_profile_id,
             "customer_name": draft.customer_name,
             "customer_gstin": draft.customer_gstin,
+            "loyalty_points_to_redeem": int(loyalty_redemption["points_to_redeem"]),
+            "loyalty_discount_amount": float(loyalty_redemption["discount_amount"]),
+            "net_order_amount": net_order_amount,
             "lines": [{"product_id": line.product_id, "quantity": line.quantity} for line in draft.lines],
             "totals": {
                 "subtotal": draft.subtotal,
@@ -397,7 +424,7 @@ class CheckoutPaymentsService:
             checkout_payment_session_id=checkout_payment_session_id,
             handoff_surface=handoff_surface,
             provider_payment_mode=provider_payment_mode,
-            order_amount=draft.grand_total,
+            order_amount=float(cart_snapshot.get("net_order_amount", draft.grand_total)),
             currency_code="INR",
             customer_name=customer_name,
             customer_gstin=customer_gstin,
@@ -416,7 +443,7 @@ class CheckoutPaymentsService:
             provider_payment_mode=provider_payment_mode,
             lifecycle_status="ACTION_READY",
             provider_status=provider_result.provider_status,
-            order_amount=draft.grand_total,
+            order_amount=float(cart_snapshot.get("net_order_amount", draft.grand_total)),
             currency_code="INR",
             cart_summary_hash=cart_summary_hash,
             cart_snapshot=cart_snapshot,
@@ -475,6 +502,7 @@ class CheckoutPaymentsService:
                 customer_name=record.customer_name,
                 customer_gstin=record.customer_gstin,
                 payment_method=record.payment_method,
+                loyalty_points_to_redeem=int(record.cart_snapshot.get("loyalty_points_to_redeem", 0)),
                 lines=list(record.cart_snapshot.get("lines", [])),
                 auto_commit=False,
             )

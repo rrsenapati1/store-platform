@@ -11,6 +11,8 @@ from ..models import (
     CustomerCreditLedgerEntry,
     CustomerCreditLot,
     CustomerExchangeSnapshot,
+    CustomerLoyaltyAccount,
+    CustomerLoyaltyLedgerEntry,
     CustomerProfile,
     CustomerSaleReturnSnapshot,
     CustomerSaleSnapshot,
@@ -19,6 +21,7 @@ from ..models import (
     Sale,
     SaleReturn,
     SalesInvoice,
+    TenantLoyaltyProgram,
 )
 
 
@@ -91,6 +94,34 @@ class CustomerProfileRepository:
         await self._session.flush()
         return record
 
+    async def get_loyalty_program(self, *, tenant_id: str) -> TenantLoyaltyProgram | None:
+        statement = select(TenantLoyaltyProgram).where(TenantLoyaltyProgram.tenant_id == tenant_id)
+        return await self._session.scalar(statement)
+
+    async def create_loyalty_program(
+        self,
+        *,
+        tenant_id: str,
+        program_id: str,
+        status: str,
+        earn_points_per_currency_unit: float,
+        redeem_step_points: int,
+        redeem_value_per_step: float,
+        minimum_redeem_points: int,
+    ) -> TenantLoyaltyProgram:
+        record = TenantLoyaltyProgram(
+            id=program_id,
+            tenant_id=tenant_id,
+            status=status,
+            earn_points_per_currency_unit=earn_points_per_currency_unit,
+            redeem_step_points=redeem_step_points,
+            redeem_value_per_step=redeem_value_per_step,
+            minimum_redeem_points=minimum_redeem_points,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
     async def list_profiles_by_ids(
         self,
         *,
@@ -138,6 +169,38 @@ class CustomerProfileRepository:
         await self._session.flush()
         return record
 
+    async def get_loyalty_account(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+    ) -> CustomerLoyaltyAccount | None:
+        statement = select(CustomerLoyaltyAccount).where(
+            CustomerLoyaltyAccount.tenant_id == tenant_id,
+            CustomerLoyaltyAccount.customer_profile_id == customer_profile_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def create_loyalty_account(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        account_id: str,
+    ) -> CustomerLoyaltyAccount:
+        record = CustomerLoyaltyAccount(
+            id=account_id,
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+            available_points=0,
+            earned_total=0,
+            redeemed_total=0,
+            adjusted_total=0,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
     async def list_active_credit_lots(
         self,
         *,
@@ -168,6 +231,22 @@ class CustomerProfileRepository:
                 CustomerCreditLedgerEntry.customer_profile_id == customer_profile_id,
             )
             .order_by(CustomerCreditLedgerEntry.created_at.asc(), CustomerCreditLedgerEntry.id.asc())
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def list_loyalty_ledger_entries(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+    ) -> list[CustomerLoyaltyLedgerEntry]:
+        statement = (
+            select(CustomerLoyaltyLedgerEntry)
+            .where(
+                CustomerLoyaltyLedgerEntry.tenant_id == tenant_id,
+                CustomerLoyaltyLedgerEntry.customer_profile_id == customer_profile_id,
+            )
+            .order_by(CustomerLoyaltyLedgerEntry.created_at.asc(), CustomerLoyaltyLedgerEntry.id.asc())
         )
         return list((await self._session.scalars(statement)).all())
 
@@ -229,6 +308,38 @@ class CustomerProfileRepository:
             source_reference_id=source_reference_id,
             amount=amount,
             running_balance=running_balance,
+            note=note,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def create_loyalty_ledger_entry(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        account_id: str,
+        entry_id: str,
+        branch_id: str | None,
+        entry_type: str,
+        source_type: str,
+        source_reference_id: str | None,
+        points_delta: int,
+        balance_after: int,
+        note: str | None,
+    ) -> CustomerLoyaltyLedgerEntry:
+        record = CustomerLoyaltyLedgerEntry(
+            id=entry_id,
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+            account_id=account_id,
+            branch_id=branch_id,
+            entry_type=entry_type,
+            source_type=source_type,
+            source_reference_id=source_reference_id,
+            points_delta=points_delta,
+            balance_after=balance_after,
             note=note,
         )
         self._session.add(record)

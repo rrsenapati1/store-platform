@@ -13,6 +13,7 @@ import type {
   ControlPlaneCheckoutPaymentSessionListResponse,
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
+  ControlPlaneCustomerLoyalty,
   ControlPlaneCustomerProfile,
   ControlPlaneCustomerStoreCredit,
   ControlPlaneDeviceRecord,
@@ -35,6 +36,7 @@ import type {
   ControlPlaneSaleRecord,
   ControlPlaneSaleReturn,
   ControlPlaneSession,
+  ControlPlaneLoyaltyProgram,
   ControlPlaneStoreDesktopActivationSession,
   ControlPlaneSupplierAgingReport,
   ControlPlaneSupplierDueScheduleReport,
@@ -535,6 +537,20 @@ export const storeControlPlaneClient = {
       accessToken,
     );
   },
+  getLoyaltyProgram(accessToken: string, tenantId: string) {
+    return request<ControlPlaneLoyaltyProgram>(
+      `/v1/tenants/${tenantId}/loyalty-program`,
+      undefined,
+      accessToken,
+    );
+  },
+  getCustomerLoyalty(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<ControlPlaneCustomerLoyalty>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/loyalty`,
+      undefined,
+      accessToken,
+    );
+  },
   createCustomerProfile(
     accessToken: string,
     tenantId: string,
@@ -649,6 +665,7 @@ export const storeControlPlaneClient = {
       customer_gstin?: string | null;
       payment_method: string;
       store_credit_amount?: number;
+      loyalty_points_to_redeem?: number;
       lines: Array<{ product_id: string; quantity: number }>;
     },
   ) {
@@ -673,6 +690,7 @@ export const storeControlPlaneClient = {
       customer_profile_id?: string | null;
       customer_name: string;
       customer_gstin?: string | null;
+      loyalty_points_to_redeem?: number;
       lines: Array<{ product_id: string; quantity: number }>;
     },
   ) {

@@ -91,6 +91,9 @@ function buildSnapshot(): StoreRuntimeCacheSnapshot {
       payment_method: 'UPI',
       grand_total: 388.5,
       store_credit_amount: 0,
+      loyalty_points_redeemed: 0,
+      loyalty_discount_amount: 0,
+      loyalty_points_earned: 388,
       issued_on: '2026-04-13',
     },
   ];

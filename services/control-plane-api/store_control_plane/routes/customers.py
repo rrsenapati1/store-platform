@@ -8,6 +8,8 @@ from ..schemas import (
     BranchCustomerReportResponse,
     CustomerDirectoryResponse,
     CustomerHistoryResponse,
+    CustomerLoyaltyAdjustmentRequest,
+    CustomerLoyaltyResponse,
     CustomerProfileCreateRequest,
     CustomerProfileListResponse,
     CustomerProfileResponse,
@@ -15,16 +17,46 @@ from ..schemas import (
     CustomerStoreCreditAdjustmentRequest,
     CustomerStoreCreditIssueRequest,
     CustomerStoreCreditResponse,
+    LoyaltyProgramResponse,
+    LoyaltyProgramUpsertRequest,
 )
 from ..services import (
     ActorContext,
     CustomerProfileService,
     CustomerReportingService,
+    LoyaltyService,
     StoreCreditService,
     assert_branch_any_capability,
+    assert_tenant_capability,
 )
 
 router = APIRouter(prefix="/v1/tenants", tags=["customers"])
+
+
+@router.get("/{tenant_id}/loyalty-program", response_model=LoyaltyProgramResponse)
+async def get_loyalty_program(
+    tenant_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> LoyaltyProgramResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = LoyaltyService(session)
+    record = await service.get_loyalty_program(tenant_id=tenant_id)
+    return LoyaltyProgramResponse(**record)
+
+
+@router.put("/{tenant_id}/loyalty-program", response_model=LoyaltyProgramResponse)
+async def update_loyalty_program(
+    tenant_id: str,
+    payload: LoyaltyProgramUpsertRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> LoyaltyProgramResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = LoyaltyService(session)
+    record = await service.update_loyalty_program(tenant_id=tenant_id, **payload.model_dump())
+    await session.commit()
+    return LoyaltyProgramResponse(**record)
 
 
 @router.get("/{tenant_id}/customer-profiles", response_model=CustomerProfileListResponse)
@@ -220,6 +252,50 @@ async def adjust_customer_store_credit(
     )
     await session.commit()
     return CustomerStoreCreditResponse(**record)
+
+
+@router.get(
+    "/{tenant_id}/customer-profiles/{customer_profile_id}/loyalty",
+    response_model=CustomerLoyaltyResponse,
+)
+async def get_customer_loyalty(
+    tenant_id: str,
+    customer_profile_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerLoyaltyResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = LoyaltyService(session)
+    record = await service.get_customer_loyalty(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
+    return CustomerLoyaltyResponse(**record)
+
+
+@router.post(
+    "/{tenant_id}/customer-profiles/{customer_profile_id}/loyalty/adjust",
+    response_model=CustomerLoyaltyResponse,
+)
+async def adjust_customer_loyalty(
+    tenant_id: str,
+    customer_profile_id: str,
+    payload: CustomerLoyaltyAdjustmentRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerLoyaltyResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = LoyaltyService(session)
+    record = await service.adjust_customer_loyalty(
+        tenant_id=tenant_id,
+        customer_profile_id=customer_profile_id,
+        points_delta=payload.points_delta,
+        note=payload.note,
+    )
+    await session.commit()
+    return CustomerLoyaltyResponse(**record)
 
 
 @router.get("/{tenant_id}/customers", response_model=CustomerDirectoryResponse)

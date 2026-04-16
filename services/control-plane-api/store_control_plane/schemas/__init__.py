@@ -29,6 +29,9 @@ from .customers import (
     CustomerHistoryCustomer,
     CustomerHistoryResponse,
     CustomerHistorySummary,
+    CustomerLoyaltyAdjustmentRequest,
+    CustomerLoyaltyLedgerEntryResponse,
+    CustomerLoyaltyResponse,
     CustomerProfileCreateRequest,
     CustomerProfileListResponse,
     CustomerProfileResponse,
@@ -40,6 +43,8 @@ from .customers import (
     CustomerStoreCreditLedgerEntryResponse,
     CustomerStoreCreditLotResponse,
     CustomerStoreCreditResponse,
+    LoyaltyProgramResponse,
+    LoyaltyProgramUpsertRequest,
 )
 from .inventory import GoodsReceiptCreateRequest, GoodsReceiptLineReceiveRequest, GoodsReceiptLineResponse, GoodsReceiptListResponse, GoodsReceiptRecord, GoodsReceiptResponse, InventoryLedgerListResponse, InventoryLedgerRecord, InventorySnapshotListResponse, InventorySnapshotRecord, ReceivingBoardRecord, ReceivingBoardResponse, ReplenishmentBoardRecord, ReplenishmentBoardResponse, RestockBoardRecord, RestockBoardResponse, RestockTaskCancelRequest, RestockTaskCompleteRequest, RestockTaskCreateRequest, RestockTaskPickRequest, RestockTaskResponse, StockAdjustmentCreateRequest, StockAdjustmentResponse, StockCountApprovalResponse, StockCountBoardRecord, StockCountBoardResponse, StockCountCreateRequest, StockCountResponse, StockCountReviewSessionApproveRequest, StockCountReviewSessionCancelRequest, StockCountReviewSessionCreateRequest, StockCountReviewSessionRecordRequest, StockCountReviewSessionResponse, TransferBoardRecord, TransferBoardResponse, TransferCreateRequest, TransferResponse
 from .memberships import BranchMembershipCreateRequest, MembershipResponse, TenantMembershipCreateRequest
@@ -137,6 +142,9 @@ __all__ = [
     "CustomerHistoryCustomer",
     "CustomerHistoryResponse",
     "CustomerHistorySummary",
+    "CustomerLoyaltyAdjustmentRequest",
+    "CustomerLoyaltyLedgerEntryResponse",
+    "CustomerLoyaltyResponse",
     "CustomerProfileCreateRequest",
     "CustomerProfileListResponse",
     "CustomerProfileResponse",
@@ -148,6 +156,8 @@ __all__ = [
     "CustomerStoreCreditLedgerEntryResponse",
     "CustomerStoreCreditLotResponse",
     "CustomerStoreCreditResponse",
+    "LoyaltyProgramResponse",
+    "LoyaltyProgramUpsertRequest",
     "DeviceClaimApprovalResponse",
     "DeviceClaimApproveRequest",
     "DeviceClaimListResponse",

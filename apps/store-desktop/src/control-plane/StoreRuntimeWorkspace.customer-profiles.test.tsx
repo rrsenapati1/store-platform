@@ -86,6 +86,39 @@ function buildStoreCreditResponse(customerProfileId: string) {
   };
 }
 
+function buildLoyaltyProgramResponse() {
+  return {
+    status: 'ACTIVE',
+    earn_points_per_currency_unit: 1,
+    redeem_step_points: 100,
+    redeem_value_per_step: 10,
+    minimum_redeem_points: 200,
+  };
+}
+
+function buildCustomerLoyaltyResponse(customerProfileId: string) {
+  return {
+    customer_profile_id: customerProfileId,
+    available_points: 300,
+    earned_total: 300,
+    redeemed_total: 0,
+    adjusted_total: 300,
+    ledger_entries: [
+      {
+        id: 'loyalty-ledger-1',
+        entry_type: 'ADJUSTED',
+        source_type: 'MANUAL_ADJUSTMENT',
+        source_reference_id: null,
+        points_delta: 300,
+        balance_after: 300,
+        note: 'Welcome points',
+        branch_id: null,
+        created_at: '2026-04-16T09:20:00Z',
+      },
+    ],
+  };
+}
+
 describe('store runtime checkout customer profiles', () => {
   const originalFetch = globalThis.fetch;
 
@@ -192,9 +225,16 @@ describe('store runtime checkout customer profiles', () => {
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
       }
+      if (url.endsWith('/v1/tenants/tenant-acme/loyalty-program') && method === 'GET') {
+        return jsonResponse(buildLoyaltyProgramResponse()) as never;
+      }
       if (/\/v1\/tenants\/tenant-acme\/customer-profiles\/[^/]+\/store-credit$/.test(url) && method === 'GET') {
         const customerProfileId = url.split('/customer-profiles/')[1]?.split('/store-credit')[0] ?? 'profile-created';
         return jsonResponse(buildStoreCreditResponse(customerProfileId)) as never;
+      }
+      if (/\/v1\/tenants\/tenant-acme\/customer-profiles\/[^/]+\/loyalty$/.test(url) && method === 'GET') {
+        const customerProfileId = url.split('/customer-profiles/')[1]?.split('/loyalty')[0] ?? 'profile-created';
+        return jsonResponse(buildCustomerLoyaltyResponse(customerProfileId)) as never;
       }
       if (url.includes('/v1/tenants/tenant-acme/customer-profiles') && method === 'GET') {
         return jsonResponse({ records: profileRecords }) as never;
@@ -394,8 +434,14 @@ describe('store runtime checkout customer profiles', () => {
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
       }
+      if (url.endsWith('/v1/tenants/tenant-acme/loyalty-program') && method === 'GET') {
+        return jsonResponse(buildLoyaltyProgramResponse()) as never;
+      }
       if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/store-credit') && method === 'GET') {
         return jsonResponse(buildStoreCreditResponse('profile-1')) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/loyalty') && method === 'GET') {
+        return jsonResponse(buildCustomerLoyaltyResponse('profile-1')) as never;
       }
       if (url.includes('/v1/tenants/tenant-acme/customer-profiles') && method === 'GET') {
         return jsonResponse({
@@ -442,6 +488,130 @@ describe('store runtime checkout customer profiles', () => {
       expect(capturedSalePayload?.customer_gstin).toBeNull();
       expect(capturedSalePayload).not.toHaveProperty('customer_profile_id');
     });
+  });
+
+  test('loads customer loyalty posture when a customer profile is selected', async () => {
+    globalThis.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+
+      if (url.endsWith('/v1/auth/oidc/exchange') && method === 'POST') {
+        return jsonResponse({ access_token: 'session-cashier', token_type: 'Bearer' }) as never;
+      }
+      if (url.endsWith('/v1/auth/me')) {
+        return jsonResponse({
+          user_id: 'user-cashier',
+          email: 'cashier@acme.local',
+          full_name: 'Counter Cashier',
+          is_platform_admin: false,
+          tenant_memberships: [],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme')) {
+        return jsonResponse({
+          id: 'tenant-acme',
+          name: 'Acme Retail',
+          slug: 'acme-retail',
+          status: 'ACTIVE',
+          onboarding_status: 'BRANCH_READY',
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches')) {
+        return jsonResponse({
+          records: [{ branch_id: 'branch-1', tenant_id: 'tenant-acme', name: 'Bengaluru Flagship', code: 'blr-flagship', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/catalog-items')) {
+        return jsonResponse({
+          records: [
+            {
+              id: 'catalog-item-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              barcode: '8901234567890',
+              hsn_sac_code: '0902',
+              gst_rate: 5,
+              base_selling_price: 92.5,
+              selling_price_override: null,
+              effective_selling_price: 92.5,
+              availability_status: 'ACTIVE',
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/inventory-snapshot')) {
+        return jsonResponse({
+          records: [
+            {
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              stock_on_hand: 24,
+              last_entry_type: 'PURCHASE_RECEIPT',
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
+        return jsonResponse({
+          records: [
+            {
+              id: 'device-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              device_name: 'Counter Desktop 1',
+              device_code: 'counter-1',
+              session_surface: 'store_desktop',
+              status: 'ACTIVE',
+              assigned_staff_profile_id: null,
+              assigned_staff_full_name: null,
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/loyalty-program') && method === 'GET') {
+        return jsonResponse(buildLoyaltyProgramResponse()) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/store-credit') && method === 'GET') {
+        return jsonResponse(buildStoreCreditResponse('profile-1')) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/loyalty') && method === 'GET') {
+        return jsonResponse(buildCustomerLoyaltyResponse('profile-1')) as never;
+      }
+      if (url.includes('/v1/tenants/tenant-acme/customer-profiles') && method === 'GET') {
+        return jsonResponse({
+          records: [buildCustomerProfile('profile-1', 'Acme Traders', '29AAEPM0111C1Z3')],
+        }) as never;
+      }
+
+      throw new Error(`Unexpected fetch call: ${method} ${url}`);
+    }) as typeof fetch;
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('Korsenex token'), {
+      target: { value: 'stub:sub=cashier-1;email=cashier@acme.local;name=Counter Cashier' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
+
+    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Use customer profile Acme Traders/i }));
+
+    expect(await screen.findByText('Available loyalty points')).toBeInTheDocument();
+    expect(screen.getAllByText('300').length).toBeGreaterThan(0);
   });
 
   test('passes the selected customer profile into Cashfree checkout session creation', async () => {
@@ -535,8 +705,14 @@ describe('store runtime checkout customer profiles', () => {
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
       }
+      if (url.endsWith('/v1/tenants/tenant-acme/loyalty-program') && method === 'GET') {
+        return jsonResponse(buildLoyaltyProgramResponse()) as never;
+      }
       if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/store-credit') && method === 'GET') {
         return jsonResponse(buildStoreCreditResponse('profile-1')) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/loyalty') && method === 'GET') {
+        return jsonResponse(buildCustomerLoyaltyResponse('profile-1')) as never;
       }
       if (url.includes('/v1/tenants/tenant-acme/customer-profiles') && method === 'GET') {
         return jsonResponse({
@@ -594,6 +770,7 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
     fireEvent.click(await screen.findByRole('button', { name: /Use customer profile Acme Traders/i }));
     expect(await screen.findByText('Available store credit')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Redeem loyalty points'), { target: { value: '200' } });
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'CASHFREE_UPI_QR' } });
     fireEvent.click(screen.getByRole('button', { name: 'Start branded UPI QR' }));
@@ -604,6 +781,7 @@ describe('store runtime checkout customer profiles', () => {
         customer_profile_id: 'profile-1',
         customer_name: 'Acme Traders',
         customer_gstin: '29AAEPM0111C1Z3',
+        loyalty_points_to_redeem: 200,
       });
     });
   });

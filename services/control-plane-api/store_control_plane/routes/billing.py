@@ -52,6 +52,7 @@ async def create_sale(
         customer_gstin=payload.customer_gstin,
         payment_method=payload.payment_method,
         store_credit_amount=payload.store_credit_amount,
+        loyalty_points_to_redeem=payload.loyalty_points_to_redeem,
         lines=[line.model_dump() for line in payload.lines],
     )
     return SaleResponse(**sale)
@@ -79,6 +80,7 @@ async def create_checkout_payment_session(
         customer_profile_id=payload.customer_profile_id,
         customer_name=payload.customer_name,
         customer_gstin=payload.customer_gstin,
+        loyalty_points_to_redeem=payload.loyalty_points_to_redeem,
         lines=[line.model_dump() for line in payload.lines],
     )
     return CheckoutPaymentSessionResponse(**checkout_payment_session)

@@ -2,6 +2,21 @@
 
 ## 2026-04-16
 
+- Started `V2-005` loyalty foundation on top of customer profiles and store credit:
+  - added control-plane loyalty program, loyalty account, and append-only loyalty ledger foundations with owner-managed earn and redeem rules plus customer-level manual adjustments
+  - extended billing and checkout payment sessions so customer-linked sales can redeem loyalty points as a discount instrument, earn points on finalized eligible spend, and reverse or restore loyalty posture through existing sale-return authority flows
+  - upgraded owner-web customer insights with tenant loyalty program management plus customer loyalty balances and ledger visibility, and extended Store Desktop checkout with loyalty balance loading and cashier-entered redemption alongside store credit and existing payment methods
+  - hardened desktop and owner-web tests to use route-complete mocks and post-mutation ledger assertions once customer selection and commercial checkout flows began loading loyalty posture in parallel with store credit
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_loyalty_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 - Started `V2-005` with first-class customer profile foundation:
   - added control-plane-owned customer profiles with tenant-scoped create/search/update/archive/reactivate routes, linked sales and checkout payment sessions to optional `customer_profile_id`, and kept invoice-facing customer snapshots intact for anonymous and historical compatibility
   - upgraded owner-web customer insights from read-only reporting into profile-aware customer management so operators can search, inspect history, edit core fields, and archive or reactivate customer profiles inside the existing customer surface

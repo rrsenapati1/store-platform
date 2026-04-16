@@ -8,6 +8,7 @@ from ..utils import utc_now
 from .billing_policy import build_sale_draft, ensure_sale_stock_available, sale_invoice_number
 from .customer_profiles import CustomerProfileService
 from .exchange_policy import build_exchange_settlement
+from .loyalty import LoyaltyService
 from .returns_policy import build_sale_return_draft, credit_note_number, ensure_refund_amount_allowed
 from .store_credit import StoreCreditService
 
@@ -21,6 +22,7 @@ class BillingService:
         self._billing_repo = BillingRepository(session)
         self._audit_repo = AuditRepository(session)
         self._customer_profile_service = CustomerProfileService(session)
+        self._loyalty_service = LoyaltyService(session)
         self._store_credit_service = StoreCreditService(session)
 
     async def create_sale(
@@ -34,6 +36,7 @@ class BillingService:
         customer_gstin: str | None,
         payment_method: str,
         store_credit_amount: float = 0.0,
+        loyalty_points_to_redeem: int = 0,
         lines: list[dict[str, float | str]],
         auto_commit: bool = True,
     ) -> dict[str, object]:
@@ -80,6 +83,25 @@ class BillingService:
         except ValueError as error:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
+        loyalty_points_to_redeem = int(loyalty_points_to_redeem or 0)
+        loyalty_points_redeemed = 0
+        loyalty_discount_amount = 0.0
+        if loyalty_points_to_redeem > 0:
+            if customer_profile_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Customer profile is required for loyalty redemption",
+                )
+            loyalty_redemption = await self._loyalty_service.calculate_sale_redemption(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+                points_to_redeem=loyalty_points_to_redeem,
+                sale_total=draft.grand_total,
+            )
+            loyalty_points_redeemed = int(loyalty_redemption["points_to_redeem"])
+            loyalty_discount_amount = round(float(loyalty_redemption["discount_amount"]), 2)
+
+        net_sale_total = round(draft.grand_total - loyalty_discount_amount, 2)
         store_credit_amount = round(float(store_credit_amount or 0.0), 2)
         if store_credit_amount > 0:
             if customer_profile_id is None:
@@ -87,7 +109,7 @@ class BillingService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Customer profile is required for store credit redemption",
                 )
-            if store_credit_amount > draft.grand_total:
+            if store_credit_amount > net_sale_total:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Store credit redemption cannot exceed sale total",
@@ -116,9 +138,16 @@ class BillingService:
         payment_rows: list[dict[str, float | str]] | None = None
         if store_credit_amount > 0:
             payment_rows = [{"payment_method": "STORE_CREDIT", "amount": store_credit_amount}]
-            remaining_payment_amount = round(draft.grand_total - store_credit_amount, 2)
+            remaining_payment_amount = round(net_sale_total - store_credit_amount, 2)
             if remaining_payment_amount > 0:
                 payment_rows.append({"payment_method": payment_method, "amount": remaining_payment_amount})
+
+        loyalty_points_earned = 0
+        if customer_profile_id is not None:
+            loyalty_points_earned = await self._loyalty_service.calculate_sale_earn_points(
+                tenant_id=tenant_id,
+                eligible_sale_amount=net_sale_total,
+            )
 
         sequence_number = await self._billing_repo.next_branch_sale_sequence(tenant_id=tenant_id, branch_id=branch_id)
         persisted = await self._billing_repo.create_sale(
@@ -136,7 +165,10 @@ class BillingService:
             cgst_total=draft.cgst_total,
             sgst_total=draft.sgst_total,
             igst_total=draft.igst_total,
-            grand_total=draft.grand_total,
+            grand_total=net_sale_total,
+            loyalty_points_redeemed=loyalty_points_redeemed,
+            loyalty_discount_amount=loyalty_discount_amount,
+            loyalty_points_earned=loyalty_points_earned,
             payment_method=payment_method,
             payments=payment_rows,
             lines=[
@@ -166,6 +198,24 @@ class BillingService:
                 tenant_id=tenant_id,
                 customer_profile_id=customer_profile_id,
                 amount=store_credit_amount,
+                branch_id=branch_id,
+                source_reference_id=persisted.sale.id,
+                note=f"Sale {persisted.invoice.invoice_number}",
+            )
+        if loyalty_points_redeemed > 0:
+            await self._loyalty_service.redeem_customer_loyalty(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+                points_to_redeem=loyalty_points_redeemed,
+                branch_id=branch_id,
+                source_reference_id=persisted.sale.id,
+                note=f"Sale {persisted.invoice.invoice_number}",
+            )
+        if customer_profile_id is not None and loyalty_points_earned > 0:
+            await self._loyalty_service.earn_customer_loyalty(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+                eligible_sale_amount=net_sale_total,
                 branch_id=branch_id,
                 source_reference_id=persisted.sale.id,
                 note=f"Sale {persisted.invoice.invoice_number}",
@@ -240,6 +290,9 @@ class BillingService:
                     sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
                     2,
                 ),
+                "loyalty_points_redeemed": sale.loyalty_points_redeemed,
+                "loyalty_discount_amount": sale.loyalty_discount_amount,
+                "loyalty_points_earned": sale.loyalty_points_earned,
                 "issued_on": invoice.issued_on,
             }
             for sale, invoice, payments in records
@@ -597,6 +650,9 @@ class BillingService:
             sgst_total=replacement_draft.sgst_total,
             igst_total=replacement_draft.igst_total,
             grand_total=replacement_draft.grand_total,
+            loyalty_points_redeemed=0,
+            loyalty_discount_amount=0.0,
+            loyalty_points_earned=0,
             payment_method=None,
             payments=[
                 {"payment_method": allocation.payment_method, "amount": allocation.amount}
@@ -828,6 +884,9 @@ class BillingService:
                 sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
                 2,
             ),
+            "loyalty_points_redeemed": sale.loyalty_points_redeemed,
+            "loyalty_discount_amount": sale.loyalty_discount_amount,
+            "loyalty_points_earned": sale.loyalty_points_earned,
             "payment": self._payment_summary(payments),
             "lines": [
                 {

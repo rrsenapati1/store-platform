@@ -18,6 +18,7 @@ interface UseStoreRuntimeCheckoutPaymentArgs {
   customerProfileId: string | null;
   customerName: string;
   customerGstin: string;
+  loyaltyPointsToRedeem: number;
   saleQuantity: string;
   paymentMethod: string;
   isSessionLive: boolean;
@@ -77,6 +78,7 @@ export function useStoreRuntimeCheckoutPayment({
   customerProfileId,
   customerName,
   customerGstin,
+  loyaltyPointsToRedeem,
   saleQuantity,
   paymentMethod,
   isSessionLive,
@@ -167,6 +169,7 @@ export function useStoreRuntimeCheckoutPayment({
         customer_profile_id: customerProfileId,
         customer_name: customerName,
         customer_gstin: customerGstin || null,
+        loyalty_points_to_redeem: loyaltyPointsToRedeem,
         lines: [{ product_id: selectedCatalogItem.product_id, quantity }],
       });
       setCheckoutPaymentSession(session);

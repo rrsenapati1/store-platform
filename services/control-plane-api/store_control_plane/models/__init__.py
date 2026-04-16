@@ -9,9 +9,12 @@ from .customers import (
     CustomerCreditLedgerEntry,
     CustomerCreditLot,
     CustomerExchangeSnapshot,
+    CustomerLoyaltyAccount,
+    CustomerLoyaltyLedgerEntry,
     CustomerProfile,
     CustomerSaleReturnSnapshot,
     CustomerSaleSnapshot,
+    TenantLoyaltyProgram,
 )
 from .identity import AppSession, PlatformAdminAccount, User
 from .operations import OperationsJob
@@ -44,10 +47,13 @@ __all__ = [
     "CustomerCreditAccount",
     "CustomerCreditLedgerEntry",
     "CustomerCreditLot",
+    "CustomerLoyaltyAccount",
+    "CustomerLoyaltyLedgerEntry",
     "CustomerProfile",
     "CustomerExchangeSnapshot",
     "CustomerSaleReturnSnapshot",
     "CustomerSaleSnapshot",
+    "TenantLoyaltyProgram",
     "DeviceClaim",
     "ExchangeOrder",
     "GstExportJob",

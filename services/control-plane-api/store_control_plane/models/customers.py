@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, TimestampMixin
@@ -28,6 +28,21 @@ class CustomerProfile(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(32), default="ACTIVE", index=True)
 
 
+class TenantLoyaltyProgram(Base, TimestampMixin):
+    __tablename__ = "tenant_loyalty_programs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_tenant_loyalty_programs_tenant"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="DISABLED")
+    earn_points_per_currency_unit: Mapped[float] = mapped_column(Float(), default=0.0)
+    redeem_step_points: Mapped[int] = mapped_column(Integer(), default=100)
+    redeem_value_per_step: Mapped[float] = mapped_column(Float(), default=0.0)
+    minimum_redeem_points: Mapped[int] = mapped_column(Integer(), default=0)
+
+
 class CustomerCreditAccount(Base, TimestampMixin):
     __tablename__ = "customer_credit_accounts"
     __table_args__ = (
@@ -48,6 +63,28 @@ class CustomerCreditAccount(Base, TimestampMixin):
     issued_total: Mapped[float] = mapped_column(Float(), default=0.0)
     redeemed_total: Mapped[float] = mapped_column(Float(), default=0.0)
     adjusted_total: Mapped[float] = mapped_column(Float(), default=0.0)
+
+
+class CustomerLoyaltyAccount(Base, TimestampMixin):
+    __tablename__ = "customer_loyalty_accounts"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "customer_profile_id",
+            name="uq_customer_loyalty_accounts_tenant_customer_profile",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    customer_profile_id: Mapped[str] = mapped_column(
+        ForeignKey("customer_profiles.id", ondelete="CASCADE"),
+        index=True,
+    )
+    available_points: Mapped[int] = mapped_column(Integer(), default=0)
+    earned_total: Mapped[int] = mapped_column(Integer(), default=0)
+    redeemed_total: Mapped[int] = mapped_column(Integer(), default=0)
+    adjusted_total: Mapped[int] = mapped_column(Integer(), default=0)
 
 
 class CustomerCreditLot(Base, TimestampMixin):
@@ -96,6 +133,28 @@ class CustomerCreditLedgerEntry(Base, TimestampMixin):
     source_reference_id: Mapped[str | None] = mapped_column(String(64), default=None)
     amount: Mapped[float] = mapped_column(Float(), default=0.0)
     running_balance: Mapped[float] = mapped_column(Float(), default=0.0)
+    note: Mapped[str | None] = mapped_column(String(1024), default=None)
+
+
+class CustomerLoyaltyLedgerEntry(Base, TimestampMixin):
+    __tablename__ = "customer_loyalty_ledger_entries"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    customer_profile_id: Mapped[str] = mapped_column(
+        ForeignKey("customer_profiles.id", ondelete="CASCADE"),
+        index=True,
+    )
+    account_id: Mapped[str] = mapped_column(
+        ForeignKey("customer_loyalty_accounts.id", ondelete="CASCADE"),
+        index=True,
+    )
+    branch_id: Mapped[str | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), default=None)
+    entry_type: Mapped[str] = mapped_column(String(32))
+    source_type: Mapped[str] = mapped_column(String(32))
+    source_reference_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    points_delta: Mapped[int] = mapped_column(Integer(), default=0)
+    balance_after: Mapped[int] = mapped_column(Integer(), default=0)
     note: Mapped[str | None] = mapped_column(String(1024), default=None)
 
 

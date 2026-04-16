@@ -173,6 +173,9 @@ class OfflineContinuityService:
             sgst_total=draft.sgst_total,
             igst_total=draft.igst_total,
             grand_total=draft.grand_total,
+            loyalty_points_redeemed=0,
+            loyalty_discount_amount=0.0,
+            loyalty_points_earned=0,
             payment_method=str(payload["payment_method"]),
             payments=None,
             lines=[

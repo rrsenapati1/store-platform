@@ -108,6 +108,8 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
   const selectedItem = workspace.branchCatalogItems[0];
   const hasSelectedCustomerProfile = workspace.selectedCustomerProfile !== null;
   const selectedCustomerStoreCredit = workspace.selectedCustomerStoreCredit;
+  const selectedCustomerLoyalty = workspace.selectedCustomerLoyalty;
+  const loyaltyProgram = workspace.loyaltyProgram;
   const paymentMethodDescription = describePaymentMethod(workspace.paymentMethod);
   const isDigitalCheckout = isProviderBackedPaymentMethod(workspace.paymentMethod);
   const checkoutPaymentSession = workspace.checkoutPaymentSession;
@@ -186,6 +188,35 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                 label="Apply store credit amount"
                 value={workspace.storeCreditAmount}
                 onChange={workspace.setStoreCreditAmount}
+              />
+            </div>
+          </>
+        ) : null}
+        {hasSelectedCustomerProfile && selectedCustomerLoyalty ? (
+          <>
+            <DetailList
+              items={[
+                { label: 'Available loyalty points', value: String(selectedCustomerLoyalty.available_points) },
+                { label: 'Earned loyalty points', value: String(selectedCustomerLoyalty.earned_total) },
+                { label: 'Redeemed loyalty points', value: String(selectedCustomerLoyalty.redeemed_total) },
+                {
+                  label: 'Redemption rule',
+                  value: loyaltyProgram
+                    ? `${loyaltyProgram.redeem_step_points} pts = ${loyaltyProgram.redeem_value_per_step}`
+                    : 'Program unavailable',
+                },
+                {
+                  label: 'Minimum redeem',
+                  value: loyaltyProgram ? String(loyaltyProgram.minimum_redeem_points) : 'Program unavailable',
+                },
+              ]}
+            />
+            <div style={{ marginTop: '14px' }}>
+              <FormField
+                id="runtime-loyalty-points"
+                label="Redeem loyalty points"
+                value={workspace.loyaltyPointsToRedeem}
+                onChange={workspace.setLoyaltyPointsToRedeem}
               />
             </div>
           </>

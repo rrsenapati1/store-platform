@@ -363,6 +363,25 @@ describe('store runtime sale return flow', () => {
           ledger_entries: [],
         }) as never;
       }
+      if (url.endsWith('/v1/tenants/tenant-acme/loyalty-program') && method === 'GET') {
+        return jsonResponse({
+          status: 'ACTIVE',
+          earn_points_per_currency_unit: 1,
+          redeem_step_points: 100,
+          redeem_value_per_step: 10,
+          minimum_redeem_points: 200,
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/loyalty') && method === 'GET') {
+        return jsonResponse({
+          customer_profile_id: 'profile-1',
+          available_points: 300,
+          earned_total: 300,
+          redeemed_total: 0,
+          adjusted_total: 0,
+          ledger_entries: [],
+        }) as never;
+      }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'POST') {
         return jsonResponse({
           id: 'sale-1',
@@ -381,6 +400,9 @@ describe('store runtime sale return flow', () => {
           igst_total: 0,
           grand_total: 388.5,
           store_credit_amount: 0,
+          loyalty_points_redeemed: 0,
+          loyalty_discount_amount: 0,
+          loyalty_points_earned: 0,
           payment: { payment_method: 'UPI', amount: 388.5 },
           lines: [
             {
@@ -415,6 +437,9 @@ describe('store runtime sale return flow', () => {
               payment_method: 'UPI',
               grand_total: 388.5,
               store_credit_amount: 0,
+              loyalty_points_redeemed: 0,
+              loyalty_discount_amount: 0,
+              loyalty_points_earned: 0,
               issued_on: '2026-04-16',
             },
           ],

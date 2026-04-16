@@ -16,6 +16,7 @@ class SaleCreateRequest(BaseModel):
     customer_gstin: str | None = None
     payment_method: str
     store_credit_amount: float = Field(default=0, ge=0)
+    loyalty_points_to_redeem: int = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
 
 
@@ -27,6 +28,7 @@ class CheckoutPaymentSessionCreateRequest(BaseModel):
     customer_profile_id: str | None = None
     customer_name: str
     customer_gstin: str | None = None
+    loyalty_points_to_redeem: int = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
 
 
@@ -120,6 +122,9 @@ class SaleResponse(BaseModel):
     igst_total: float
     grand_total: float
     store_credit_amount: float = 0
+    loyalty_points_redeemed: int = 0
+    loyalty_discount_amount: float = 0
+    loyalty_points_earned: int = 0
     payment: PaymentResponse
     lines: list[SaleLineResponse]
     tax_lines: list[InvoiceTaxLineResponse]
@@ -135,6 +140,9 @@ class SaleRecord(BaseModel):
     payment_method: str
     grand_total: float
     store_credit_amount: float = 0
+    loyalty_points_redeemed: int = 0
+    loyalty_discount_amount: float = 0
+    loyalty_points_earned: int = 0
     issued_on: date
 
 
