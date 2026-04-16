@@ -16,6 +16,9 @@ import type {
   ControlPlaneRestockTask,
   ControlPlaneRuntimeDeviceClaimResolution,
   ControlPlaneRuntimeHeartbeat,
+  ControlPlaneStockCount,
+  ControlPlaneStockCountBoard,
+  ControlPlaneStockCountReviewSession,
   ControlPlaneSale,
   ControlPlaneSaleRecord,
   ControlPlaneSaleReturn,
@@ -51,6 +54,13 @@ import {
   runLoadRestockBoard,
   runPickRestockTask,
 } from './storeRestockActions';
+import {
+  runApproveStockCountSession,
+  runCancelStockCountSession,
+  runCreateStockCountSession,
+  runLoadStockCountBoard,
+  runRecordStockCountSession,
+} from './storeStockCountActions';
 import {
   clearStoreRuntimeLocalAuth,
   isStoreRuntimeLocalAuthOfflineExpired,
@@ -120,6 +130,9 @@ export function useStoreRuntimeWorkspace() {
   const [latestScanLookup, setLatestScanLookup] = useState<ControlPlaneBarcodeScanLookup | null>(null);
   const [restockBoard, setRestockBoard] = useState<ControlPlaneRestockBoard | null>(null);
   const [latestRestockTask, setLatestRestockTask] = useState<ControlPlaneRestockTask | null>(null);
+  const [stockCountBoard, setStockCountBoard] = useState<ControlPlaneStockCountBoard | null>(null);
+  const [activeStockCountSession, setActiveStockCountSession] = useState<ControlPlaneStockCountReviewSession | null>(null);
+  const [latestApprovedStockCount, setLatestApprovedStockCount] = useState<ControlPlaneStockCount | null>(null);
   const [latestSale, setLatestSale] = useState<ControlPlaneSale | null>(null);
   const [latestSaleReturn, setLatestSaleReturn] = useState<ControlPlaneSaleReturn | null>(null);
   const [latestExchange, setLatestExchange] = useState<ControlPlaneExchange | null>(null);
@@ -144,6 +157,10 @@ export function useStoreRuntimeWorkspace() {
   const [restockSourcePosture, setRestockSourcePosture] = useState('BACKROOM_AVAILABLE');
   const [restockNote, setRestockNote] = useState('');
   const [restockCompletionNote, setRestockCompletionNote] = useState('');
+  const [selectedStockCountProductId, setSelectedStockCountProductId] = useState('');
+  const [stockCountNote, setStockCountNote] = useState('');
+  const [blindCountedQuantity, setBlindCountedQuantity] = useState('');
+  const [stockCountReviewNote, setStockCountReviewNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [returnQuantity, setReturnQuantity] = useState('1');
   const [refundAmount, setRefundAmount] = useState('');
@@ -1230,6 +1247,92 @@ export function useStoreRuntimeWorkspace() {
     });
   }
 
+  async function loadStockCountBoard() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    await runLoadStockCountBoard({
+      accessToken,
+      tenantId,
+      branchId,
+      setIsBusy,
+      setErrorMessage,
+      setStockCountBoard,
+      setSelectedStockCountProductId,
+    });
+  }
+
+  async function createStockCountSession() {
+    if (!accessToken || !tenantId || !branchId || !selectedStockCountProductId) {
+      return;
+    }
+    await runCreateStockCountSession({
+      accessToken,
+      tenantId,
+      branchId,
+      productId: selectedStockCountProductId,
+      note: stockCountNote,
+      setIsBusy,
+      setErrorMessage,
+      setActiveStockCountSession,
+      setStockCountBoard,
+    });
+  }
+
+  async function recordStockCountSession() {
+    if (!accessToken || !tenantId || !branchId || !activeStockCountSession || !blindCountedQuantity) {
+      return;
+    }
+    await runRecordStockCountSession({
+      accessToken,
+      tenantId,
+      branchId,
+      stockCountSessionId: activeStockCountSession.id,
+      countedQuantity: Number(blindCountedQuantity),
+      note: stockCountNote,
+      setIsBusy,
+      setErrorMessage,
+      setActiveStockCountSession,
+      setStockCountBoard,
+    });
+  }
+
+  async function approveStockCountSession() {
+    if (!accessToken || !tenantId || !branchId || !activeStockCountSession) {
+      return;
+    }
+    await runApproveStockCountSession({
+      accessToken,
+      tenantId,
+      branchId,
+      stockCountSessionId: activeStockCountSession.id,
+      reviewNote: stockCountReviewNote,
+      setIsBusy,
+      setErrorMessage,
+      setActiveStockCountSession,
+      setLatestApprovedStockCount,
+      setStockCountBoard,
+      setInventorySnapshot,
+    });
+  }
+
+  async function cancelStockCountSession() {
+    if (!accessToken || !tenantId || !branchId || !activeStockCountSession) {
+      return;
+    }
+    await runCancelStockCountSession({
+      accessToken,
+      tenantId,
+      branchId,
+      stockCountSessionId: activeStockCountSession.id,
+      reviewNote: stockCountReviewNote,
+      setIsBusy,
+      setErrorMessage,
+      setActiveStockCountSession,
+      setStockCountBoard,
+    });
+  }
+
   async function createExchange() {
     const sale = latestSale;
     const saleLine = sale?.lines[0];
@@ -1659,7 +1762,9 @@ export function useStoreRuntimeWorkspace() {
   return {
     accessToken,
     activeBatchExpirySession,
+    activeStockCountSession,
     actor,
+    approveStockCountSession,
     approveBatchExpirySession,
     batchExpiryReport,
     batchExpiryBoard,
@@ -1679,9 +1784,11 @@ export function useStoreRuntimeWorkspace() {
     createExchange,
     createBatchExpirySession,
     createBatchExpiryWriteOff,
+    createStockCountSession,
     createSaleReturn,
     createSalesInvoice,
     cancelBatchExpirySession,
+    cancelStockCountSession,
     cancelCheckoutPaymentSession,
     checkoutPaymentSession: runtimeCheckoutPayment.checkoutPaymentSession,
     checkoutPaymentHistory: runtimeCheckoutPayment.checkoutPaymentHistory,
@@ -1707,6 +1814,7 @@ export function useStoreRuntimeWorkspace() {
     localAuthRecord,
     latestPrintJob,
     latestBatchWriteOff,
+    latestApprovedStockCount,
     latestScanLookup,
     latestRestockTask,
     latestSale,
@@ -1727,6 +1835,7 @@ export function useStoreRuntimeWorkspace() {
     loadBatchExpiryBoard,
     loadBatchExpiryReport,
     loadRestockBoard,
+    loadStockCountBoard,
     queueLatestCreditNotePrint,
     queueLatestInvoicePrint,
     replayOfflineSales: offlineContinuity.replayOfflineSales,
@@ -1740,6 +1849,7 @@ export function useStoreRuntimeWorkspace() {
     openRuntimeCashDrawer,
     readRuntimeScaleWeight,
     recordBatchExpirySession,
+    recordStockCountSession,
     runtimeAppVersion: runtimeShellStatus?.app_version ?? null,
     runtimeArchitecture: runtimeShellStatus?.architecture ?? null,
     runtimeCacheDatabasePath: runtimeShellStatus?.cache_db_path ?? null,
@@ -1823,9 +1933,12 @@ export function useStoreRuntimeWorkspace() {
     sales,
     sessionExpiresAt,
     selectedRuntimeDeviceId,
+    selectedStockCountProductId,
+    blindCountedQuantity,
     setConfirmPin,
     setCustomerGstin,
     setCustomerName,
+    setBlindCountedQuantity,
     setExpiryReviewNote,
     setExpirySessionNote,
     setExpiryWriteOffQuantity,
@@ -1843,14 +1956,20 @@ export function useStoreRuntimeWorkspace() {
     setRestockCompletionNote,
     setScannedBarcode,
     setSelectedRuntimeDeviceId,
+    setSelectedStockCountProductId,
     setReplacementQuantity,
     setRefundAmount,
     setRefundMethod,
     setReturnQuantity,
     setSaleQuantity,
+    setStockCountNote,
+    setStockCountReviewNote,
     setUnlockPin,
     signOut,
     startSession,
+    stockCountBoard,
+    stockCountNote,
+    stockCountReviewNote,
     tenantId,
     tenant,
     completeFirstPrintJob,
