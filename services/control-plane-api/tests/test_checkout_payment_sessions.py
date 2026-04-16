@@ -62,6 +62,8 @@ def _seed_checkout_context(client: TestClient) -> dict[str, object]:
             "barcode": "8901234567890",
             "hsn_sac_code": "0902",
             "gst_rate": 5.0,
+            "mrp": 120.0,
+            "category_code": "TEA",
             "selling_price": 92.5,
         },
     )
@@ -143,6 +145,7 @@ def _payment_session_payload(
     customer_profile_id: str | None = None,
     promotion_code: str | None = None,
     loyalty_points_to_redeem: int = 0,
+    store_credit_amount: float = 0.0,
 ) -> dict[str, object]:
     return {
         "provider_name": "cashfree",
@@ -154,6 +157,7 @@ def _payment_session_payload(
         "customer_name": "Acme Traders",
         "customer_gstin": "29AAEPM0111C1Z3",
         "loyalty_points_to_redeem": loyalty_points_to_redeem,
+        "store_credit_amount": store_credit_amount,
         "lines": [{"product_id": product_id, "quantity": 4}],
     }
 
@@ -573,6 +577,121 @@ def test_checkout_payment_session_rejects_invalid_promotion_code(monkeypatch) ->
     )
     assert create_response.status_code == 400
     assert create_response.json()["detail"] == "Promotion code is invalid"
+
+
+def test_checkout_payment_session_amount_matches_price_preview_with_automatic_discount_and_store_credit(monkeypatch) -> None:
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", "cashfree-secret")
+    database_url = sqlite_test_database_url("checkout-payment-session-price-preview")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+
+    customer_profile = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles",
+        headers=context["owner_headers"],
+        json={
+            "full_name": "Acme Traders",
+            "phone": "+919999999999",
+            "email": "billing@acme.example",
+            "gstin": "29AAEPM0111C1Z3",
+            "default_note": "Wholesale customer",
+            "tags": ["wholesale"],
+        },
+    )
+    assert customer_profile.status_code == 200
+    customer_profile_id = customer_profile.json()["id"]
+
+    credit_issue = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/store-credit/issue",
+        headers=context["owner_headers"],
+        json={"amount": 50.0, "note": "Return credit"},
+    )
+    assert credit_issue.status_code == 200
+
+    automatic_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Tea automatic discount",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_category_codes": ["TEA"],
+        },
+    )
+    assert automatic_campaign.status_code == 200
+
+    code_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Checkout QR Discount",
+            "status": "ACTIVE",
+            "trigger_mode": "CODE",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 20.0,
+            "minimum_order_amount": 100.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": 500,
+        },
+    )
+    assert code_campaign.status_code == 200
+
+    code = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns/{code_campaign.json()['id']}/codes",
+        headers=context["owner_headers"],
+        json={"code": "CHECKOUT20", "status": "ACTIVE", "redemption_limit_per_code": 100},
+    )
+    assert code.status_code == 200
+
+    preview = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-price-preview",
+        headers=context["cashier_headers"],
+        json={
+            "customer_profile_id": customer_profile_id,
+            "customer_name": "Acme Traders",
+            "customer_gstin": "29AAEPM0111C1Z3",
+            "promotion_code": "CHECKOUT20",
+            "loyalty_points_to_redeem": 0,
+            "store_credit_amount": 10.0,
+            "lines": [{"product_id": context["product_id"], "quantity": 4}],
+        },
+    )
+    assert preview.status_code == 200
+    assert preview.json()["summary"]["automatic_discount_total"] == 37.0
+    assert preview.json()["summary"]["promotion_code_discount_total"] == 20.0
+    assert preview.json()["summary"]["store_credit_amount"] == 10.0
+    assert preview.json()["summary"]["final_payable_amount"] == 325.65
+
+    create_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            customer_profile_id=customer_profile_id,
+            promotion_code="CHECKOUT20",
+            store_credit_amount=10.0,
+        ),
+    )
+    assert create_response.status_code == 200
+    assert create_response.json()["order_amount"] == preview.json()["summary"]["final_payable_amount"]
+    assert create_response.json()["automatic_campaign_name"] == "Tea automatic discount"
+    assert create_response.json()["automatic_discount_total"] == 37.0
+    assert create_response.json()["promotion_code_discount_total"] == 20.0
+    assert create_response.json()["store_credit_amount"] == 10.0
 
 
 def test_confirmed_checkout_payment_session_can_be_recovered_and_history_lists_recent_records(monkeypatch) -> None:

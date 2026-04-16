@@ -155,3 +155,106 @@ def test_shared_promotion_codes_track_duplicates_and_campaign_status() -> None:
     )
     assert reactivated.status_code == 200
     assert reactivated.json()["status"] == "ACTIVE"
+
+
+def test_automatic_promotion_campaign_supports_cart_and_item_category_rules() -> None:
+    client, tenant_id, owner_headers = _create_owner_context(slug="promotion-campaign-automatic")
+
+    automatic_cart = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Weekend automatic cart",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "CART",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 5.0,
+            "minimum_order_amount": 100.0,
+            "maximum_discount_amount": 40.0,
+            "redemption_limit_total": None,
+        },
+    )
+    assert automatic_cart.status_code == 200
+    assert automatic_cart.json()["trigger_mode"] == "AUTOMATIC"
+    assert automatic_cart.json()["scope"] == "CART"
+    assert automatic_cart.json()["target_product_ids"] == []
+    assert automatic_cart.json()["target_category_codes"] == []
+
+    automatic_item_category = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Tea automatic discount",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_product_ids": ["product-tea-1"],
+            "target_category_codes": ["TEA"],
+        },
+    )
+    assert automatic_item_category.status_code == 200
+    assert automatic_item_category.json()["trigger_mode"] == "AUTOMATIC"
+    assert automatic_item_category.json()["scope"] == "ITEM_CATEGORY"
+    assert automatic_item_category.json()["target_product_ids"] == ["product-tea-1"]
+    assert automatic_item_category.json()["target_category_codes"] == ["TEA"]
+
+
+def test_automatic_item_category_campaign_requires_targets_and_rejects_shared_codes() -> None:
+    client, tenant_id, owner_headers = _create_owner_context(slug="promotion-campaign-automatic-invalid")
+
+    missing_targets = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Broken automatic item discount",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_product_ids": [],
+            "target_category_codes": [],
+        },
+    )
+    assert missing_targets.status_code == 400
+    assert missing_targets.json()["detail"] == "Automatic item or category campaigns require at least one target"
+
+    automatic_item_category = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Tea automatic item discount",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_category_codes": ["TEA"],
+        },
+    )
+    assert automatic_item_category.status_code == 200
+    campaign_id = automatic_item_category.json()["id"]
+
+    shared_code = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns/{campaign_id}/codes",
+        headers=owner_headers,
+        json={
+            "code": "TEA10",
+            "status": "ACTIVE",
+            "redemption_limit_per_code": 100,
+        },
+    )
+    assert shared_code.status_code == 400
+    assert shared_code.json()["detail"] == "Automatic campaigns do not support shared promotion codes"

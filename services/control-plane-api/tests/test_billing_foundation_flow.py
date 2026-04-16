@@ -1484,3 +1484,241 @@ def test_sale_rejects_unknown_promotion_code() -> None:
     )
     assert invalid.status_code == 400
     assert invalid.json()["detail"] == "Promotion code is invalid"
+
+
+def test_sale_snapshots_automatic_discounts_before_code_loyalty_and_store_credit() -> None:
+    database_url = sqlite_test_database_url("billing-foundation-automatic-discounts")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    admin_session = _exchange(client, subject="platform-admin-1", email="admin@store.local", name="Platform Admin")
+    admin_headers = {"authorization": f"Bearer {admin_session['access_token']}"}
+
+    tenant = client.post(
+        "/v1/platform/tenants",
+        headers=admin_headers,
+        json={"name": "Acme Retail", "slug": "acme-retail-automatic-discounts"},
+    )
+    assert tenant.status_code == 200
+    tenant_id = tenant.json()["id"]
+
+    owner_invite = client.post(
+        f"/v1/platform/tenants/{tenant_id}/owner-invites",
+        headers=admin_headers,
+        json={"email": "owner@acme.local", "full_name": "Acme Owner"},
+    )
+    assert owner_invite.status_code == 200
+
+    owner_session = _exchange(client, subject="owner-1", email="owner@acme.local", name="Acme Owner")
+    owner_headers = {"authorization": f"Bearer {owner_session['access_token']}"}
+
+    branch = client.post(
+        f"/v1/tenants/{tenant_id}/branches",
+        headers=owner_headers,
+        json={"name": "Bengaluru Flagship", "code": "blr-flagship", "gstin": "29ABCDE1234F1Z5"},
+    )
+    assert branch.status_code == 200
+    branch_id = branch.json()["id"]
+
+    product = client.post(
+        f"/v1/tenants/{tenant_id}/catalog/products",
+        headers=owner_headers,
+        json={
+            "name": "Classic Tea",
+            "sku_code": "tea-classic-250g",
+            "barcode": "8901234567890",
+            "hsn_sac_code": "0902",
+            "gst_rate": 5.0,
+            "mrp": 120.0,
+            "category_code": "TEA",
+            "selling_price": 92.5,
+        },
+    )
+    assert product.status_code == 200
+    product_id = product.json()["id"]
+
+    branch_catalog_item = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/catalog-items",
+        headers=owner_headers,
+        json={"product_id": product_id, "selling_price_override": None, "availability_status": "ACTIVE"},
+    )
+    assert branch_catalog_item.status_code == 200
+
+    supplier = client.post(
+        f"/v1/tenants/{tenant_id}/suppliers",
+        headers=owner_headers,
+        json={"name": "Acme Tea Traders", "gstin": "29AAEPM0111C1Z3", "payment_terms_days": 14},
+    )
+    assert supplier.status_code == 200
+    supplier_id = supplier.json()["id"]
+
+    purchase_order = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders",
+        headers=owner_headers,
+        json={
+            "supplier_id": supplier_id,
+            "lines": [{"product_id": product_id, "quantity": 24, "unit_cost": 61.5}],
+        },
+    )
+    assert purchase_order.status_code == 200
+    purchase_order_id = purchase_order.json()["id"]
+
+    submitted = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}/submit-approval",
+        headers=owner_headers,
+        json={"note": "Need replenishment before the weekend rush"},
+    )
+    assert submitted.status_code == 200
+
+    approved = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}/approve",
+        headers=owner_headers,
+        json={"note": "Approved for branch restock"},
+    )
+    assert approved.status_code == 200
+
+    goods_receipt = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/goods-receipts",
+        headers=owner_headers,
+        json={"purchase_order_id": purchase_order_id},
+    )
+    assert goods_receipt.status_code == 200
+
+    customer_profile = client.post(
+        f"/v1/tenants/{tenant_id}/customer-profiles",
+        headers=owner_headers,
+        json={
+            "full_name": "Acme Traders",
+            "phone": "+919999999999",
+            "email": "billing@acme.example",
+            "gstin": "29AAEPM0111C1Z3",
+            "default_note": "Wholesale customer",
+            "tags": ["wholesale"],
+        },
+    )
+    assert customer_profile.status_code == 200
+    customer_profile_id = customer_profile.json()["id"]
+
+    loyalty_program = client.put(
+        f"/v1/tenants/{tenant_id}/loyalty-program",
+        headers=owner_headers,
+        json={
+            "status": "ACTIVE",
+            "earn_points_per_currency_unit": 1.0,
+            "redeem_step_points": 100,
+            "redeem_value_per_step": 10.0,
+            "minimum_redeem_points": 200,
+        },
+    )
+    assert loyalty_program.status_code == 200
+
+    loyalty_adjustment = client.post(
+        f"/v1/tenants/{tenant_id}/customer-profiles/{customer_profile_id}/loyalty/adjust",
+        headers=owner_headers,
+        json={"points_delta": 300, "note": "Welcome points"},
+    )
+    assert loyalty_adjustment.status_code == 200
+
+    credit_issue = client.post(
+        f"/v1/tenants/{tenant_id}/customer-profiles/{customer_profile_id}/store-credit/issue",
+        headers=owner_headers,
+        json={"amount": 50.0, "note": "Return credit"},
+    )
+    assert credit_issue.status_code == 200
+
+    automatic_campaign = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Tea automatic discount",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_category_codes": ["TEA"],
+        },
+    )
+    assert automatic_campaign.status_code == 200
+
+    code_campaign = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Welcome Flat Discount",
+            "status": "ACTIVE",
+            "trigger_mode": "CODE",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 20.0,
+            "minimum_order_amount": 50.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": 500,
+        },
+    )
+    assert code_campaign.status_code == 200
+    code = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns/{code_campaign.json()['id']}/codes",
+        headers=owner_headers,
+        json={"code": "WELCOME20", "status": "ACTIVE", "redemption_limit_per_code": 100},
+    )
+    assert code.status_code == 200
+
+    branch_membership = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/memberships",
+        headers=owner_headers,
+        json={"email": "cashier@acme.local", "full_name": "Counter Cashier", "role_name": "cashier"},
+    )
+    assert branch_membership.status_code == 200
+
+    cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
+    cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+
+    sale = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
+        headers=cashier_headers,
+        json={
+            "customer_profile_id": customer_profile_id,
+            "customer_name": "Acme Traders",
+            "customer_gstin": "29AAEPM0111C1Z3",
+            "payment_method": "UPI",
+            "promotion_code": "WELCOME20",
+            "loyalty_points_to_redeem": 200,
+            "store_credit_amount": 10.0,
+            "lines": [{"product_id": product_id, "quantity": 1}],
+        },
+    )
+    assert sale.status_code == 200
+    assert sale.json()["automatic_campaign_name"] == "Tea automatic discount"
+    assert sale.json()["automatic_discount_total"] == 9.25
+    assert sale.json()["promotion_code_discount_total"] == 20.0
+    assert sale.json()["total_discount"] == 49.25
+    assert sale.json()["invoice_total"] == 66.41
+    assert sale.json()["grand_total"] == 46.41
+    assert sale.json()["lines"] == [
+        {
+            "product_id": product_id,
+            "product_name": "Classic Tea",
+            "sku_code": "tea-classic-250g",
+            "hsn_sac_code": "0902",
+            "quantity": 1.0,
+            "mrp": 120.0,
+            "unit_selling_price": 92.5,
+            "gst_rate": 5.0,
+            "automatic_discount_amount": 9.25,
+            "promotion_code_discount_amount": 20.0,
+            "promotion_discount_source": "AUTOMATIC_ITEM_CATEGORY+CODE",
+            "taxable_amount": 63.25,
+            "tax_amount": 3.16,
+            "line_total": 66.41,
+        }
+    ]
