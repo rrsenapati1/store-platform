@@ -10,6 +10,7 @@ from .exchanges import router as exchange_router
 from .inventory import router as inventory_router
 from .operations import router as operations_router
 from .platform import router as platform_router
+from .promotions import router as promotions_router
 from .procurement_finance import router as procurement_finance_router
 from .purchasing import router as purchasing_router
 from .runtime import router as runtime_router
@@ -32,6 +33,7 @@ __all__ = [
     "inventory_router",
     "operations_router",
     "platform_router",
+    "promotions_router",
     "procurement_finance_router",
     "purchasing_router",
     "runtime_router",

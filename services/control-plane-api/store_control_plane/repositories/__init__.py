@@ -11,6 +11,7 @@ from .inventory import InventoryRepository
 from .memberships import MembershipRepository
 from .operations import OperationsRepository
 from .procurement_finance import ProcurementFinanceRepository
+from .promotions import PromotionRepository
 from .purchasing import PurchasingRepository
 from .runtime import RuntimeRepository
 from .sync_runtime import SyncRuntimeRepository
@@ -33,6 +34,7 @@ __all__ = [
     "MembershipRepository",
     "OperationsRepository",
     "ProcurementFinanceRepository",
+    "PromotionRepository",
     "PurchasingRepository",
     "RuntimeRepository",
     "SyncRuntimeRepository",
