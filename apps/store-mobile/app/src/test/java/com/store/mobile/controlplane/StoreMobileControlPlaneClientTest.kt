@@ -111,6 +111,57 @@ class StoreMobileControlPlaneClientTest {
     }
 
     @Test
+    fun getsReplenishmentBoardWithLowStockRecords() {
+        val transport = FakeStoreMobileControlPlaneTransport(
+            responseBody = """
+                {
+                  "branch_id": "branch-demo-1",
+                  "low_stock_count": 1,
+                  "adequate_count": 1,
+                  "records": [
+                    {
+                      "product_id": "prod-demo-1",
+                      "product_name": "ACME TEA",
+                      "sku_code": "TEA-001",
+                      "stock_on_hand": 8.0,
+                      "reorder_point": 10.0,
+                      "target_stock": 24.0,
+                      "suggested_reorder_quantity": 16.0,
+                      "replenishment_status": "LOW_STOCK"
+                    },
+                    {
+                      "product_id": "prod-demo-2",
+                      "product_name": "GINGER TEA",
+                      "sku_code": "TEA-002",
+                      "stock_on_hand": 18.0,
+                      "reorder_point": 10.0,
+                      "target_stock": 24.0,
+                      "suggested_reorder_quantity": 0.0,
+                      "replenishment_status": "ADEQUATE"
+                    }
+                  ]
+                }
+            """.trimIndent(),
+        )
+        val client = StoreMobileControlPlaneClient(
+            baseUrl = "http://127.0.0.1:9400",
+            accessToken = "session-token",
+            transport = transport,
+        )
+
+        val board = client.getReplenishmentBoard(tenantId = "tenant-demo-1", branchId = "branch-demo-1")
+
+        assertEquals(
+            "/v1/tenants/tenant-demo-1/branches/branch-demo-1/replenishment-board",
+            transport.lastRequest?.path,
+        )
+        assertEquals("Bearer session-token", transport.lastRequest?.authorizationHeader)
+        assertEquals(1, board.lowStockCount)
+        assertEquals("LOW_STOCK", board.records.first().replenishmentStatus)
+        assertEquals(16.0, board.records.first().suggestedReorderQuantity, 0.001)
+    }
+
+    @Test
     fun postsRecordBlindCountPayload() {
         val transport = FakeStoreMobileControlPlaneTransport(
             responseBody = """

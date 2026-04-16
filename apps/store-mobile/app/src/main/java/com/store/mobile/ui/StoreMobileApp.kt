@@ -279,6 +279,10 @@ fun StoreMobileApp() {
                 restockViewModel.refreshBoard()
                 restockState = restockViewModel.state
             },
+            onSelectReplenishmentProduct = { productId ->
+                restockViewModel.selectReplenishmentProduct(productId)
+                restockState = restockViewModel.state
+            },
             onRequestedQuantityChange = { value ->
                 restockViewModel.updateRequestedQuantity(value)
                 restockState = restockViewModel.state

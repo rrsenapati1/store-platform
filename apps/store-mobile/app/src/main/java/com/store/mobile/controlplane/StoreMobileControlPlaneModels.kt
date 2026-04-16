@@ -301,3 +301,21 @@ data class ControlPlaneRestockBoard(
     val canceledCount: Int,
     val records: List<ControlPlaneRestockBoardRecord>,
 )
+
+data class ControlPlaneReplenishmentBoardRecord(
+    val productId: String,
+    val productName: String,
+    val skuCode: String,
+    val stockOnHand: Double,
+    val reorderPoint: Double,
+    val targetStock: Double,
+    val suggestedReorderQuantity: Double,
+    val replenishmentStatus: String,
+)
+
+data class ControlPlaneReplenishmentBoard(
+    val branchId: String,
+    val lowStockCount: Int,
+    val adequateCount: Int,
+    val records: List<ControlPlaneReplenishmentBoardRecord>,
+)

@@ -60,8 +60,27 @@ data class RestockBoard(
     val records: List<RestockBoardRecord>,
 )
 
+data class ReplenishmentBoardRecord(
+    val productId: String,
+    val productName: String,
+    val skuCode: String,
+    val stockOnHand: Double,
+    val reorderPoint: Double,
+    val targetStock: Double,
+    val suggestedReorderQuantity: Double,
+    val replenishmentStatus: String,
+)
+
+data class ReplenishmentBoard(
+    val branchId: String,
+    val lowStockCount: Int,
+    val adequateCount: Int,
+    val records: List<ReplenishmentBoardRecord>,
+)
+
 interface RestockRepository {
     fun loadRestockBoard(branchId: String): RestockBoard
+    fun loadReplenishmentBoard(branchId: String): ReplenishmentBoard
     fun createRestockTask(branchId: String, input: CreateRestockTaskInput): RestockTask
     fun pickRestockTask(branchId: String, taskId: String, pickedQuantity: Double, note: String? = null): RestockTask
     fun completeRestockTask(branchId: String, taskId: String, completionNote: String? = null): RestockTask
@@ -104,6 +123,15 @@ class InMemoryRestockRepository : RestockRepository {
                     },
                 )
             },
+        )
+    }
+
+    override fun loadReplenishmentBoard(branchId: String): ReplenishmentBoard {
+        return ReplenishmentBoard(
+            branchId = branchId,
+            lowStockCount = 0,
+            adequateCount = 0,
+            records = emptyList(),
         )
     }
 

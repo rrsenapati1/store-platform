@@ -1,6 +1,7 @@
 package com.store.mobile.operations
 
 import com.store.mobile.controlplane.ControlPlaneInventorySnapshotRecord
+import com.store.mobile.controlplane.ControlPlaneReplenishmentBoardRecord
 import com.store.mobile.controlplane.ControlPlaneRestockBoardRecord
 import com.store.mobile.controlplane.ControlPlaneRestockTask
 import com.store.mobile.controlplane.StoreMobileControlPlaneClient
@@ -30,6 +31,18 @@ class RemoteRestockRepository(
                 completedCount = board.completedCount,
                 canceledCount = board.canceledCount,
                 records = board.records.map(::mapBoardRecord),
+            )
+        }
+    }
+
+    override fun loadReplenishmentBoard(branchId: String): ReplenishmentBoard {
+        return runControlPlane {
+            val board = client.getReplenishmentBoard(tenantId = tenantId, branchId = branchId)
+            ReplenishmentBoard(
+                branchId = board.branchId,
+                lowStockCount = board.lowStockCount,
+                adequateCount = board.adequateCount,
+                records = board.records.map(::mapReplenishmentRecord),
             )
         }
     }
@@ -109,6 +122,19 @@ class RemoteRestockRepository(
             note = record.note,
             completionNote = record.completionNote,
             activeTaskId = if (record.hasActiveTask) record.restockTaskId else null,
+        )
+    }
+
+    private fun mapReplenishmentRecord(record: ControlPlaneReplenishmentBoardRecord): ReplenishmentBoardRecord {
+        return ReplenishmentBoardRecord(
+            productId = record.productId,
+            productName = record.productName,
+            skuCode = record.skuCode,
+            stockOnHand = record.stockOnHand,
+            reorderPoint = record.reorderPoint,
+            targetStock = record.targetStock,
+            suggestedReorderQuantity = record.suggestedReorderQuantity,
+            replenishmentStatus = record.replenishmentStatus,
         )
     }
 

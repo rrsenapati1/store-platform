@@ -2,6 +2,16 @@
 
 ## 2026-04-16
 
+- Expanded `V2-004` on Store Mobile and Inventory Tablet with replenishment-board-driven assisted restock:
+  - extended the Android control-plane client and models with `replenishment-board` parsing so paired runtimes can read low-stock posture directly from the control plane instead of relying only on scan-first context
+  - extended the restock repository boundary and `RemoteRestockRepository` to map replenishment-board records into the mobile restock domain without creating a separate workflow silo
+  - updated `RestockViewModel`, `RestockScreen`, and `StoreMobileApp` so operators can select a low-stock item from the replenishment board, seed the current restock draft, and still use the existing scan-first path when that is faster
+- Verified:
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest --tests com.store.mobile.controlplane.StoreMobileControlPlaneClientTest --tests com.store.mobile.operations.RemoteRestockRepositoryTest --tests com.store.mobile.ui.operations.RestockViewModelTest`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+  - `git -c core.safecrlf=false diff --check`
+
 - Expanded `V2-004` on Store Desktop with reviewed receiving workflow:
   - added desktop client routes for receiving-board, purchase-order detail, goods-receipt creation, and goods-receipt history so the runtime can execute reviewed receiving against the existing control-plane authority model
   - extracted receiving mutations into `storeReceivingActions.ts` and extended `useStoreRuntimeWorkspace.ts` with a board-driven reviewed-receiving flow that loads approved POs, builds line drafts from PO detail, validates quantities, creates the GRN, and refreshes board, receipts, and inventory snapshot

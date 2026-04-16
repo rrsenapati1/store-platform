@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 
 data class RestockScreenActions(
     val onRefreshBoard: () -> Unit = {},
+    val onSelectReplenishmentProduct: (String) -> Unit = {},
     val onRequestedQuantityChange: (String) -> Unit = {},
     val onPickedQuantityChange: (String) -> Unit = {},
     val onNoteChange: (String) -> Unit = {},
@@ -46,9 +47,35 @@ fun RestockScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(text = "Assisted restock", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            text = "Low-stock board: ${state.lowStockCount} low, ${state.adequateCount} adequate",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (state.replenishmentRecords.isEmpty()) {
+            Text(text = "No replenishment suggestions yet.", style = MaterialTheme.typography.bodyMedium)
+        } else {
+            state.replenishmentRecords.forEach { record ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { actions.onSelectReplenishmentProduct(record.productId) },
+                    ) {
+                        Text(text = "Select ${record.productName}")
+                    }
+                    Text(
+                        text = "${record.replenishmentStatus} :: suggested ${record.suggestedReorderQuantity}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
+        }
+
         if (state.productId == null) {
             Text(
-                text = "Scan and look up a branch item first, then use this screen to raise and progress a shelf/backroom restock task.",
+                text = "Select a low-stock item from the replenishment board or scan and look up a branch item first, then use this screen to raise and progress a shelf/backroom restock task.",
                 style = MaterialTheme.typography.bodyMedium,
             )
         } else {

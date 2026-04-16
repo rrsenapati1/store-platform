@@ -26,6 +26,23 @@ class RemoteRestockRepositoryTest {
     }
 
     @Test
+    fun mapsReplenishmentBoardIntoMobileBoard() {
+        val repository = RemoteRestockRepository(
+            tenantId = "tenant-demo-1",
+            client = buildClient(),
+        )
+
+        val board = repository.loadReplenishmentBoard(branchId = "branch-demo-1")
+
+        assertEquals("branch-demo-1", board.branchId)
+        assertEquals(1, board.lowStockCount)
+        assertEquals(1, board.adequateCount)
+        assertEquals("prod-demo-1", board.records.first().productId)
+        assertEquals("LOW_STOCK", board.records.first().replenishmentStatus)
+        assertEquals(16.0, board.records.first().suggestedReorderQuantity, 0.001)
+    }
+
+    @Test
     fun mapsRemoteRestockLifecycle() {
         val repository = RemoteRestockRepository(
             tenantId = "tenant-demo-1",
@@ -135,6 +152,37 @@ private class FakeRemoteRestockTransport : StoreMobileControlPlaneTransport {
                           "note": "Front shelf refill",
                           "completion_note": null,
                           "has_active_task": true
+                        }
+                      ]
+                    }
+                """.trimIndent()
+
+            "/v1/tenants/tenant-demo-1/branches/branch-demo-1/replenishment-board" ->
+                """
+                    {
+                      "branch_id": "branch-demo-1",
+                      "low_stock_count": 1,
+                      "adequate_count": 1,
+                      "records": [
+                        {
+                          "product_id": "prod-demo-1",
+                          "product_name": "ACME TEA",
+                          "sku_code": "TEA-001",
+                          "stock_on_hand": 8.0,
+                          "reorder_point": 10.0,
+                          "target_stock": 24.0,
+                          "suggested_reorder_quantity": 16.0,
+                          "replenishment_status": "LOW_STOCK"
+                        },
+                        {
+                          "product_id": "prod-demo-2",
+                          "product_name": "GINGER TEA",
+                          "sku_code": "TEA-002",
+                          "stock_on_hand": 18.0,
+                          "reorder_point": 10.0,
+                          "target_stock": 24.0,
+                          "suggested_reorder_quantity": 0.0,
+                          "replenishment_status": "ADEQUATE"
                         }
                       ]
                     }

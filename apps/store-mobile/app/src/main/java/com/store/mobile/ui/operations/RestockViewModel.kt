@@ -22,6 +22,17 @@ data class RestockTaskUiRecord(
     val activeTaskId: String? = null,
 )
 
+data class ReplenishmentUiRecord(
+    val productId: String,
+    val productName: String,
+    val skuCode: String,
+    val stockOnHand: Int,
+    val reorderPoint: Int,
+    val targetStock: Int,
+    val suggestedReorderQuantity: Int,
+    val replenishmentStatus: String,
+)
+
 data class RestockUiState(
     val productId: String? = null,
     val productName: String = "",
@@ -39,7 +50,10 @@ data class RestockUiState(
     val pickedCount: Int = 0,
     val completedCount: Int = 0,
     val canceledCount: Int = 0,
+    val lowStockCount: Int = 0,
+    val adequateCount: Int = 0,
     val records: List<RestockTaskUiRecord> = emptyList(),
+    val replenishmentRecords: List<ReplenishmentUiRecord> = emptyList(),
     val activeTask: RestockTaskUiRecord? = null,
     val errorMessage: String? = null,
 )
@@ -106,7 +120,33 @@ class RestockViewModel(
 
     fun refreshBoard() {
         val currentBranchId = branchId ?: return
-        applyBoard(repository.loadRestockBoard(currentBranchId))
+        applyBoard(
+            board = repository.loadRestockBoard(currentBranchId),
+            replenishmentBoard = repository.loadReplenishmentBoard(currentBranchId),
+        )
+    }
+
+    fun selectReplenishmentProduct(productId: String) {
+        val record = state.replenishmentRecords.firstOrNull { it.productId == productId } ?: run {
+            state = state.copy(errorMessage = "Replenishment product not found.")
+            return
+        }
+        state = state.copy(
+            productId = record.productId,
+            productName = record.productName,
+            skuCode = record.skuCode,
+            stockOnHand = record.stockOnHand,
+            reorderPoint = record.reorderPoint,
+            targetStock = record.targetStock,
+            suggestedQuantity = record.suggestedReorderQuantity,
+            requestedQuantity = if (record.suggestedReorderQuantity > 0) {
+                record.suggestedReorderQuantity.toString()
+            } else {
+                state.requestedQuantity
+            },
+            activeTask = deriveActiveTask(state.records, record.productId),
+            errorMessage = null,
+        )
     }
 
     fun createRestockTaskForCurrentProduct() {
@@ -143,7 +183,10 @@ class RestockViewModel(
                     note = state.note,
                 ),
             )
-            applyBoard(repository.loadRestockBoard(currentBranchId))
+            applyBoard(
+                board = repository.loadRestockBoard(currentBranchId),
+                replenishmentBoard = repository.loadReplenishmentBoard(currentBranchId),
+            )
         } catch (error: IllegalArgumentException) {
             state = state.copy(errorMessage = error.message ?: "Unable to create restock task.")
         }
@@ -168,7 +211,10 @@ class RestockViewModel(
                 pickedQuantity = pickedQuantity,
                 note = state.note,
             )
-            applyBoard(repository.loadRestockBoard(currentBranchId))
+            applyBoard(
+                board = repository.loadRestockBoard(currentBranchId),
+                replenishmentBoard = repository.loadReplenishmentBoard(currentBranchId),
+            )
         } catch (error: IllegalArgumentException) {
             state = state.copy(errorMessage = error.message ?: "Unable to mark restock task picked.")
         }
@@ -187,7 +233,10 @@ class RestockViewModel(
                 taskId = activeTask.taskId,
                 completionNote = state.completionNote,
             )
-            applyBoard(repository.loadRestockBoard(currentBranchId))
+            applyBoard(
+                board = repository.loadRestockBoard(currentBranchId),
+                replenishmentBoard = repository.loadReplenishmentBoard(currentBranchId),
+            )
         } catch (error: IllegalArgumentException) {
             state = state.copy(errorMessage = error.message ?: "Unable to complete restock task.")
         }
@@ -206,13 +255,19 @@ class RestockViewModel(
                 taskId = activeTask.taskId,
                 cancelNote = state.completionNote.ifBlank { state.note },
             )
-            applyBoard(repository.loadRestockBoard(currentBranchId))
+            applyBoard(
+                board = repository.loadRestockBoard(currentBranchId),
+                replenishmentBoard = repository.loadReplenishmentBoard(currentBranchId),
+            )
         } catch (error: IllegalArgumentException) {
             state = state.copy(errorMessage = error.message ?: "Unable to cancel restock task.")
         }
     }
 
-    private fun applyBoard(board: RestockBoard) {
+    private fun applyBoard(
+        board: RestockBoard,
+        replenishmentBoard: com.store.mobile.operations.ReplenishmentBoard,
+    ) {
         val records = board.records.map(::toUiRecord)
         state = state.copy(
             openCount = board.openCount,
@@ -220,6 +275,9 @@ class RestockViewModel(
             completedCount = board.completedCount,
             canceledCount = board.canceledCount,
             records = records,
+            lowStockCount = replenishmentBoard.lowStockCount,
+            adequateCount = replenishmentBoard.adequateCount,
+            replenishmentRecords = replenishmentBoard.records.map(::toUiRecord),
             activeTask = deriveActiveTask(records, state.productId),
             errorMessage = null,
         )
@@ -249,6 +307,19 @@ class RestockViewModel(
             note = record.note,
             completionNote = record.completionNote,
             activeTaskId = record.activeTaskId,
+        )
+    }
+
+    private fun toUiRecord(record: com.store.mobile.operations.ReplenishmentBoardRecord): ReplenishmentUiRecord {
+        return ReplenishmentUiRecord(
+            productId = record.productId,
+            productName = record.productName,
+            skuCode = record.skuCode,
+            stockOnHand = record.stockOnHand.toInt(),
+            reorderPoint = record.reorderPoint.toInt(),
+            targetStock = record.targetStock.toInt(),
+            suggestedReorderQuantity = record.suggestedReorderQuantity.toInt(),
+            replenishmentStatus = record.replenishmentStatus,
         )
     }
 

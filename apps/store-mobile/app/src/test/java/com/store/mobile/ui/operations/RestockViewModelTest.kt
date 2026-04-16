@@ -1,6 +1,11 @@
 package com.store.mobile.ui.operations
 
 import com.store.mobile.operations.InMemoryRestockRepository
+import com.store.mobile.operations.ReplenishmentBoard
+import com.store.mobile.operations.ReplenishmentBoardRecord
+import com.store.mobile.operations.RestockBoard
+import com.store.mobile.operations.RestockRepository
+import com.store.mobile.operations.RestockTask
 import com.store.mobile.ui.scan.ScanLookupUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -44,5 +49,68 @@ class RestockViewModelTest {
         assertEquals(1, viewModel.state.completedCount)
         assertNull(viewModel.state.activeTask)
         assertEquals("COMPLETED", viewModel.state.records.first().status)
+    }
+
+    @Test
+    fun selectsLowStockProductFromReplenishmentBoardWithoutScanLookup() {
+        val viewModel = RestockViewModel(
+            repository = object : RestockRepository {
+                override fun loadRestockBoard(branchId: String): RestockBoard {
+                    return RestockBoard(
+                        branchId = branchId,
+                        openCount = 0,
+                        pickedCount = 0,
+                        completedCount = 0,
+                        canceledCount = 0,
+                        records = emptyList(),
+                    )
+                }
+
+                override fun loadReplenishmentBoard(branchId: String): ReplenishmentBoard {
+                    return ReplenishmentBoard(
+                        branchId = branchId,
+                        lowStockCount = 1,
+                        adequateCount = 0,
+                        records = listOf(
+                            ReplenishmentBoardRecord(
+                                productId = "prod-demo-1",
+                                productName = "ACME TEA",
+                                skuCode = "TEA-001",
+                                stockOnHand = 8.0,
+                                reorderPoint = 10.0,
+                                targetStock = 24.0,
+                                suggestedReorderQuantity = 16.0,
+                                replenishmentStatus = "LOW_STOCK",
+                            ),
+                        ),
+                    )
+                }
+
+                override fun createRestockTask(branchId: String, input: com.store.mobile.operations.CreateRestockTaskInput): RestockTask {
+                    error("not used")
+                }
+
+                override fun pickRestockTask(branchId: String, taskId: String, pickedQuantity: Double, note: String?): RestockTask {
+                    error("not used")
+                }
+
+                override fun completeRestockTask(branchId: String, taskId: String, completionNote: String?): RestockTask {
+                    error("not used")
+                }
+
+                override fun cancelRestockTask(branchId: String, taskId: String, cancelNote: String?): RestockTask {
+                    error("not used")
+                }
+            },
+        )
+
+        viewModel.loadBranch(branchId = "branch-demo-1")
+        viewModel.selectReplenishmentProduct(productId = "prod-demo-1")
+
+        assertEquals(1, viewModel.state.lowStockCount)
+        assertEquals("prod-demo-1", viewModel.state.productId)
+        assertEquals("ACME TEA", viewModel.state.productName)
+        assertEquals(16, viewModel.state.suggestedQuantity)
+        assertEquals("16", viewModel.state.requestedQuantity)
     }
 }

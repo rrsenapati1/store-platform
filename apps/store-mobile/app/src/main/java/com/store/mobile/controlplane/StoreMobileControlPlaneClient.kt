@@ -114,6 +114,31 @@ class StoreMobileControlPlaneClient(
         return ControlPlaneInventorySnapshotResponse(records = records)
     }
 
+    fun getReplenishmentBoard(tenantId: String, branchId: String): ControlPlaneReplenishmentBoard {
+        val response = execute(
+            method = "GET",
+            path = "/v1/tenants/$tenantId/branches/$branchId/replenishment-board",
+        )
+        val root = JSONObject(response.body)
+        return ControlPlaneReplenishmentBoard(
+            branchId = root.getString("branch_id"),
+            lowStockCount = root.getInt("low_stock_count"),
+            adequateCount = root.getInt("adequate_count"),
+            records = root.getJSONArray("records").mapObjects { item ->
+                ControlPlaneReplenishmentBoardRecord(
+                    productId = item.getString("product_id"),
+                    productName = item.getString("product_name"),
+                    skuCode = item.getString("sku_code"),
+                    stockOnHand = item.getDouble("stock_on_hand"),
+                    reorderPoint = item.getDouble("reorder_point"),
+                    targetStock = item.getDouble("target_stock"),
+                    suggestedReorderQuantity = item.getDouble("suggested_reorder_quantity"),
+                    replenishmentStatus = item.getString("replenishment_status"),
+                )
+            },
+        )
+    }
+
     fun getReceivingBoard(tenantId: String, branchId: String): ControlPlaneReceivingBoard {
         val response = execute(
             method = "GET",
