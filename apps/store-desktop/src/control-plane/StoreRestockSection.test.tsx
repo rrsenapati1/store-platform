@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import { StoreRestockSection } from './StoreRestockSection';
 import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
@@ -86,6 +86,26 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     restockSourcePosture: 'BACKROOM_AVAILABLE',
     restockNote: 'Aisle 2 shelf gap',
     restockCompletionNote: '',
+    replenishmentBoard: {
+      branch_id: 'branch-1',
+      low_stock_count: 1,
+      adequate_count: 0,
+      records: [
+        {
+          product_id: 'product-1',
+          product_name: 'Classic Tea',
+          sku_code: 'tea-classic-250g',
+          availability_status: 'ACTIVE',
+          stock_on_hand: 4,
+          reorder_point: 10,
+          target_stock: 24,
+          suggested_reorder_quantity: 20,
+          replenishment_status: 'LOW_STOCK',
+        },
+      ],
+    },
+    selectedRestockProductId: '',
+    selectRestockProduct: vi.fn(),
     setRestockRequestedQuantity: vi.fn(),
     setRestockPickedQuantity: vi.fn(),
     setRestockSourcePosture: vi.fn(),
@@ -108,8 +128,22 @@ describe('store assisted restock section', () => {
     expect(screen.getByText('Classic Tea')).toBeInTheDocument();
     expect(screen.getByText('Suggested restock -> 20')).toBeInTheDocument();
     expect(screen.getByText('Active restock task -> RST-BLRFLAGSHIP-0001')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create restock task for scanned product' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create restock task' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mark active task picked' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh restock board' })).toBeInTheDocument();
+  });
+
+  test('renders replenishment board visibility and selection controls', () => {
+    const workspace = buildWorkspace({
+      latestScanLookup: null,
+      selectedRestockProductId: 'product-1',
+    });
+
+    render(<StoreRestockSection workspace={workspace} />);
+
+    expect(screen.getByText('Replenishment board')).toBeInTheDocument();
+    expect(screen.getByText(/Low-stock items -> 1/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Use Classic Tea' }));
+    expect(workspace.selectRestockProduct).toHaveBeenCalledWith('product-1');
   });
 });

@@ -2,6 +2,17 @@
 
 ## 2026-04-16
 
+- Expanded `V2-004` on Store Desktop with replenishment-board visibility inside assisted restock:
+  - extended the desktop control-plane client with the existing `replenishment-board` route so the runtime can read low-stock posture without adding a new backend contract
+  - updated the extracted restock-board loader and `useStoreRuntimeWorkspace.ts` so desktop now tracks both restock tasks and replenishment suggestions, supports selecting a low-stock product into the current restock draft, and keeps scan-first restock intact
+  - upgraded `StoreRestockSection.tsx` so operators can refresh the replenishment board, pick a low-stock product directly from the board, seed the requested quantity from the suggested reorder amount, and create a restock task without scanning first
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- client.replenishment.test.ts StoreRestockSection.test.tsx StoreRuntimeWorkspace.restock.test.tsx`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 - Expanded `V2-004` on Store Mobile and Inventory Tablet with replenishment-board-driven assisted restock:
   - extended the Android control-plane client and models with `replenishment-board` parsing so paired runtimes can read low-stock posture directly from the control plane instead of relying only on scan-first context
   - extended the restock repository boundary and `RemoteRestockRepository` to map replenishment-board records into the mobile restock domain without creating a separate workflow silo

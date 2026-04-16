@@ -22,6 +22,7 @@ import type {
   ControlPlaneOfflineSaleReplayResponse,
   ControlPlanePrintJob,
   ControlPlanePurchaseOrder,
+  ControlPlaneReplenishmentBoard,
   ControlPlaneReceivingBoard,
   ControlPlaneRestockBoard,
   ControlPlaneRestockTask,
@@ -327,6 +328,13 @@ export const storeControlPlaneClient = {
   getRestockBoard(accessToken: string, tenantId: string, branchId: string) {
     return request<ControlPlaneRestockBoard>(
       `/v1/tenants/${tenantId}/branches/${branchId}/restock-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  getReplenishmentBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneReplenishmentBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/replenishment-board`,
       undefined,
       accessToken,
     );

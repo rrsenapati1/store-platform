@@ -9,18 +9,34 @@ const RESTOCK_SOURCE_OPTIONS = [
 
 export function StoreRestockSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const scannedLookup = workspace.latestScanLookup;
-  const branchCatalogItem = workspace.branchCatalogItems.find(
-    (item) => item.product_id === scannedLookup?.product_id,
-  );
-  const activeTask = workspace.restockBoard?.records.find(
-    (record) => record.product_id === scannedLookup?.product_id && record.has_active_task,
+  const activeProductId = workspace.selectedRestockProductId || scannedLookup?.product_id || '';
+  const replenishmentRecord = workspace.replenishmentBoard?.records.find(
+    (record) => record.product_id === activeProductId,
   ) ?? null;
-  const reorderPoint = branchCatalogItem?.reorder_point ?? null;
-  const targetStock = branchCatalogItem?.target_stock ?? null;
-  const stockOnHand = scannedLookup?.stock_on_hand ?? null;
-  const suggestedRestock = stockOnHand !== null && targetStock !== null
-    ? Math.max(targetStock - stockOnHand, 0)
-    : null;
+  const branchCatalogItem = workspace.branchCatalogItems.find(
+    (item) => item.product_id === activeProductId,
+  );
+  const isScannedWorkflow = Boolean(scannedLookup?.product_id && scannedLookup.product_id === activeProductId);
+  const activeTask = workspace.restockBoard?.records.find(
+    (record) => record.product_id === activeProductId && record.has_active_task,
+  ) ?? null;
+  const reorderPoint = branchCatalogItem?.reorder_point ?? replenishmentRecord?.reorder_point ?? null;
+  const targetStock = branchCatalogItem?.target_stock ?? replenishmentRecord?.target_stock ?? null;
+  const stockOnHand = isScannedWorkflow
+    ? scannedLookup?.stock_on_hand ?? null
+    : replenishmentRecord?.stock_on_hand ?? null;
+  const suggestedRestock = replenishmentRecord?.suggested_reorder_quantity ?? (
+    stockOnHand !== null && targetStock !== null
+      ? Math.max(targetStock - stockOnHand, 0)
+      : null
+  );
+  const activeProductName = isScannedWorkflow
+    ? scannedLookup?.product_name ?? null
+    : replenishmentRecord?.product_name ?? branchCatalogItem?.product_name ?? null;
+  const activeSkuCode = isScannedWorkflow
+    ? scannedLookup?.sku_code ?? null
+    : replenishmentRecord?.sku_code ?? branchCatalogItem?.sku_code ?? null;
+  const workflowTitle = isScannedWorkflow ? 'Latest scanned stock workflow' : 'Selected low-stock workflow';
 
   return (
     <SectionCard eyebrow="Assisted stock workflow" title="Assisted restock">
@@ -30,14 +46,40 @@ export function StoreRestockSection({ workspace }: { workspace: StoreRuntimeWork
         </ActionButton>
       </div>
 
-      {scannedLookup ? (
+      <div style={{ marginBottom: '16px' }}>
+        <h3 style={{ marginBottom: '10px' }}>Replenishment board</h3>
+        <p style={{ color: '#4e5871' }}>
+          Low-stock items -&gt; {workspace.replenishmentBoard?.low_stock_count ?? 0}
+        </p>
+        <ul style={{ margin: 0, color: '#4e5871', lineHeight: 1.7, paddingLeft: '20px' }}>
+          {workspace.replenishmentBoard?.records.length ? (
+            workspace.replenishmentBoard.records.map((record) => (
+              <li key={record.product_id} style={{ marginBottom: '8px' }}>
+                <span>
+                  {record.product_name} :: {record.replenishment_status} :: suggested {record.suggested_reorder_quantity}
+                </span>{' '}
+                <ActionButton
+                  onClick={() => workspace.selectRestockProduct(record.product_id)}
+                  disabled={workspace.isBusy || !workspace.isSessionLive}
+                >
+                  Use {record.product_name}
+                </ActionButton>
+              </li>
+            ))
+          ) : (
+            <li>No replenishment suggestions yet.</li>
+          )}
+        </ul>
+      </div>
+
+      {activeProductId ? (
         <div style={{ marginBottom: '16px' }}>
-          <h3 style={{ marginBottom: '10px' }}>Latest scanned stock workflow</h3>
+          <h3 style={{ marginBottom: '10px' }}>{workflowTitle}</h3>
           <DetailList
             items={[
-              { label: 'Product', value: scannedLookup.product_name },
-              { label: 'SKU', value: scannedLookup.sku_code },
-              { label: 'Stock on hand', value: String(scannedLookup.stock_on_hand) },
+              { label: 'Product', value: activeProductName ?? 'Unknown product' },
+              { label: 'SKU', value: activeSkuCode ?? 'Unknown SKU' },
+              { label: 'Stock on hand', value: stockOnHand !== null ? String(stockOnHand) : 'Unavailable' },
               { label: 'Reorder point', value: reorderPoint !== null ? String(reorderPoint) : 'No policy set' },
               { label: 'Target stock', value: targetStock !== null ? String(targetStock) : 'No policy set' },
               { label: 'Suggested restock', value: suggestedRestock !== null ? String(suggestedRestock) : 'No policy set' },
@@ -61,7 +103,7 @@ export function StoreRestockSection({ workspace }: { workspace: StoreRuntimeWork
         </div>
       ) : (
         <p style={{ color: '#4e5871' }}>
-          Scan and look up a branch item first to drive an assisted restock workflow from the runtime counter surface.
+          Select a low-stock item from the replenishment board or scan and look up a branch item first to drive an assisted restock workflow from the runtime counter surface.
         </p>
       )}
 
@@ -121,9 +163,9 @@ export function StoreRestockSection({ workspace }: { workspace: StoreRuntimeWork
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
         <ActionButton
           onClick={() => void workspace.createRestockTaskForLatestScanLookup()}
-          disabled={workspace.isBusy || !workspace.isSessionLive || !scannedLookup || !branchCatalogItem || !workspace.restockRequestedQuantity}
+          disabled={workspace.isBusy || !workspace.isSessionLive || !activeProductId || !workspace.restockRequestedQuantity}
         >
-          Create restock task for scanned product
+          Create restock task
         </ActionButton>
         <ActionButton
           onClick={() => void workspace.pickActiveRestockTaskForLatestScanLookup()}

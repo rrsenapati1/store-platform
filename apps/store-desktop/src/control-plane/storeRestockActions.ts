@@ -1,5 +1,5 @@
 import { startTransition } from 'react';
-import type { ControlPlaneRestockBoard, ControlPlaneRestockTask } from '@store/types';
+import type { ControlPlaneReplenishmentBoard, ControlPlaneRestockBoard, ControlPlaneRestockTask } from '@store/types';
 import { storeControlPlaneClient } from './client';
 
 type SetString = (value: string) => void;
@@ -11,15 +11,28 @@ export async function runLoadRestockBoard(params: {
   setIsBusy: (value: boolean) => void;
   setErrorMessage: SetString;
   setRestockBoard: (value: ControlPlaneRestockBoard | null) => void;
+  setReplenishmentBoard: (value: ControlPlaneReplenishmentBoard | null) => void;
 }) {
-  const { accessToken, tenantId, branchId, setIsBusy, setErrorMessage, setRestockBoard } = params;
+  const {
+    accessToken,
+    tenantId,
+    branchId,
+    setIsBusy,
+    setErrorMessage,
+    setRestockBoard,
+    setReplenishmentBoard,
+  } = params;
 
   setIsBusy(true);
   setErrorMessage('');
   try {
-    const board = await storeControlPlaneClient.getRestockBoard(accessToken, tenantId, branchId);
+    const [board, replenishmentBoard] = await Promise.all([
+      storeControlPlaneClient.getRestockBoard(accessToken, tenantId, branchId),
+      storeControlPlaneClient.getReplenishmentBoard(accessToken, tenantId, branchId),
+    ]);
     startTransition(() => {
       setRestockBoard(board);
+      setReplenishmentBoard(replenishmentBoard);
     });
   } catch (error) {
     setErrorMessage(error instanceof Error ? error.message : 'Unable to load restock board');

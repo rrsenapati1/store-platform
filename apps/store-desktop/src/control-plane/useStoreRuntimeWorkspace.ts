@@ -15,6 +15,7 @@ import type {
   ControlPlaneInventorySnapshotRecord,
   ControlPlanePrintJob,
   ControlPlanePurchaseOrder,
+  ControlPlaneReplenishmentBoard,
   ControlPlaneReceivingBoard,
   ControlPlaneRestockBoard,
   ControlPlaneRestockTask,
@@ -145,6 +146,7 @@ export function useStoreRuntimeWorkspace() {
   const [selectedReceivingPurchaseOrder, setSelectedReceivingPurchaseOrder] = useState<ControlPlanePurchaseOrder | null>(null);
   const [receivingLineDrafts, setReceivingLineDrafts] = useState<StoreReceivingLineDraft[]>([]);
   const [restockBoard, setRestockBoard] = useState<ControlPlaneRestockBoard | null>(null);
+  const [replenishmentBoard, setReplenishmentBoard] = useState<ControlPlaneReplenishmentBoard | null>(null);
   const [latestRestockTask, setLatestRestockTask] = useState<ControlPlaneRestockTask | null>(null);
   const [stockCountBoard, setStockCountBoard] = useState<ControlPlaneStockCountBoard | null>(null);
   const [activeStockCountSession, setActiveStockCountSession] = useState<ControlPlaneStockCountReviewSession | null>(null);
@@ -173,6 +175,7 @@ export function useStoreRuntimeWorkspace() {
   const [restockSourcePosture, setRestockSourcePosture] = useState('BACKROOM_AVAILABLE');
   const [restockNote, setRestockNote] = useState('');
   const [restockCompletionNote, setRestockCompletionNote] = useState('');
+  const [selectedRestockProductId, setSelectedRestockProductId] = useState('');
   const [goodsReceiptNote, setGoodsReceiptNote] = useState('');
   const [selectedStockCountProductId, setSelectedStockCountProductId] = useState('');
   const [stockCountNote, setStockCountNote] = useState('');
@@ -351,6 +354,7 @@ export function useStoreRuntimeWorkspace() {
       setSelectedReceivingPurchaseOrder(null);
       setReceivingLineDrafts([]);
       setRestockBoard(null);
+      setReplenishmentBoard(null);
       setLatestRestockTask(null);
       setLatestSale(null);
       setLatestSaleReturn(null);
@@ -364,6 +368,7 @@ export function useStoreRuntimeWorkspace() {
       setRestockSourcePosture('BACKROOM_AVAILABLE');
       setRestockNote('');
       setRestockCompletionNote('');
+      setSelectedRestockProductId('');
       setGoodsReceiptNote('');
       setExpirySessionNote('');
       setExpiryWriteOffQuantity('1');
@@ -380,6 +385,21 @@ export function useStoreRuntimeWorkspace() {
       setRestockSourcePosture('BACKROOM_AVAILABLE');
       setRestockNote('');
       setRestockCompletionNote('');
+    });
+  }
+
+  function resolveActiveRestockProductId() {
+    return selectedRestockProductId || latestScanLookup?.product_id || '';
+  }
+
+  function selectRestockProduct(productId: string) {
+    const nextRecord = replenishmentBoard?.records.find((record) => record.product_id === productId) ?? null;
+    applyStateTransition(() => {
+      setSelectedRestockProductId(productId);
+      if (nextRecord) {
+        setRestockRequestedQuantity(String(nextRecord.suggested_reorder_quantity));
+      }
+      setErrorMessage('');
     });
   }
 
@@ -1194,6 +1214,7 @@ export function useStoreRuntimeWorkspace() {
       const lookup = await storeControlPlaneClient.lookupCatalogScan(accessToken, tenantId, branchId, barcodeToLookup);
       applyStateTransition(() => {
         setLatestScanLookup(lookup);
+        setSelectedRestockProductId('');
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to look up scanned barcode');
@@ -1213,18 +1234,20 @@ export function useStoreRuntimeWorkspace() {
       setIsBusy,
       setErrorMessage,
       setRestockBoard,
+      setReplenishmentBoard,
     });
   }
 
   async function createRestockTaskForLatestScanLookup() {
-    if (!accessToken || !tenantId || !branchId || !latestScanLookup || !restockRequestedQuantity) {
+    const activeProductId = resolveActiveRestockProductId();
+    if (!accessToken || !tenantId || !branchId || !activeProductId || !restockRequestedQuantity) {
       return;
     }
     await runCreateRestockTask({
       accessToken,
       tenantId,
       branchId,
-      productId: latestScanLookup.product_id,
+      productId: activeProductId,
       requestedQuantity: Number(restockRequestedQuantity),
       sourcePosture: restockSourcePosture,
       note: restockNote,
@@ -1237,8 +1260,9 @@ export function useStoreRuntimeWorkspace() {
   }
 
   async function pickActiveRestockTaskForLatestScanLookup() {
+    const activeProductId = resolveActiveRestockProductId();
     const activeTask = restockBoard?.records.find(
-      (record) => record.product_id === latestScanLookup?.product_id && record.has_active_task,
+      (record) => record.product_id === activeProductId && record.has_active_task,
     );
     if (!accessToken || !tenantId || !branchId || !activeTask || !restockPickedQuantity) {
       return;
@@ -1259,8 +1283,9 @@ export function useStoreRuntimeWorkspace() {
   }
 
   async function completeActiveRestockTaskForLatestScanLookup() {
+    const activeProductId = resolveActiveRestockProductId();
     const activeTask = restockBoard?.records.find(
-      (record) => record.product_id === latestScanLookup?.product_id && record.has_active_task,
+      (record) => record.product_id === activeProductId && record.has_active_task,
     );
     if (!accessToken || !tenantId || !branchId || !activeTask) {
       return;
@@ -1280,8 +1305,9 @@ export function useStoreRuntimeWorkspace() {
   }
 
   async function cancelActiveRestockTaskForLatestScanLookup() {
+    const activeProductId = resolveActiveRestockProductId();
     const activeTask = restockBoard?.records.find(
-      (record) => record.product_id === latestScanLookup?.product_id && record.has_active_task,
+      (record) => record.product_id === activeProductId && record.has_active_task,
     );
     if (!accessToken || !tenantId || !branchId || !activeTask) {
       return;
@@ -2036,12 +2062,15 @@ export function useStoreRuntimeWorkspace() {
     goodsReceiptNote,
     selectReceivingPurchaseOrder,
     createGoodsReceipt,
+    replenishmentBoard,
     restockBoard,
     restockRequestedQuantity,
     restockPickedQuantity,
     restockSourcePosture,
     restockNote,
     restockCompletionNote,
+    selectedRestockProductId,
+    selectRestockProduct,
     createRestockTaskForLatestScanLookup,
     pickActiveRestockTaskForLatestScanLookup,
     completeActiveRestockTaskForLatestScanLookup,
