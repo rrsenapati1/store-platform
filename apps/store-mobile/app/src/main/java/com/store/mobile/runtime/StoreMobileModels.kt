@@ -13,6 +13,8 @@ data class StoreMobilePairedDevice(
     val runtimeProfile: String,
     val sessionSurface: String,
     val hubBaseUrl: String,
+    val tenantId: String,
+    val branchId: String,
 )
 
 data class StoreMobileRuntimeSession(
@@ -22,4 +24,6 @@ data class StoreMobileRuntimeSession(
     val staffProfileId: String,
     val runtimeProfile: String,
     val sessionSurface: String,
+    val tenantId: String,
+    val branchId: String,
 )

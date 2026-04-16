@@ -301,7 +301,8 @@ def test_checkout_payment_session_does_not_create_sale_until_payment_confirms():
         },
     )
     assert payment_session.status_code == 200
-    assert payment_session.json()["lifecycle_status"] == "QR_READY"
+    assert payment_session.json()["lifecycle_status"] == "ACTION_READY"
+    assert payment_session.json()["handoff_surface"] == "BRANDED_UPI_QR"
 
     sales_register = client.get(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",

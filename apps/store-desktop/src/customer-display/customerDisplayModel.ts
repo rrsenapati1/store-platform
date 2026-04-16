@@ -12,6 +12,14 @@ export interface CustomerDisplayPaymentQr {
   expires_at: string | null;
 }
 
+export interface CustomerDisplayPaymentAction {
+  kind: string;
+  value: string;
+  label?: string | null;
+  description?: string | null;
+  handoff_surface?: string | null;
+}
+
 export interface CustomerDisplayPayload {
   state: CustomerDisplayState;
   title: string;
@@ -24,6 +32,7 @@ export interface CustomerDisplayPayload {
   grand_total: number | null;
   cash_received: number | null;
   change_due: number | null;
+  payment_action: CustomerDisplayPaymentAction | null;
   payment_qr: CustomerDisplayPaymentQr | null;
   updated_at: string | null;
 }
@@ -62,13 +71,16 @@ export interface BuildCustomerDisplayPayloadArgs {
   latestSale: CustomerDisplayCompletedSale | null;
   checkoutPaymentSession: {
     payment_method: string;
+    handoff_surface: string;
     lifecycle_status: string;
     order_amount: number;
     currency_code: string;
+    action_payload: CustomerDisplayPaymentAction;
+    action_expires_at?: string | null;
     qr_payload: {
       format: string;
       value: string;
-    };
+    } | null;
     qr_expires_at?: string | null;
   } | null;
   isBusy: boolean;
@@ -113,6 +125,17 @@ function isCustomerDisplayPaymentQr(value: unknown): value is CustomerDisplayPay
     && (typeof value.expires_at === 'string' || value.expires_at === null);
 }
 
+function isCustomerDisplayPaymentAction(value: unknown): value is CustomerDisplayPaymentAction {
+  if (!isObject(value)) {
+    return false;
+  }
+  return typeof value.kind === 'string'
+    && typeof value.value === 'string'
+    && (typeof value.label === 'string' || value.label === null || typeof value.label === 'undefined')
+    && (typeof value.description === 'string' || value.description === null || typeof value.description === 'undefined')
+    && (typeof value.handoff_surface === 'string' || value.handoff_surface === null || typeof value.handoff_surface === 'undefined');
+}
+
 export function isCustomerDisplayPayload(value: unknown): value is CustomerDisplayPayload {
   if (!isObject(value)) {
     return false;
@@ -133,6 +156,7 @@ export function isCustomerDisplayPayload(value: unknown): value is CustomerDispl
     && (typeof value.grand_total === 'number' || value.grand_total === null)
     && (typeof value.cash_received === 'number' || value.cash_received === null)
     && (typeof value.change_due === 'number' || value.change_due === null)
+    && (value.payment_action === null || isCustomerDisplayPaymentAction(value.payment_action))
     && (value.payment_qr === null || isCustomerDisplayPaymentQr(value.payment_qr))
     && (typeof value.updated_at === 'string' || value.updated_at === null);
 }
@@ -152,7 +176,88 @@ export function buildIdleCustomerDisplayPayload(branchName: string | null): Cust
     grand_total: null,
     cash_received: null,
     change_due: null,
+    payment_action: null,
     payment_qr: null,
+    updated_at: null,
+  };
+}
+
+function buildCheckoutPaymentPreview(
+  args: BuildCustomerDisplayPayloadArgs,
+): CustomerDisplayPayload {
+  const quantity = parseQuantity(args.saleQuantity);
+  const subtotal = args.selectedItem && quantity !== null
+    ? money(quantity * args.selectedItem.effective_selling_price)
+    : null;
+  const taxTotal = args.selectedItem && quantity !== null
+    ? money(subtotal! * args.selectedItem.gst_rate / 100)
+    : null;
+  const lineItems = args.selectedItem && quantity !== null
+    ? [
+        {
+          label: args.selectedItem.product_name,
+          quantity,
+          amount: money(args.checkoutPaymentSession!.order_amount),
+        },
+      ]
+    : [];
+  const activePaymentState = args.checkoutPaymentSession!.lifecycle_status === 'FAILED'
+    || args.checkoutPaymentSession!.lifecycle_status === 'EXPIRED'
+    || args.checkoutPaymentSession!.lifecycle_status === 'CANCELED'
+    ? 'unavailable'
+    : 'payment_in_progress';
+  const paymentAction: CustomerDisplayPaymentAction = {
+    kind: args.checkoutPaymentSession!.action_payload.kind,
+    value: args.checkoutPaymentSession!.action_payload.value,
+    label: args.checkoutPaymentSession!.action_payload.label ?? null,
+    description: args.checkoutPaymentSession!.action_payload.description ?? null,
+    handoff_surface: args.checkoutPaymentSession!.handoff_surface,
+  };
+  const isPhoneHandoff = args.checkoutPaymentSession!.handoff_surface === 'HOSTED_PHONE';
+  const isTerminalHandoff = args.checkoutPaymentSession!.handoff_surface === 'HOSTED_TERMINAL';
+  const paymentQr = activePaymentState === 'unavailable'
+    ? null
+    : args.checkoutPaymentSession!.handoff_surface === 'BRANDED_UPI_QR'
+      ? {
+          format: args.checkoutPaymentSession!.qr_payload?.format ?? 'upi_qr',
+          value: args.checkoutPaymentSession!.qr_payload?.value ?? args.checkoutPaymentSession!.action_payload.value,
+          expires_at: args.checkoutPaymentSession!.qr_expires_at ?? args.checkoutPaymentSession!.action_expires_at ?? null,
+        }
+      : isPhoneHandoff
+        ? {
+            format: args.checkoutPaymentSession!.qr_payload?.format ?? 'hosted_url',
+            value: args.checkoutPaymentSession!.qr_payload?.value ?? args.checkoutPaymentSession!.action_payload.value,
+            expires_at: args.checkoutPaymentSession!.qr_expires_at ?? args.checkoutPaymentSession!.action_expires_at ?? null,
+          }
+        : null;
+
+  return {
+    state: activePaymentState,
+    title: activePaymentState === 'unavailable'
+      ? 'Payment unavailable'
+      : isPhoneHandoff
+        ? 'Continue on phone'
+        : isTerminalHandoff
+          ? 'Complete payment on terminal'
+          : 'Scan to pay',
+    message: activePaymentState === 'unavailable'
+      ? 'Ask the cashier to retry or switch to a manual payment method.'
+      : args.checkoutPaymentSession!.action_payload.description
+        ?? (isTerminalHandoff
+          ? 'The cashier is continuing the hosted checkout on this terminal.'
+          : isPhoneHandoff
+            ? 'Scan this QR on the customer phone to open hosted checkout.'
+            : 'Scan to pay with any UPI app.'),
+    currency_code: args.checkoutPaymentSession!.currency_code,
+    line_items: lineItems,
+    subtotal,
+    discount_total: 0,
+    tax_total: taxTotal,
+    grand_total: money(args.checkoutPaymentSession!.order_amount),
+    cash_received: null,
+    change_due: null,
+    payment_action: paymentAction,
+    payment_qr: paymentQr,
     updated_at: null,
   };
 }
@@ -182,59 +287,17 @@ export function buildCustomerDisplayPayload(args: BuildCustomerDisplayPayloadArg
       grand_total: money(args.latestSale.grand_total),
       cash_received: cashReceived,
       change_due: changeDue,
+      payment_action: null,
       payment_qr: null,
       updated_at: args.latestSale.issued_on ?? null,
     };
   }
 
-  const quantity = parseQuantity(args.saleQuantity);
-  if (args.checkoutPaymentSession && args.checkoutPaymentSession.payment_method === 'CASHFREE_UPI_QR') {
-    const subtotal = args.selectedItem && quantity !== null
-      ? money(quantity * args.selectedItem.effective_selling_price)
-      : null;
-    const taxTotal = args.selectedItem && quantity !== null
-      ? money(subtotal! * args.selectedItem.gst_rate / 100)
-      : null;
-    const lineItems = args.selectedItem && quantity !== null
-      ? [
-          {
-            label: args.selectedItem.product_name,
-            quantity,
-            amount: money(args.checkoutPaymentSession.order_amount),
-          },
-        ]
-      : [];
-    const activePaymentState = args.checkoutPaymentSession.lifecycle_status === 'FAILED'
-      || args.checkoutPaymentSession.lifecycle_status === 'EXPIRED'
-      || args.checkoutPaymentSession.lifecycle_status === 'CANCELED'
-      ? 'unavailable'
-      : 'payment_in_progress';
-
-    return {
-      state: activePaymentState,
-      title: activePaymentState === 'unavailable' ? 'QR unavailable' : 'Scan to pay',
-      message: activePaymentState === 'unavailable'
-        ? 'Ask the cashier to retry or switch to a manual payment method.'
-        : 'Scan to pay with any UPI app.',
-      currency_code: args.checkoutPaymentSession.currency_code,
-      line_items: lineItems,
-      subtotal,
-      discount_total: 0,
-      tax_total: taxTotal,
-      grand_total: money(args.checkoutPaymentSession.order_amount),
-      cash_received: null,
-      change_due: null,
-      payment_qr: activePaymentState === 'unavailable'
-        ? null
-        : {
-            format: args.checkoutPaymentSession.qr_payload.format,
-            value: args.checkoutPaymentSession.qr_payload.value,
-            expires_at: args.checkoutPaymentSession.qr_expires_at ?? null,
-          },
-      updated_at: null,
-    };
+  if (args.checkoutPaymentSession) {
+    return buildCheckoutPaymentPreview(args);
   }
 
+  const quantity = parseQuantity(args.saleQuantity);
   if (!args.selectedItem || quantity === null) {
     return buildIdleCustomerDisplayPayload(args.branchName);
   }
@@ -264,6 +327,7 @@ export function buildCustomerDisplayPayload(args: BuildCustomerDisplayPayloadArg
     grand_total: grandTotal,
     cash_received: null,
     change_due: null,
+    payment_action: null,
     payment_qr: null,
     updated_at: null,
   };

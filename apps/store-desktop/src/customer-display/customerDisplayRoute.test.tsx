@@ -53,6 +53,7 @@ function buildPayload(overrides: Partial<CustomerDisplayPayload> = {}): Customer
     grand_total: 194.25,
     cash_received: null,
     change_due: null,
+    payment_action: null,
     payment_qr: null,
     updated_at: '2026-04-15T12:00:00.000Z',
     ...overrides,
@@ -125,7 +126,7 @@ describe('customer display route', () => {
       payment_qr: {
         format: 'upi_qr',
         value: 'upi://pay?tr=cf_order_checkout-1',
-        expires_at: '2026-04-15T12:10:00.000Z',
+        expires_at: '2099-01-01T00:10:00.000Z',
       },
     }));
 
@@ -133,5 +134,52 @@ describe('customer display route', () => {
 
     expect(await screen.findByRole('img', { name: 'Customer payment QR code' })).toBeInTheDocument();
     expect(screen.getByText(/Expires in/i)).toBeInTheDocument();
+  });
+
+  test('renders hosted phone handoff posture with a scannable checkout link', async () => {
+    saveCustomerDisplayPayload(buildPayload({
+      state: 'payment_in_progress',
+      title: 'Continue on phone',
+      message: 'Scan this QR on the customer phone to open hosted checkout.',
+      payment_action: {
+        kind: 'hosted_url',
+        value: 'https://payments.store.local/checkout/cf_order_checkout-1?surface=hosted_phone',
+        label: 'Customer phone checkout',
+        description: 'Scan this QR on the customer phone to open hosted checkout.',
+        handoff_surface: 'HOSTED_PHONE',
+      },
+      payment_qr: {
+        format: 'hosted_url',
+        value: 'https://payments.store.local/checkout/cf_order_checkout-1?surface=hosted_phone',
+        expires_at: '2099-01-01T00:10:00.000Z',
+      },
+    }));
+
+    render(<CustomerDisplayRoute />);
+
+    expect(await screen.findByRole('img', { name: 'Customer payment QR code' })).toBeInTheDocument();
+    expect(screen.getByText('Continue on phone')).toBeInTheDocument();
+    expect(screen.getAllByText(/hosted checkout/i).length).toBeGreaterThan(0);
+  });
+
+  test('renders hosted terminal instructions without a payment QR graphic', async () => {
+    saveCustomerDisplayPayload(buildPayload({
+      state: 'payment_in_progress',
+      title: 'Complete payment on terminal',
+      message: 'The cashier is continuing the hosted checkout on this terminal.',
+      payment_action: {
+        kind: 'hosted_url',
+        value: 'https://payments.store.local/checkout/cf_order_checkout-1?surface=hosted_terminal',
+        label: 'Terminal hosted checkout',
+        description: 'The cashier is continuing the hosted checkout on this terminal.',
+        handoff_surface: 'HOSTED_TERMINAL',
+      },
+      payment_qr: null,
+    }));
+
+    render(<CustomerDisplayRoute />);
+
+    expect(await screen.findByText('Complete payment on terminal')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Customer payment QR code' })).not.toBeInTheDocument();
   });
 });

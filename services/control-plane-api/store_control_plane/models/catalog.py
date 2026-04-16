@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy import Float, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, TimestampMixin
@@ -36,3 +36,5 @@ class BranchCatalogItem(Base, TimestampMixin):
     product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
     selling_price_override: Mapped[float | None] = mapped_column(default=None)
     availability_status: Mapped[str] = mapped_column(String(32), default="ACTIVE")
+    reorder_point: Mapped[float | None] = mapped_column(Float(), default=None)
+    target_stock: Mapped[float | None] = mapped_column(Float(), default=None)

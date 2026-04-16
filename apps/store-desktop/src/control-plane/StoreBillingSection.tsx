@@ -1,21 +1,123 @@
+import type { ControlPlaneCheckoutPaymentSession } from '@store/types';
 import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@store/ui';
 import { PaymentQrCode, usePaymentQrExpiry } from '../customer-display/paymentQr';
 import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
 
+function isProviderBackedPaymentMethod(paymentMethod: string) {
+  return paymentMethod === 'CASHFREE_UPI_QR'
+    || paymentMethod === 'CASHFREE_HOSTED_TERMINAL'
+    || paymentMethod === 'CASHFREE_HOSTED_PHONE';
+}
+
+function describePaymentMethod(paymentMethod: string) {
+  if (paymentMethod === 'CASHFREE_UPI_QR') {
+    return {
+      title: 'Korsenex UPI QR',
+      actionLabel: 'Start branded UPI QR',
+      helpText: 'Cashfree stays the payment rail while the customer-facing QR remains branded for Store/Korsenex.',
+    };
+  }
+  if (paymentMethod === 'CASHFREE_HOSTED_TERMINAL') {
+    return {
+      title: 'Cashfree hosted checkout',
+      actionLabel: 'Start hosted terminal checkout',
+      helpText: 'Open Cashfree hosted checkout on this terminal for cards, wallets, EMI, and other supported methods.',
+    };
+  }
+  if (paymentMethod === 'CASHFREE_HOSTED_PHONE') {
+    return {
+      title: 'Cashfree hosted checkout',
+      actionLabel: 'Start phone checkout link',
+      helpText: 'Generate a hosted checkout link for the customer phone while keeping webhook-based sale finalization.',
+    };
+  }
+  return {
+    title: 'Manual payment',
+    actionLabel: 'Create sales invoice',
+    helpText: 'Manual payment methods continue to work during offline continuity or when provider-backed checkout is unavailable.',
+  };
+}
+
+function CheckoutPaymentActionCard({ checkoutPaymentSession }: { checkoutPaymentSession: ControlPlaneCheckoutPaymentSession }) {
+  const expiry = usePaymentQrExpiry(checkoutPaymentSession.qr_expires_at ?? checkoutPaymentSession.action_expires_at ?? null);
+  if (checkoutPaymentSession.action_payload.kind === 'upi_qr' && checkoutPaymentSession.qr_payload?.value) {
+    return (
+      <div
+        style={{
+          marginTop: '16px',
+          borderRadius: '16px',
+          border: '1px solid rgba(23, 32, 51, 0.12)',
+          padding: '16px',
+          background: 'rgba(244, 247, 255, 0.9)',
+          color: '#25314f',
+          display: 'grid',
+          gap: '14px',
+          justifyItems: 'center',
+        }}
+      >
+        <strong style={{ display: 'block' }}>{checkoutPaymentSession.action_payload.label ?? 'Korsenex UPI QR'}</strong>
+        <PaymentQrCode
+          alt="Cashfree UPI QR code"
+          value={checkoutPaymentSession.qr_payload.value}
+        />
+        <span style={{ fontSize: '14px', color: '#4e5871' }}>{expiry}</span>
+        <span style={{ wordBreak: 'break-all', textAlign: 'center' }}>{checkoutPaymentSession.qr_payload.value}</span>
+      </div>
+    );
+  }
+
+  const isPhoneHandoff = checkoutPaymentSession.handoff_surface === 'HOSTED_PHONE';
+  return (
+    <div
+      style={{
+        marginTop: '16px',
+        borderRadius: '16px',
+        border: '1px solid rgba(23, 32, 51, 0.12)',
+        padding: '16px',
+        background: 'rgba(244, 247, 255, 0.9)',
+        color: '#25314f',
+        display: 'grid',
+        gap: '14px',
+      }}
+    >
+      <strong>{checkoutPaymentSession.action_payload.label ?? 'Cashfree hosted checkout'}</strong>
+      <span>{checkoutPaymentSession.action_payload.description ?? 'Continue the hosted checkout flow.'}</span>
+      <a
+        href={checkoutPaymentSession.action_payload.value}
+        target="_blank"
+        rel="noreferrer"
+        style={{ color: '#173a8c', fontWeight: 700, wordBreak: 'break-all' }}
+      >
+        {checkoutPaymentSession.action_payload.label ?? checkoutPaymentSession.action_payload.value}
+      </a>
+      <span style={{ fontSize: '14px', color: '#4e5871' }}>{expiry}</span>
+      {isPhoneHandoff && checkoutPaymentSession.qr_payload?.value ? (
+        <div style={{ display: 'grid', gap: '12px', justifyItems: 'center' }}>
+          <PaymentQrCode
+            alt="Cashfree UPI QR code"
+            value={checkoutPaymentSession.qr_payload.value}
+          />
+          <span style={{ fontSize: '14px', color: '#4e5871' }}>Scan this on the customer phone to continue hosted checkout.</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const selectedItem = workspace.branchCatalogItems[0];
-  const isCashfreeQrPayment = workspace.paymentMethod === 'CASHFREE_UPI_QR';
+  const paymentMethodDescription = describePaymentMethod(workspace.paymentMethod);
+  const isDigitalCheckout = isProviderBackedPaymentMethod(workspace.paymentMethod);
   const checkoutPaymentSession = workspace.checkoutPaymentSession;
-  const isCheckoutTerminalState = checkoutPaymentSession
-    && (checkoutPaymentSession.lifecycle_status === 'FAILED'
-      || checkoutPaymentSession.lifecycle_status === 'EXPIRED'
-      || checkoutPaymentSession.lifecycle_status === 'CANCELED'
-      || checkoutPaymentSession.lifecycle_status === 'FINALIZED');
   const checkoutPaymentTone = checkoutPaymentSession?.lifecycle_status === 'FINALIZED'
     ? 'success'
-    : isCheckoutTerminalState
-      ? 'warning'
-      : 'success';
+    : checkoutPaymentSession?.lifecycle_status === 'ACTION_READY'
+      || checkoutPaymentSession?.lifecycle_status === 'PENDING_CUSTOMER_PAYMENT'
+      ? 'success'
+      : 'warning';
+  const digitalPaymentTitle = checkoutPaymentSession
+    ? (checkoutPaymentSession.handoff_surface === 'BRANDED_UPI_QR' ? 'Korsenex UPI QR' : 'Cashfree hosted checkout')
+    : paymentMethodDescription.title;
   const isCheckoutActionDisabled = workspace.isBusy
     || workspace.isCheckoutPaymentBusy
     || (!workspace.isSessionLive && !workspace.offlineContinuityReady)
@@ -24,8 +126,7 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
     || !workspace.customerName
     || !workspace.saleQuantity
     || !workspace.paymentMethod
-    || (isCashfreeQrPayment && !workspace.isSessionLive);
-  const checkoutPaymentExpiry = usePaymentQrExpiry(checkoutPaymentSession?.qr_expires_at ?? null);
+    || (isDigitalCheckout && !workspace.isSessionLive);
 
   return (
     <>
@@ -34,21 +135,26 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
         <FormField id="runtime-customer-gstin" label="Customer GSTIN" value={workspace.customerGstin} onChange={workspace.setCustomerGstin} />
         <FormField id="runtime-sale-quantity" label="Sale quantity" value={workspace.saleQuantity} onChange={workspace.setSaleQuantity} />
         <FormField id="runtime-payment-method" label="Payment method" value={workspace.paymentMethod} onChange={workspace.setPaymentMethod} />
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+          {['Cash', 'UPI', 'CASHFREE_UPI_QR', 'CASHFREE_HOSTED_TERMINAL', 'CASHFREE_HOSTED_PHONE'].map((paymentChoice) => (
+            <ActionButton key={paymentChoice} onClick={() => workspace.setPaymentMethod(paymentChoice)}>
+              {paymentChoice}
+            </ActionButton>
+          ))}
+        </div>
         <ActionButton
           onClick={() => void workspace.createSalesInvoice()}
           disabled={isCheckoutActionDisabled}
         >
-          {isCashfreeQrPayment ? 'Start Cashfree UPI QR' : 'Create sales invoice'}
+          {paymentMethodDescription.actionLabel}
         </ActionButton>
-        {isCashfreeQrPayment ? (
-          <p style={{ marginBottom: 0, color: '#4e5871' }}>
-            Cashfree QR stays online-only. If branch continuity is offline, switch to a manual payment method instead of starting a QR session.
-          </p>
-        ) : null}
+        <p style={{ marginBottom: 0, color: '#4e5871' }}>
+          {paymentMethodDescription.helpText}
+        </p>
       </SectionCard>
 
-      {isCashfreeQrPayment || checkoutPaymentSession ? (
-        <SectionCard eyebrow="Digital payment" title="Cashfree UPI QR payment">
+      {isDigitalCheckout || checkoutPaymentSession ? (
+        <SectionCard eyebrow="Digital payment" title={digitalPaymentTitle}>
           {checkoutPaymentSession ? (
             <>
               <DetailList
@@ -58,57 +164,42 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                     value: <StatusBadge label={checkoutPaymentSession.lifecycle_status} tone={checkoutPaymentTone} />,
                   },
                   { label: 'Provider order', value: checkoutPaymentSession.provider_order_id },
+                  { label: 'Mode', value: checkoutPaymentSession.provider_payment_mode },
+                  { label: 'Surface', value: checkoutPaymentSession.handoff_surface },
                   { label: 'Amount', value: `${checkoutPaymentSession.currency_code} ${checkoutPaymentSession.order_amount.toFixed(2)}` },
-                  { label: 'QR expires at', value: checkoutPaymentSession.qr_expires_at ?? 'Unknown' },
+                  { label: 'Recovery', value: checkoutPaymentSession.recovery_state },
                 ]}
               />
-              {(checkoutPaymentSession.lifecycle_status === 'QR_READY' || checkoutPaymentSession.lifecycle_status === 'PENDING_CUSTOMER_PAYMENT') ? (
-                <p style={{ color: '#4e5871' }}>Waiting for customer payment</p>
+              {checkoutPaymentSession.lifecycle_status === 'ACTION_READY' || checkoutPaymentSession.lifecycle_status === 'PENDING_CUSTOMER_PAYMENT' ? (
+                <p style={{ color: '#4e5871' }}>Waiting for customer payment.</p>
               ) : null}
               {checkoutPaymentSession.lifecycle_status === 'CONFIRMED' ? (
-                <p style={{ color: '#4e5871' }}>Payment confirmed. Finalizing the sale now.</p>
+                <p style={{ color: '#9d2b19' }}>
+                  Payment is confirmed but the sale is not finalized yet. Finalize it now or refresh the status.
+                </p>
               ) : null}
-              {(checkoutPaymentSession.lifecycle_status === 'FAILED' || checkoutPaymentSession.lifecycle_status === 'EXPIRED') ? (
-                <p style={{ color: '#9d2b19' }}>The QR payment attempt did not complete. Retry it or switch to a manual payment method.</p>
+              {checkoutPaymentSession.last_error_message ? (
+                <p style={{ color: '#9d2b19' }}>{checkoutPaymentSession.last_error_message}</p>
               ) : null}
-              {checkoutPaymentSession.lifecycle_status === 'CANCELED' ? (
-                <p style={{ color: '#4e5871' }}>This QR attempt was canceled. You can retry it or continue with a manual payment method.</p>
-              ) : null}
-              {checkoutPaymentSession.qr_payload?.value ? (
-                <div
-                  style={{
-                    marginTop: '16px',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(23, 32, 51, 0.12)',
-                    padding: '16px',
-                    background: 'rgba(244, 247, 255, 0.9)',
-                    color: '#25314f',
-                    display: 'grid',
-                    gap: '14px',
-                    justifyItems: 'center',
-                  }}
-                >
-                  <strong style={{ display: 'block' }}>Cashfree UPI QR</strong>
-                  <PaymentQrCode
-                    alt="Cashfree UPI QR code"
-                    value={checkoutPaymentSession.qr_payload.value}
-                  />
-                  <span style={{ fontSize: '14px', color: '#4e5871' }}>{checkoutPaymentExpiry}</span>
-                  <span style={{ wordBreak: 'break-all', textAlign: 'center' }}>{checkoutPaymentSession.qr_payload.value}</span>
-                </div>
-              ) : null}
+              <CheckoutPaymentActionCard checkoutPaymentSession={checkoutPaymentSession} />
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '16px' }}>
-                {(checkoutPaymentSession.lifecycle_status === 'FAILED'
-                  || checkoutPaymentSession.lifecycle_status === 'EXPIRED'
-                  || checkoutPaymentSession.lifecycle_status === 'CANCELED') ? (
-                    <ActionButton onClick={() => void workspace.retryCheckoutPaymentSession()} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
-                      Retry Cashfree UPI QR
-                    </ActionButton>
-                  ) : null}
-                {(checkoutPaymentSession.lifecycle_status === 'QR_READY'
+                <ActionButton onClick={() => void workspace.refreshCheckoutPaymentSession()} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
+                  Refresh payment status
+                </ActionButton>
+                {checkoutPaymentSession.recovery_state === 'FINALIZE_REQUIRED' ? (
+                  <ActionButton onClick={() => void workspace.finalizeCheckoutPaymentSession()} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
+                    Finalize confirmed payment
+                  </ActionButton>
+                ) : null}
+                {checkoutPaymentSession.recovery_state === 'RETRYABLE' ? (
+                  <ActionButton onClick={() => void workspace.retryCheckoutPaymentSession()} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
+                    Retry payment session
+                  </ActionButton>
+                ) : null}
+                {(checkoutPaymentSession.lifecycle_status === 'ACTION_READY'
                   || checkoutPaymentSession.lifecycle_status === 'PENDING_CUSTOMER_PAYMENT') ? (
                     <ActionButton onClick={() => void workspace.cancelCheckoutPaymentSession()} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
-                      Cancel QR payment
+                      Cancel checkout session
                     </ActionButton>
                   ) : null}
                 {checkoutPaymentSession.lifecycle_status !== 'FINALIZED' ? (
@@ -120,9 +211,45 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
             </>
           ) : (
             <p style={{ margin: 0, color: '#4e5871' }}>
-              Start a Cashfree QR payment to generate a dynamic UPI payload for the cashier and customer display.
+              Start a Cashfree-backed checkout session to generate a branded QR, terminal checkout, or phone checkout link.
             </p>
           )}
+        </SectionCard>
+      ) : null}
+
+      {workspace.checkoutPaymentHistory?.length ? (
+        <SectionCard eyebrow="Recovery" title="Recent payment sessions">
+          <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '16px' }}>
+            {workspace.checkoutPaymentHistory.map((session) => (
+              <li key={session.id} style={{ color: '#4e5871' }}>
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  <strong style={{ color: '#172033' }}>{session.provider_order_id}</strong>
+                  <span>{session.handoff_surface} :: {session.provider_payment_mode} :: {session.lifecycle_status}</span>
+                  {session.last_error_message ? <span>{session.last_error_message}</span> : null}
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <ActionButton onClick={() => void workspace.refreshCheckoutPaymentSession(session.id)} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
+                      Refresh payment status
+                    </ActionButton>
+                    {session.recovery_state === 'FINALIZE_REQUIRED' ? (
+                      <ActionButton onClick={() => void workspace.finalizeCheckoutPaymentSession(session.id)} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
+                        Finalize confirmed payment
+                      </ActionButton>
+                    ) : null}
+                    {session.recovery_state === 'RETRYABLE' ? (
+                      <ActionButton onClick={() => void workspace.retryCheckoutPaymentSession(session.id)} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
+                        Retry payment session
+                      </ActionButton>
+                    ) : null}
+                    {(session.lifecycle_status === 'ACTION_READY' || session.lifecycle_status === 'PENDING_CUSTOMER_PAYMENT') ? (
+                      <ActionButton onClick={() => void workspace.cancelCheckoutPaymentSession(session.id)} disabled={workspace.isBusy || workspace.isCheckoutPaymentBusy}>
+                        Cancel checkout session
+                      </ActionButton>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         </SectionCard>
       ) : null}
 

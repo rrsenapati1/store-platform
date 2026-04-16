@@ -63,6 +63,14 @@ export function isCustomerDisplayRoute() {
 export function CustomerDisplayRoute() {
   const payload = useCustomerDisplayPayload();
   const paymentQrExpiry = usePaymentQrExpiry(payload.payment_qr?.expires_at ?? null);
+  const paymentActionLabel = payload.payment_action?.label
+    ?? (payload.payment_action?.handoff_surface === 'HOSTED_PHONE'
+      ? 'Customer phone checkout'
+      : payload.payment_action?.handoff_surface === 'HOSTED_TERMINAL'
+        ? 'Terminal hosted checkout'
+        : payload.payment_action?.handoff_surface === 'BRANDED_UPI_QR'
+          ? 'Korsenex UPI QR'
+          : null);
 
   return (
     <main
@@ -153,6 +161,28 @@ export function CustomerDisplayRoute() {
           <ToneBar label="Subtotal" value={formatAmount(payload.subtotal)} />
           <ToneBar label="Tax" value={formatAmount(payload.tax_total)} />
           <ToneBar label="Total" value={formatAmount(payload.grand_total)} />
+          {payload.payment_action ? (
+            <div
+              style={{
+                display: 'grid',
+                gap: '10px',
+                padding: '18px',
+                borderRadius: '24px',
+                background: 'rgba(122, 224, 255, 0.08)',
+                border: '1px solid rgba(122, 224, 255, 0.16)',
+              }}
+            >
+              <span style={{ fontSize: '12px', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#d1d8f0' }}>
+                Payment handoff
+              </span>
+              {paymentActionLabel ? (
+                <strong style={{ fontSize: '22px', color: '#f5f7ff' }}>{paymentActionLabel}</strong>
+              ) : null}
+              {payload.payment_action.description ? (
+                <span style={{ fontSize: '16px', color: '#dbe3ff', lineHeight: 1.5 }}>{payload.payment_action.description}</span>
+              ) : null}
+            </div>
+          ) : null}
           {payload.payment_qr ? (
             <div
               style={{

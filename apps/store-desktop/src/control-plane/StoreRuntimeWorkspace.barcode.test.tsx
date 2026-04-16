@@ -60,6 +60,7 @@ describe('store runtime barcode lookup flow', () => {
           },
         ],
       }),
+      jsonResponse({ records: [] }),
       jsonResponse({
         product_id: 'product-1',
         product_name: 'Classic Tea',
@@ -103,8 +104,8 @@ describe('store runtime barcode lookup flow', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Latest scan lookup')).toBeInTheDocument();
-      expect(screen.getByText('Classic Tea')).toBeInTheDocument();
-      expect(screen.getByText('24')).toBeInTheDocument();
+      expect(screen.getAllByText('Classic Tea').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('24').length).toBeGreaterThan(0);
     });
   });
 });

@@ -12,6 +12,8 @@ import type { WorkspaceMetric } from '@store/types';
 import { OwnerInventoryControlSection } from './OwnerInventoryControlSection';
 import { OwnerProcurementFinanceSection } from './OwnerProcurementFinanceSection';
 import { OwnerProcurementSection } from './OwnerProcurementSection';
+import { OwnerReplenishmentSection } from './OwnerReplenishmentSection';
+import { OwnerRestockSection } from './OwnerRestockSection';
 import { OwnerReturnApprovalsSection } from './OwnerReturnApprovalsSection';
 import { OwnerReceivingSection } from './OwnerReceivingSection';
 import { useOwnerWorkspace } from './useOwnerWorkspace';
@@ -286,6 +288,8 @@ export function OwnerWorkspace() {
       <OwnerBatchExpirySection workspace={workspace} />
       <OwnerProcurementFinanceSection workspace={workspace} />
       <OwnerInventoryControlSection workspace={workspace} />
+      <OwnerReplenishmentSection workspace={workspace} />
+      <OwnerRestockSection workspace={workspace} />
       <OwnerReturnApprovalsSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerComplianceSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerCustomerInsightsSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />

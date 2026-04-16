@@ -7,6 +7,37 @@ function branchTransferOptions(workspace: OwnerWorkspaceState) {
 
 export function OwnerInventoryControlSection({ workspace }: { workspace: OwnerWorkspaceState }) {
   const transferBranches = branchTransferOptions(workspace);
+  const activeCountSession = workspace.latestStockCountSession;
+  const isOpenCountSession = activeCountSession?.status === 'OPEN';
+  const isCountedSession = activeCountSession?.status === 'COUNTED';
+  const activeCountSessionDetails = activeCountSession
+    ? [
+        { label: 'Session number', value: activeCountSession.session_number },
+        {
+          label: 'Status',
+          value: (
+            <StatusBadge
+              label={activeCountSession.status}
+              tone={
+                activeCountSession.status === 'APPROVED'
+                  ? 'success'
+                  : activeCountSession.status === 'COUNTED'
+                    ? 'warning'
+                    : 'neutral'
+              }
+            />
+          ),
+        },
+        ...(activeCountSession.status === 'OPEN'
+          ? []
+          : [
+              { label: 'Expected quantity', value: String(activeCountSession.expected_quantity) },
+              { label: 'Counted quantity', value: String(activeCountSession.counted_quantity) },
+              { label: 'Variance quantity', value: String(activeCountSession.variance_quantity) },
+              { label: 'Review note', value: activeCountSession.review_note || 'Pending' },
+            ]),
+      ]
+    : [];
 
   return (
     <>
@@ -47,20 +78,59 @@ export function OwnerInventoryControlSection({ workspace }: { workspace: OwnerWo
 
         <div style={{ height: '16px' }} />
 
-        <FormField
-          id="stock-count-quantity"
-          label="Counted quantity"
-          value={workspace.countedQuantity}
-          onChange={workspace.setCountedQuantity}
-          placeholder="20"
-        />
         <FormField id="stock-count-note" label="Count note" value={workspace.countNote} onChange={workspace.setCountNote} />
         <ActionButton
-          onClick={() => void workspace.createStockCount()}
-          disabled={workspace.isBusy || !workspace.actor || !workspace.branchId || !workspace.countedQuantity}
+          onClick={() => void workspace.createStockCountSession()}
+          disabled={workspace.isBusy || !workspace.actor || !workspace.branchId}
         >
-          Record stock count
+          Open stock count session
         </ActionButton>
+
+        {activeCountSession ? (
+          <div style={{ marginTop: '16px' }}>
+            <h3 style={{ marginBottom: '10px' }}>Latest stock count session</h3>
+            <DetailList items={activeCountSessionDetails} />
+          </div>
+        ) : null}
+
+        {isOpenCountSession ? (
+          <div style={{ marginTop: '16px' }}>
+            <FormField
+              id="stock-count-blind-quantity"
+              label="Blind counted quantity"
+              value={workspace.blindCountedQuantity}
+              onChange={workspace.setBlindCountedQuantity}
+              placeholder="20"
+            />
+            <ActionButton
+              onClick={() => void workspace.recordStockCountSession()}
+              disabled={workspace.isBusy || !workspace.actor || !workspace.branchId || !workspace.blindCountedQuantity}
+            >
+              Record blind count
+            </ActionButton>
+          </div>
+        ) : null}
+
+        {isCountedSession ? (
+          <div style={{ marginTop: '16px' }}>
+            <h3 style={{ marginBottom: '10px' }}>Review stock count session</h3>
+            <FormField
+              id="stock-count-review-note"
+              label="Review note"
+              value={workspace.stockCountReviewNote}
+              onChange={workspace.setStockCountReviewNote}
+              placeholder="Approved after blind count review"
+            />
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <ActionButton onClick={() => void workspace.approveStockCountSession()} disabled={workspace.isBusy}>
+                Approve stock count session
+              </ActionButton>
+              <ActionButton onClick={() => void workspace.cancelStockCountSession()} disabled={workspace.isBusy}>
+                Cancel stock count session
+              </ActionButton>
+            </div>
+          </div>
+        ) : null}
 
         {workspace.latestStockCount ? (
           <div style={{ marginTop: '16px' }}>
@@ -74,6 +144,21 @@ export function OwnerInventoryControlSection({ workspace }: { workspace: OwnerWo
             />
           </div>
         ) : null}
+      </SectionCard>
+
+      <SectionCard eyebrow="Count visibility" title="Stock count board">
+        <ul style={{ marginBottom: 0, marginTop: 0, color: '#4e5871', lineHeight: 1.7 }}>
+          {workspace.stockCountBoard?.records.length ? (
+            workspace.stockCountBoard.records.map((record) => (
+              <li key={record.stock_count_session_id}>
+                {record.session_number} :: {record.product_name} :: {record.status}
+                {record.variance_quantity == null ? '' : ` :: variance ${record.variance_quantity}`}
+              </li>
+            ))
+          ) : (
+            <li>No stock count sessions recorded yet.</li>
+          )}
+        </ul>
       </SectionCard>
 
       <SectionCard eyebrow="Branch stock movement" title="Branch transfers">

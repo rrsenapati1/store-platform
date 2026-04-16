@@ -92,6 +92,8 @@ class BarcodeService:
             "selling_price": effective_selling_price,
             "stock_on_hand": stock_on_hand,
             "availability_status": item.availability_status,
+            "reorder_point": item.reorder_point,
+            "target_stock": item.target_stock,
         }
 
     async def preview_branch_barcode_label(

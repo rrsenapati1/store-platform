@@ -224,6 +224,7 @@ function runtimeBootstrapResponses(accessToken: string): FetchQueueEntry[] {
       bound_device_code: 'blr-hub-01',
       last_access_token: accessToken,
     }),
+    jsonResponse({ records: [] }),
   ];
 }
 

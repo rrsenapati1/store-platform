@@ -20,9 +20,18 @@ class SaleCreateRequest(BaseModel):
 class CheckoutPaymentSessionCreateRequest(BaseModel):
     provider_name: str
     payment_method: str
+    handoff_surface: str | None = None
+    provider_payment_mode: str | None = None
     customer_name: str
     customer_gstin: str | None = None
     lines: list[SaleLineCreateRequest]
+
+
+class CheckoutPaymentActionPayloadResponse(BaseModel):
+    kind: str
+    value: str
+    label: str | None = None
+    description: str | None = None
 
 
 class CheckoutPaymentQrPayloadResponse(BaseModel):
@@ -39,12 +48,19 @@ class CheckoutPaymentSessionResponse(BaseModel):
     provider_payment_session_id: str | None = None
     provider_payment_id: str | None = None
     payment_method: str
+    handoff_surface: str
+    provider_payment_mode: str
     lifecycle_status: str
     provider_status: str
     order_amount: float
     currency_code: str
-    qr_payload: CheckoutPaymentQrPayloadResponse
+    action_payload: CheckoutPaymentActionPayloadResponse
+    action_expires_at: datetime | None = None
+    qr_payload: CheckoutPaymentQrPayloadResponse | None = None
     qr_expires_at: datetime | None = None
+    last_error_message: str | None = None
+    last_reconciled_at: datetime | None = None
+    recovery_state: str
     sale: "SaleResponse | None" = None
 
 
@@ -52,6 +68,10 @@ class CheckoutPaymentWebhookResponse(BaseModel):
     status: str
     checkout_payment_session_id: str | None = None
     lifecycle_status: str | None = None
+
+
+class CheckoutPaymentSessionListResponse(BaseModel):
+    records: list[CheckoutPaymentSessionResponse]
 
 
 class PaymentResponse(BaseModel):

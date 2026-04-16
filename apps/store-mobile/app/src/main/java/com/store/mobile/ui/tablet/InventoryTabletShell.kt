@@ -12,11 +12,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.store.mobile.operations.ExpiryReport
-import com.store.mobile.operations.ReceivingBoard
-import com.store.mobile.operations.StockCountContext
 import com.store.mobile.ui.operations.MobileOperationsContent
 import com.store.mobile.ui.operations.MobileOperationsSection
+import com.store.mobile.ui.operations.ExpiryScreenActions
+import com.store.mobile.ui.operations.ExpiryUiState
+import com.store.mobile.ui.operations.ReceivingScreenActions
+import com.store.mobile.ui.operations.ReceivingUiState
+import com.store.mobile.ui.operations.RestockScreenActions
+import com.store.mobile.ui.operations.RestockUiState
+import com.store.mobile.ui.operations.StockCountScreenActions
+import com.store.mobile.ui.operations.StockCountUiState
 import com.store.mobile.ui.operations.mobileOperationsSectionLabel
 import com.store.mobile.ui.runtime.RuntimeStatusUiState
 import com.store.mobile.ui.scan.ScanLookupUiState
@@ -32,9 +37,14 @@ fun InventoryTabletShell(
     onCameraPermissionResolved: (Boolean) -> Unit,
     onCameraPreviewFailure: (String) -> Unit,
     onCameraBarcodeDetected: (String) -> Unit,
-    receivingBoard: ReceivingBoard,
-    stockCountContext: StockCountContext,
-    expiryReport: ExpiryReport,
+    receivingState: ReceivingUiState,
+    receivingActions: ReceivingScreenActions,
+    stockCountState: StockCountUiState,
+    stockCountActions: StockCountScreenActions,
+    restockState: RestockUiState,
+    restockActions: RestockScreenActions,
+    expiryState: ExpiryUiState,
+    expiryActions: ExpiryScreenActions,
     runtimeStatusState: RuntimeStatusUiState,
 ) {
     Row(
@@ -57,6 +67,7 @@ fun InventoryTabletShell(
                 MobileOperationsSection.STOCK_COUNT,
                 MobileOperationsSection.EXPIRY,
                 MobileOperationsSection.SCAN,
+                MobileOperationsSection.RESTOCK,
                 MobileOperationsSection.RUNTIME,
             ).forEach { section ->
                 Button(
@@ -79,9 +90,14 @@ fun InventoryTabletShell(
                 onCameraPermissionResolved = onCameraPermissionResolved,
                 onCameraPreviewFailure = onCameraPreviewFailure,
                 onCameraBarcodeDetected = onCameraBarcodeDetected,
-                receivingBoard = receivingBoard,
-                stockCountContext = stockCountContext,
-                expiryReport = expiryReport,
+                receivingState = receivingState,
+                receivingActions = receivingActions,
+                stockCountState = stockCountState,
+                stockCountActions = stockCountActions,
+                restockState = restockState,
+                restockActions = restockActions,
+                expiryState = expiryState,
+                expiryActions = expiryActions,
                 runtimeStatusState = runtimeStatusState,
             )
         }

@@ -390,15 +390,122 @@ describe('owner inventory control flow', () => {
         ],
       }),
       jsonResponse({
-        id: 'count-1',
+        id: 'count-session-1',
         tenant_id: 'tenant-acme',
         branch_id: 'branch-1',
         product_id: 'product-1',
-        counted_quantity: 20,
+        session_number: 'SCN-BLRFLAGSHIP-0001',
+        status: 'OPEN',
+        expected_quantity: null,
+        counted_quantity: null,
+        variance_quantity: null,
+        note: 'Cycle count before transfer',
+        review_note: null,
+      }),
+      jsonResponse({
+        branch_id: 'branch-1',
+        open_count: 1,
+        counted_count: 0,
+        approved_count: 0,
+        canceled_count: 0,
+        records: [
+          {
+            stock_count_session_id: 'count-session-1',
+            session_number: 'SCN-BLRFLAGSHIP-0001',
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            status: 'OPEN',
+            expected_quantity: null,
+            counted_quantity: null,
+            variance_quantity: null,
+            note: 'Cycle count before transfer',
+            review_note: null,
+          },
+        ],
+      }),
+      jsonResponse({
+        id: 'count-session-1',
+        tenant_id: 'tenant-acme',
+        branch_id: 'branch-1',
+        product_id: 'product-1',
+        session_number: 'SCN-BLRFLAGSHIP-0001',
+        status: 'COUNTED',
         expected_quantity: 22,
+        counted_quantity: 20,
         variance_quantity: -2,
         note: 'Cycle count before transfer',
-        closing_stock: 20,
+        review_note: null,
+      }),
+      jsonResponse({
+        branch_id: 'branch-1',
+        open_count: 0,
+        counted_count: 1,
+        approved_count: 0,
+        canceled_count: 0,
+        records: [
+          {
+            stock_count_session_id: 'count-session-1',
+            session_number: 'SCN-BLRFLAGSHIP-0001',
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            status: 'COUNTED',
+            expected_quantity: 22,
+            counted_quantity: 20,
+            variance_quantity: -2,
+            note: 'Cycle count before transfer',
+            review_note: null,
+          },
+        ],
+      }),
+      jsonResponse({
+        session: {
+          id: 'count-session-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          product_id: 'product-1',
+          session_number: 'SCN-BLRFLAGSHIP-0001',
+          status: 'APPROVED',
+          expected_quantity: 22,
+          counted_quantity: 20,
+          variance_quantity: -2,
+          note: 'Cycle count before transfer',
+          review_note: 'Approved after blind count review',
+        },
+        stock_count: {
+          id: 'count-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          product_id: 'product-1',
+          counted_quantity: 20,
+          expected_quantity: 22,
+          variance_quantity: -2,
+          note: 'Cycle count before transfer',
+          closing_stock: 20,
+        },
+      }),
+      jsonResponse({
+        branch_id: 'branch-1',
+        open_count: 0,
+        counted_count: 0,
+        approved_count: 1,
+        canceled_count: 0,
+        records: [
+          {
+            stock_count_session_id: 'count-session-1',
+            session_number: 'SCN-BLRFLAGSHIP-0001',
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            status: 'APPROVED',
+            expected_quantity: 22,
+            counted_quantity: 20,
+            variance_quantity: -2,
+            note: 'Cycle count before transfer',
+            review_note: 'Approved after blind count review',
+          },
+        ],
       }),
       jsonResponse({
         records: [
@@ -546,7 +653,7 @@ describe('owner inventory control flow', () => {
     vi.restoreAllMocks();
   });
 
-  test('posts adjustments, counts, and branch transfers after receipt', async () => {
+  test('posts adjustments, reviewed counts, and branch transfers after receipt', async () => {
     render(<App />);
 
     fireEvent.change(screen.getByLabelText('Korsenex token'), {
@@ -593,13 +700,29 @@ describe('owner inventory control flow', () => {
       expect(screen.getByText('22')).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText('Counted quantity'), { target: { value: '20' } });
     fireEvent.change(screen.getByLabelText('Count note'), { target: { value: 'Cycle count before transfer' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Record stock count' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open stock count session' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Latest stock count session')).toBeInTheDocument();
+      expect(screen.getByText('SCN-BLRFLAGSHIP-0001')).toBeInTheDocument();
+      expect(screen.queryByText('Expected quantity')).not.toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('Blind counted quantity'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Count note'), { target: { value: 'Cycle count before transfer' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record blind count' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Review stock count session')).toBeInTheDocument();
+      expect(screen.getAllByText('-2').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approve stock count session' }));
 
     await waitFor(() => {
       expect(screen.getByText('Latest stock count')).toBeInTheDocument();
-      expect(screen.getAllByText('-2').length).toBeGreaterThan(0);
+      expect(screen.getByText('Approved after blind count review')).toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByLabelText('Transfer quantity'), { target: { value: '5' } });

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
+import re
 from typing import Any
 
 from .purchase_policy import money
@@ -25,7 +26,10 @@ def validate_goods_receipt_batch_lots(
 
     for line in goods_receipt_lines:
         product_id = str(line["product_id"])
-        receipt_quantities[product_id] = money(receipt_quantities[product_id] + float(line["quantity"]))
+        quantity = money(float(line["quantity"]))
+        if quantity <= 0:
+            continue
+        receipt_quantities[product_id] = money(receipt_quantities[product_id] + quantity)
 
     for lot in lots:
         product_id = str(lot["product_id"])
@@ -48,6 +52,70 @@ def ensure_expiry_write_off_allowed(*, remaining_quantity: float, quantity: floa
         raise ValueError("Expiry write-off quantity must be greater than zero")
     if requested > available:
         raise ValueError("Expiry write-off exceeds remaining batch quantity")
+
+
+def batch_expiry_session_number(*, branch_code: str, sequence_number: int) -> str:
+    branch_segment = re.sub(r"[^A-Z0-9]", "", branch_code.upper())
+    return f"EWS-{branch_segment}-{sequence_number:04d}"
+
+
+def ensure_batch_expiry_review_recordable(*, status: str) -> None:
+    if status != "OPEN":
+        raise ValueError("Expiry review already recorded for session")
+
+
+def ensure_batch_expiry_review_approvable(*, status: str) -> None:
+    if status != "REVIEWED":
+        raise ValueError("Expiry review session must be reviewed before approval")
+
+
+def ensure_batch_expiry_review_cancelable(*, status: str) -> None:
+    if status == "APPROVED":
+        raise ValueError("Approved expiry review sessions cannot be canceled")
+    if status == "CANCELED":
+        raise ValueError("Expiry review session already canceled")
+
+
+def build_batch_expiry_board(
+    *,
+    branch_id: str,
+    review_sessions: list[dict[str, Any]],
+    products_by_id: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    status_priority = {"OPEN": 0, "REVIEWED": 1, "APPROVED": 2, "CANCELED": 3}
+    records: list[dict[str, Any]] = []
+    for session in review_sessions:
+        product_id = str(session["product_id"])
+        product = products_by_id.get(product_id, {})
+        records.append(
+            {
+                "batch_expiry_session_id": str(session["batch_expiry_session_id"]),
+                "session_number": str(session["session_number"]),
+                "batch_lot_id": str(session["batch_lot_id"]),
+                "product_id": product_id,
+                "product_name": str(product.get("product_name", product_id)),
+                "sku_code": str(product.get("sku_code", product_id)),
+                "batch_number": str(session["batch_number"]),
+                "status": str(session["status"]),
+                "remaining_quantity_snapshot": money(float(session["remaining_quantity_snapshot"])),
+                "proposed_quantity": None
+                if session.get("proposed_quantity") is None
+                else money(float(session["proposed_quantity"])),
+                "reason": session.get("reason"),
+                "note": session.get("note"),
+                "review_note": session.get("review_note"),
+            }
+        )
+
+    records.sort(key=lambda record: (status_priority.get(record["status"], 99), record["batch_number"], record["session_number"]))
+    return {
+        "branch_id": branch_id,
+        "open_count": sum(1 for record in records if record["status"] == "OPEN"),
+        "reviewed_count": sum(1 for record in records if record["status"] == "REVIEWED"),
+        "approved_count": sum(1 for record in records if record["status"] == "APPROVED"),
+        "canceled_count": sum(1 for record in records if record["status"] == "CANCELED"),
+        "records": records,
+    }
 
 
 def build_batch_expiry_report(

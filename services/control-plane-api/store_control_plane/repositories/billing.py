@@ -177,6 +177,8 @@ class BillingRepository:
         provider_order_id: str,
         provider_payment_session_id: str | None,
         payment_method: str,
+        handoff_surface: str,
+        provider_payment_mode: str,
         lifecycle_status: str,
         provider_status: str,
         order_amount: float,
@@ -185,6 +187,8 @@ class BillingRepository:
         cart_snapshot: dict,
         customer_name: str,
         customer_gstin: str | None,
+        action_payload: dict,
+        action_expires_at,
         qr_payload: dict,
         qr_expires_at,
         provider_response_payload: dict,
@@ -198,6 +202,8 @@ class BillingRepository:
             provider_order_id=provider_order_id,
             provider_payment_session_id=provider_payment_session_id,
             payment_method=payment_method,
+            handoff_surface=handoff_surface,
+            provider_payment_mode=provider_payment_mode,
             lifecycle_status=lifecycle_status,
             provider_status=provider_status,
             order_amount=order_amount,
@@ -206,6 +212,8 @@ class BillingRepository:
             cart_snapshot=cart_snapshot,
             customer_name=customer_name,
             customer_gstin=customer_gstin,
+            action_payload=action_payload,
+            action_expires_at=action_expires_at,
             qr_payload=qr_payload,
             qr_expires_at=qr_expires_at,
             provider_response_payload=provider_response_payload,
@@ -213,6 +221,24 @@ class BillingRepository:
         self._session.add(record)
         await self._session.flush()
         return record
+
+    async def list_checkout_payment_sessions(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        limit: int = 10,
+    ) -> list[CheckoutPaymentSession]:
+        statement = (
+            select(CheckoutPaymentSession)
+            .where(
+                CheckoutPaymentSession.tenant_id == tenant_id,
+                CheckoutPaymentSession.branch_id == branch_id,
+            )
+            .order_by(CheckoutPaymentSession.created_at.desc(), CheckoutPaymentSession.id.desc())
+            .limit(limit)
+        )
+        return list((await self._session.scalars(statement)).all())
 
     async def create_sale_return(
         self,

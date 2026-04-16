@@ -1,6 +1,154 @@
 # Store Worklog
 
+## 2026-04-16
+
+- Expanded `V2-004` on Store Mobile and Inventory Tablet with the fifth real control-plane-backed branch workflow:
+  - extended the control-plane barcode scan response so branch scan lookup now carries `reorder_point` and `target_stock` alongside price, stock, and availability, keeping branch scan semantics in one backend read model
+  - added `lookupCatalogScan` to the Android control-plane client plus a new `RemoteScanLookupRepository`, so paired runtimes now resolve scanned products against live branch data instead of the in-memory demo scan repository
+  - rewired `StoreMobileApp` to select remote scan lookup from paired session + device context, and hardened `ScanLookupViewModel` so real control-plane failures surface as lookup errors instead of crashing the runtime
+- Verified:
+  - `C:\Users\Nebula\AppData\Local\Python\bin\python.exe -m pytest services/control-plane-api/tests/test_barcode_foundation_flow.py -q`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest --tests com.store.mobile.controlplane.StoreMobileControlPlaneClientTest --tests com.store.mobile.scan.RemoteScanLookupRepositoryTest --tests com.store.mobile.scan.ScanLookupViewModelTest --tests com.store.mobile.ui.StoreMobileRuntimeContextTest`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+  - `git -c core.safecrlf=false diff --check`
+
+- Expanded `V2-004` on Store Mobile and Inventory Tablet with the second real control-plane-backed branch workflow:
+  - added a control-plane purchase-order detail read on the backend so the mobile runtime can build a reviewed receiving draft from a real approved purchase order instead of relying on in-memory Android placeholders
+  - extended the Android control-plane client for receiving-board, purchase-order detail, goods-receipt list, and reviewed goods-receipt creation, then introduced `RemoteReceivingRepository` to map those payloads into the existing receiving domain contract
+  - rewired `StoreMobileApp` to use the remote receiving repository when paired session + device context are present, while leaving the rest of the operations modules on their current repositories
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_procurement_finance_flow.py -q`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest --tests com.store.mobile.controlplane.StoreMobileControlPlaneClientTest --tests com.store.mobile.operations.RemoteReceivingRepositoryTest --tests com.store.mobile.operations.ReceivingRepositoryTest --tests com.store.mobile.ui.StoreMobileRuntimeContextTest --tests com.store.mobile.ui.operations.ReceivingViewModelTest`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+  - `git -c core.safecrlf=false diff --check`
+
+- Expanded `V2-004` on Store Mobile and Inventory Tablet with the first real control-plane-backed branch workflow:
+  - extended mobile pairing/runtime context with explicit `tenantId` and `branchId` so the Android runtime no longer depends on a hardcoded stock-count demo branch when paired
+  - added a small Android control-plane client for inventory snapshot and reviewed stock-count routes, then introduced `RemoteStockCountRepository` to map those live payloads into the existing stock-count domain contract
+  - rewired `StoreMobileApp` to resolve operational branch context from the paired runtime session and use the remote stock-count repository when session + paired device context are present, while leaving receiving/restock/expiry on their existing local repositories for now
+- Verified:
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest --tests com.store.mobile.runtime.StoreMobilePairingRepositoryTest --tests com.store.mobile.ui.pairing.PairingViewModelTest --tests com.store.mobile.controlplane.StoreMobileControlPlaneClientTest --tests com.store.mobile.operations.RemoteStockCountRepositoryTest --tests com.store.mobile.operations.StockCountRepositoryTest --tests com.store.mobile.ui.operations.StockCountViewModelTest --tests com.store.mobile.ui.StoreMobileRuntimeContextTest`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+  - `git -c core.safecrlf=false diff --check`
+
+- Expanded `V2-004` on Store Mobile and Inventory Tablet with reviewed expiry execution:
+  - replaced the static Android expiry placeholder with an in-memory reviewed expiry workflow that mirrors the control-plane review-session shape: open a lot review, record proposed write-off quantity and reason, then approve or cancel with a review note
+  - added a dedicated expiry repository, expiry view-model, and expiry screen so handheld and tablet operators can drive `OPEN -> REVIEWED -> APPROVED/CANCELED` lot disposition instead of treating expiry as a read-only report
+  - kept the runtime app modular by threading expiry state and actions through the existing operations shell rather than mixing reviewed expiry logic into scan, receiving, stock-count, or restock modules
+- Verified:
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest --tests com.store.mobile.operations.ExpiryRepositoryTest --tests com.store.mobile.ui.operations.ExpiryViewModelTest`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+
+- Expanded `V2-004` on Store Mobile and Inventory Tablet with reviewed stock-count execution:
+  - replaced the static Android stock-count placeholder with an in-memory reviewed stock-count workflow that mirrors the control-plane review-session shape: open a blind-count session, record counted quantity and note, then approve or cancel with a review note
+  - added a dedicated stock-count repository, stock-count view-model, and stock-count screen so handheld and tablet operators can work through `OPEN -> COUNTED -> APPROVED/CANCELED` lifecycle instead of posting a one-step count
+  - kept the runtime app modular by threading stock-count state and actions through the existing operations shell rather than mixing reviewed count logic into scan, receiving, expiry, or restock modules
+- Verified:
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest --tests com.store.mobile.operations.StockCountRepositoryTest --tests com.store.mobile.ui.operations.StockCountViewModelTest`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+
+- Expanded `V2-004` on Store Mobile and Inventory Tablet with reviewed receiving execution:
+  - replaced the static Android receiving placeholder with an in-memory reviewed receiving workflow that mirrors the control-plane reviewed receipt shape: editable per-line received quantities, per-line discrepancy notes, and a receipt-level note
+  - added a dedicated receiving repository, receiving view-model, and receiving screen so handheld and tablet operators can review a purchase order line by line, submit a reviewed goods receipt, and immediately see discrepancy-aware receipt posture
+  - kept the runtime app modular by threading receiving state/actions through the existing operations shell instead of mixing reviewed receiving state directly into unrelated scan, stock-count, expiry, or restock modules
+- Verified:
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest --tests com.store.mobile.operations.ReceivingRepositoryTest --tests com.store.mobile.ui.operations.ReceivingViewModelTest`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+
+- Expanded `V2-004` on Store Mobile and Inventory Tablet with assisted restock workflow:
+  - added a dedicated Android restock repository, restock view-model, and restock screen so handheld and tablet operators can create, pick, complete, or cancel shelf/backroom restock tasks from the runtime instead of relying only on owner-web
+  - extended the mobile scan lookup state with branch-policy context for the current scanned product, then reused that scan context as the entry point for assisted restock instead of adding a second product-selection path
+  - wired the new `RESTOCK` section into both handheld and tablet shells while keeping `StoreMobileApp.kt` orchestration-focused and leaving receiving/count/expiry repository boundaries intact
+- Verified:
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest --tests com.store.mobile.operations.RestockRepositoryTest --tests com.store.mobile.ui.operations.RestockViewModelTest`
+  - `cd apps/store-mobile && .\gradlew.bat testDebugUnitTest`
+  - `npm run ci:store-mobile`
+
+- Expanded `V2-004` on Store Desktop with assisted restock workflow:
+  - added runtime restock-board reads and task actions so scanned counter items can create, pick, complete, or cancel branch restock tasks directly from the desktop runtime instead of forcing operators back into owner-web
+  - introduced a dedicated assisted-restock section driven by the latest barcode lookup, branch replenishment policy, and active restock-board posture so the cashier surface can guide shelf/backroom follow-up on the item already in hand
+  - kept the large desktop workspace hook orchestration-focused by extracting the restock mutations into `storeRestockActions.ts` instead of burying another branch-operations flow in `useStoreRuntimeWorkspace.ts`
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.restock.test.tsx StoreRestockSection.test.tsx`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `npm run test --workspace @store/store-desktop`
+    - still has unrelated pre-existing failures in `StoreRuntimeWorkspace.batch-expiry.test.tsx` and `StoreRuntimeWorkspace.sync-runtime.test.tsx`
+
+- Expanded `V2-004` with shelf/backroom restock workflow:
+  - added control-plane `restock_task_sessions` plus a branch restock board so low-stock items can produce explicit `OPEN -> PICKED -> COMPLETED/CANCELED` operational tasks without inventing fake sublocation inventory moves
+  - enforced restock lifecycle guards for duplicate active tasks, invalid pick quantities, and completion/cancel transitions while preserving the invariant that restock task changes do not post inventory ledger entries
+  - updated owner-web with a focused restock section so operators can create a task from the current low-stock board, record picked quantity, complete or cancel the task, and review the latest restock posture alongside replenishment
+- Verified:
+  - `C:\Users\Nebula\AppData\Local\Python\bin\python.exe -m pytest services/control-plane-api/tests/test_inventory_policy.py services/control-plane-api/tests/test_restock_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.restock.test.tsx`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+
 ## 2026-04-15
+
+- Expanded `V2-004` with branch replenishment policy and low-stock suggestion visibility:
+  - added branch-level replenishment policy fields on branch catalog items so each branch can define reorder point and target stock without inventing a separate replenishment subsystem
+  - added a control-plane replenishment board derived from current inventory snapshot plus branch catalog policy, with `LOW_STOCK` vs `ADEQUATE` posture and suggested reorder quantities
+  - updated owner-web with a focused replenishment section so operators can set policy on the first assigned branch item, review the latest saved policy, and refresh the low-stock board
+- Verified:
+  - `C:\Users\Nebula\AppData\Local\Python\bin\python.exe -m pytest services/control-plane-api/tests/test_inventory_policy.py services/control-plane-api/tests/test_replenishment_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.replenishment.test.tsx`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+
+- Started `V2-004` with reviewed receiving workflow depth:
+  - kept one goods-receipt per approved purchase order for now, but replaced the all-or-nothing receive path with line-level reviewed receipt quantities, per-line discrepancy notes, and a receipt-level note
+  - extended the control-plane goods-receipt contract, persistence, and receiving-board policy so partial or short receipts are recorded explicitly as reviewed variance instead of pretending every approved PO is fully received
+  - updated owner-web receiving to let operators review each PO line before posting the GRN, see received-vs-ordered variance, and read discrepancy posture from the latest receipt and receiving board
+  - preserved append-only inventory posting and downstream finance/batch compatibility by only posting positive received quantities while keeping discrepancy state in the goods-receipt read models
+- Verified:
+  - `C:\Users\Nebula\AppData\Local\Python\bin\python.exe -m pytest services/control-plane-api/tests/test_inventory_policy.py services/control-plane-api/tests/test_receiving_foundation_flow.py -q`
+  - `C:\Users\Nebula\AppData\Local\Python\bin\python.exe -m pytest services/control-plane-api/tests/test_batch_expiry_flow.py services/control-plane-api/tests/test_procurement_finance_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.receiving.test.tsx`
+  - `npm run typecheck --workspace @store/owner-web`
+
+- Expanded `V2-004` with reviewed stock count sessions:
+  - replaced the direct one-step stock-count post with an explicit review-session lifecycle that opens a blind count, records the counted quantity, and only posts `COUNT_VARIANCE` ledger movement on approval
+  - added control-plane stock-count session persistence, board reporting, approval and cancellation guards, and append-only approval finalization so failed or abandoned review sessions do not mutate inventory
+  - updated owner-web inventory control to guide operators through blind count entry, variance review, approval or cancellation, and stock-count board visibility without leaking expected quantity before count recording
+- Verified:
+  - `C:\Users\Nebula\AppData\Local\Python\bin\python.exe -m pytest services/control-plane-api/tests/test_inventory_policy.py services/control-plane-api/tests/test_inventory_control_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.inventory-control.test.tsx`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+
+- Expanded `V2-004` with reviewed expiry disposition sessions:
+  - replaced the owner expiry write-off shortcut with an explicit `OPEN -> REVIEWED -> APPROVED/CANCELED` session lifecycle so branch operators can review expiring lots before inventory is mutated
+  - added control-plane expiry review-session persistence, board visibility, approval and cancellation guards, and approval-only `EXPIRY_WRITE_OFF` posting so abandoned expiry reviews do not change stock
+  - updated owner-web batch expiry controls to open a session for the first tracked lot, record proposed write-off quantity and reason, approve or cancel the reviewed session, and show the resulting disposition board
+- Verified:
+  - `C:\Users\Nebula\AppData\Local\Python\bin\python.exe -m pytest services/control-plane-api/tests/test_batches_policy.py services/control-plane-api/tests/test_batch_expiry_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.batch-expiry.test.tsx`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+
+- Completed `V2-003` with Store Desktop and control-plane checkout payment orchestration:
+  - expanded the checkout payment-session model beyond QR-only flow into one unified Cashfree-backed orchestration lane covering Korsenex-branded UPI QR, hosted checkout on terminal, hosted checkout on customer phone, and manual cashier fallback methods
+  - added handoff-surface and provider-payment-mode persistence, webhook-authoritative recovery and reconciliation, recent checkout-payment history, and idempotent finalize or retry or cancel controls so confirmed payments finalize exactly once while failed or expired sessions never create sales
+  - updated Store Desktop billing and customer-display surfaces to render the richer payment actions and recovery posture, and stabilized the desktop runtime test harness around the new checkout-history bootstrap path
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_checkout_payment_sessions.py services/control-plane-api/tests/test_billing_foundation_flow.py -q`
+  - `python -m pytest services/control-plane-api/tests -q`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `cargo test --manifest-path apps/store-desktop/src-tauri/Cargo.toml --lib`
 
 - Expanded `V2-003` on Store Desktop with branded Cashfree QR rendering:
   - replaced the raw `upi://...` payload-only payment presentation with a shared locally rendered QR image component so cashier checkout and customer display both show a real scannable QR
@@ -579,6 +727,33 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+- Completed the Store Desktop reviewed expiry session slice for `V2-004`:
+  - added reviewed batch-expiry client routes for board, create, review, approve, and cancel
+  - replaced the desktop one-step expiry write-off shortcut with the real reviewed-session workflow
+  - extended runtime workspace state with reviewed expiry board/session posture and actions
+  - added desktop regression coverage for client routing, workspace orchestration, and reviewed expiry section rendering
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- client.batch-expiry.test.ts StoreRuntimeWorkspace.batch-expiry.test.tsx StoreBatchExpirySection.test.tsx`
+  - `npm run test --workspace @store/store-desktop -- StoreRuntimeWorkspace.barcode.test.tsx`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+- Extended the Store Mobile / Inventory Tablet runtime so reviewed expiry is now the third real control-plane-backed branch workflow:
+  - added mobile control-plane batch-expiry report, board, session, approval, and cancel client mapping
+  - added `RemoteExpiryRepository` to map reviewed expiry flows onto the existing Android expiry domain
+  - switched the runtime to build a remote expiry repository from paired runtime tenant/branch context instead of always using in-memory expiry
+- Added regression coverage for:
+  - mobile control-plane client batch-expiry calls
+  - remote expiry repository mapping
+  - runtime repository selection for paired expiry workflows
+- Extended the Store Mobile / Inventory Tablet runtime so assisted restock is now the fourth real control-plane-backed branch workflow:
+  - added mobile control-plane restock board and task lifecycle client mapping
+  - added `RemoteRestockRepository` to map reviewed restock flows onto the existing Android restock domain
+  - switched the runtime to build a remote restock repository from paired runtime tenant/branch context instead of always using in-memory restock
+- Added regression coverage for:
+  - mobile control-plane client restock calls
+  - remote restock repository mapping
+  - runtime repository selection for paired restock workflows
 - Completed CP-009D on the runtime orchestration boundary:
   - `print_jobs` model and migration
   - dedicated runtime repository, service, schemas, and routes instead of pushing print orchestration into billing modules

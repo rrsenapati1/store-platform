@@ -74,6 +74,24 @@ async def list_purchase_orders(
     return PurchaseOrderListResponse(records=[PurchaseOrderRecord(**record) for record in records])
 
 
+@router.get("/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}", response_model=PurchaseOrderResponse)
+async def get_purchase_order(
+    tenant_id: str,
+    branch_id: str,
+    purchase_order_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> PurchaseOrderResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="purchase.manage")
+    service = PurchasingService(session)
+    purchase_order = await service.get_purchase_order(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        purchase_order_id=purchase_order_id,
+    )
+    return PurchaseOrderResponse(**purchase_order)
+
+
 @router.post("/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}/submit-approval", response_model=PurchaseOrderResponse)
 async def submit_purchase_order(
     tenant_id: str,

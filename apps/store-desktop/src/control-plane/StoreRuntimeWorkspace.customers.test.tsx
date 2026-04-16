@@ -46,6 +46,7 @@ describe('store runtime customer insights', () => {
       jsonResponse({ records: [] }),
       jsonResponse({ records: [] }),
       jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
       jsonResponse({
         records: [
           {

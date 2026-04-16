@@ -22,6 +22,7 @@ class GoodsReceipt(Base, TimestampMixin):
     supplier_id: Mapped[str] = mapped_column(ForeignKey("suppliers.id", ondelete="CASCADE"), index=True)
     goods_receipt_number: Mapped[str] = mapped_column(String(64), index=True)
     received_on: Mapped[date] = mapped_column(Date())
+    note: Mapped[str | None] = mapped_column(String(1024), default=None)
 
 
 class GoodsReceiptLine(Base, TimestampMixin):
@@ -30,9 +31,11 @@ class GoodsReceiptLine(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     goods_receipt_id: Mapped[str] = mapped_column(ForeignKey("goods_receipts.id", ondelete="CASCADE"), index=True)
     product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    ordered_quantity: Mapped[float] = mapped_column(default=0.0)
     quantity: Mapped[float] = mapped_column(default=0.0)
     unit_cost: Mapped[float] = mapped_column(default=0.0)
     line_total: Mapped[float] = mapped_column(default=0.0)
+    discrepancy_note: Mapped[str | None] = mapped_column(String(1024), default=None)
 
 
 class InventoryLedgerEntry(Base, TimestampMixin):
@@ -71,6 +74,48 @@ class StockCountSession(Base, TimestampMixin):
     expected_quantity: Mapped[float] = mapped_column(default=0.0)
     variance_quantity: Mapped[float] = mapped_column(default=0.0)
     note: Mapped[str | None] = mapped_column(String(1024), default=None)
+
+
+class StockCountReviewSession(Base, TimestampMixin):
+    __tablename__ = "stock_count_review_sessions"
+    __table_args__ = (
+        UniqueConstraint("branch_id", "session_number", name="uq_stock_count_review_sessions_branch_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    session_number: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="OPEN", index=True)
+    expected_quantity: Mapped[float] = mapped_column(default=0.0)
+    counted_quantity: Mapped[float | None] = mapped_column(default=None)
+    variance_quantity: Mapped[float | None] = mapped_column(default=None)
+    note: Mapped[str | None] = mapped_column(String(1024), default=None)
+    review_note: Mapped[str | None] = mapped_column(String(1024), default=None)
+
+
+class RestockTaskSession(Base, TimestampMixin):
+    __tablename__ = "restock_task_sessions"
+    __table_args__ = (
+        UniqueConstraint("branch_id", "task_number", name="uq_restock_task_sessions_branch_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    task_number: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="OPEN", index=True)
+    stock_on_hand_snapshot: Mapped[float] = mapped_column(default=0.0)
+    reorder_point_snapshot: Mapped[float] = mapped_column(default=0.0)
+    target_stock_snapshot: Mapped[float] = mapped_column(default=0.0)
+    suggested_quantity_snapshot: Mapped[float] = mapped_column(default=0.0)
+    requested_quantity: Mapped[float] = mapped_column(default=0.0)
+    picked_quantity: Mapped[float | None] = mapped_column(default=None)
+    source_posture: Mapped[str] = mapped_column(String(64))
+    note: Mapped[str | None] = mapped_column(String(1024), default=None)
+    completion_note: Mapped[str | None] = mapped_column(String(1024), default=None)
 
 
 class TransferOrder(Base, TimestampMixin):

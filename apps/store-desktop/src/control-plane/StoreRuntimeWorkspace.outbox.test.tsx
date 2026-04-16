@@ -114,6 +114,7 @@ function queueBootstrapResponses(fetchMock: ReturnType<typeof vi.fn>) {
         },
       ],
     }),
+    jsonResponse({ records: [] }),
   ];
 
   for (const response of responses) {
@@ -193,8 +194,10 @@ function queueSaleCreationResponses(fetchMock: ReturnType<typeof vi.fn>) {
 describe('store runtime outbox continuity', () => {
   const originalFetch = globalThis.fetch;
   const originalLocalStorage = globalThis.localStorage;
+  const originalTauriInternals = (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__;
 
   beforeEach(() => {
+    delete (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__;
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
       value: new MemoryStorage(),
@@ -208,6 +211,7 @@ describe('store runtime outbox continuity', () => {
       configurable: true,
       value: originalLocalStorage,
     });
+    (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ = originalTauriInternals;
     vi.restoreAllMocks();
   });
 
@@ -224,6 +228,7 @@ describe('store runtime outbox continuity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
 
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     fireEvent.click(screen.getByRole('button', { name: 'Send device heartbeat' }));
@@ -232,10 +237,12 @@ describe('store runtime outbox continuity', () => {
       expect(screen.getByText('Queued runtime actions: 1')).toBeInTheDocument();
     });
 
-    const queuedSnapshot = JSON.parse(localStorage.getItem(STORE_RUNTIME_CACHE_KEY) ?? '{}') as {
-      pending_mutations?: Array<Record<string, unknown>>;
-    };
-    expect(queuedSnapshot.pending_mutations).toHaveLength(1);
+    await waitFor(() => {
+      const queuedSnapshot = JSON.parse(localStorage.getItem(STORE_RUNTIME_CACHE_KEY) ?? '{}') as {
+        pending_mutations?: Array<Record<string, unknown>>;
+      };
+      expect(queuedSnapshot.pending_mutations).toHaveLength(1);
+    });
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
@@ -268,6 +275,7 @@ describe('store runtime outbox continuity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -285,10 +293,12 @@ describe('store runtime outbox continuity', () => {
       expect(screen.getByText(/Invoice print :: SINV-BLRFLAGSHIP-0001/)).toBeInTheDocument();
     });
 
-    const queuedSnapshot = JSON.parse(localStorage.getItem(STORE_RUNTIME_CACHE_KEY) ?? '{}') as {
-      pending_mutations?: Array<Record<string, unknown>>;
-    };
-    expect(queuedSnapshot.pending_mutations).toHaveLength(1);
+    await waitFor(() => {
+      const queuedSnapshot = JSON.parse(localStorage.getItem(STORE_RUNTIME_CACHE_KEY) ?? '{}') as {
+        pending_mutations?: Array<Record<string, unknown>>;
+      };
+      expect(queuedSnapshot.pending_mutations).toHaveLength(1);
+    });
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse({

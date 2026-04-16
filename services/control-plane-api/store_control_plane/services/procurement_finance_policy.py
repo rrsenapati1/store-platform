@@ -129,6 +129,8 @@ def build_purchase_invoice_draft(
         product_id = str(goods_receipt_line["product_id"])
         product = products_by_id[product_id]
         quantity = money(float(goods_receipt_line["quantity"]))
+        if quantity <= 0:
+            continue
         unit_cost = money(float(goods_receipt_line["unit_cost"]))
         gst_rate = money(float(product.gst_rate))
         line_subtotal = money(quantity * unit_cost)

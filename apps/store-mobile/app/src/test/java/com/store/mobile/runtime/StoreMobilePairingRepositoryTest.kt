@@ -14,8 +14,12 @@ class StoreMobilePairingRepositoryTest {
             runtimeProfile = "mobile_store_spoke",
             sessionSurface = "store_mobile",
             hubBaseUrl = "http://127.0.0.1:9400",
+            tenantId = "tenant-demo-1",
+            branchId = "branch-demo-1",
         )
 
         assertEquals("device-1", repository.loadPairedDevice()?.deviceId)
+        assertEquals("tenant-demo-1", repository.loadPairedDevice()?.tenantId)
+        assertEquals("branch-demo-1", repository.loadPairedDevice()?.branchId)
     }
 }

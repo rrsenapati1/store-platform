@@ -637,6 +637,73 @@ export interface ControlPlaneBranchCatalogItem {
   selling_price_override?: number | null;
   effective_selling_price: number;
   availability_status: string;
+  reorder_point?: number | null;
+  target_stock?: number | null;
+}
+
+export interface ControlPlaneReplenishmentBoardRecord {
+  product_id: string;
+  product_name: string;
+  sku_code: string;
+  availability_status: string;
+  stock_on_hand: number;
+  reorder_point: number;
+  target_stock: number;
+  suggested_reorder_quantity: number;
+  replenishment_status: string;
+}
+
+export interface ControlPlaneReplenishmentBoard {
+  branch_id: string;
+  low_stock_count: number;
+  adequate_count: number;
+  records: ControlPlaneReplenishmentBoardRecord[];
+}
+
+export interface ControlPlaneRestockTask {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  product_id: string;
+  task_number: string;
+  status: string;
+  stock_on_hand_snapshot: number;
+  reorder_point_snapshot: number;
+  target_stock_snapshot: number;
+  suggested_quantity_snapshot: number;
+  requested_quantity: number;
+  picked_quantity?: number | null;
+  source_posture: string;
+  note?: string | null;
+  completion_note?: string | null;
+}
+
+export interface ControlPlaneRestockBoardRecord {
+  restock_task_id: string;
+  task_number: string;
+  product_id: string;
+  product_name: string;
+  sku_code: string;
+  status: string;
+  stock_on_hand_snapshot: number;
+  reorder_point_snapshot: number;
+  target_stock_snapshot: number;
+  suggested_quantity_snapshot: number;
+  requested_quantity: number;
+  picked_quantity?: number | null;
+  source_posture: string;
+  note?: string | null;
+  completion_note?: string | null;
+  has_active_task: boolean;
+}
+
+export interface ControlPlaneRestockBoard {
+  branch_id: string;
+  open_count: number;
+  picked_count: number;
+  completed_count: number;
+  canceled_count: number;
+  records: ControlPlaneRestockBoardRecord[];
 }
 
 export interface ControlPlaneSupplier {
@@ -1050,9 +1117,12 @@ export interface ControlPlaneGoodsReceiptLine {
   product_id: string;
   product_name: string;
   sku_code: string;
+  ordered_quantity?: number;
   quantity: number;
+  variance_quantity?: number;
   unit_cost: number;
   line_total: number;
+  discrepancy_note?: string | null;
 }
 
 export interface ControlPlaneGoodsReceipt {
@@ -1063,6 +1133,11 @@ export interface ControlPlaneGoodsReceipt {
   supplier_id: string;
   goods_receipt_number: string;
   received_on: string;
+  note?: string | null;
+  ordered_quantity_total?: number;
+  received_quantity_total?: number;
+  variance_quantity_total?: number;
+  has_discrepancy?: boolean;
   lines: ControlPlaneGoodsReceiptLine[];
 }
 
@@ -1076,6 +1151,10 @@ export interface ControlPlaneGoodsReceiptRecord {
   received_on: string;
   line_count: number;
   received_quantity: number;
+  ordered_quantity?: number;
+  variance_quantity?: number;
+  has_discrepancy?: boolean;
+  note?: string | null;
 }
 
 export interface ControlPlaneBatchLot {
@@ -1098,6 +1177,8 @@ export interface ControlPlaneReceivingBoardRecord {
   approval_status: string;
   receiving_status: string;
   can_receive: boolean;
+  has_discrepancy?: boolean;
+  variance_quantity?: number;
   blocked_reason?: string | null;
   goods_receipt_id?: string | null;
 }
@@ -1107,6 +1188,7 @@ export interface ControlPlaneReceivingBoard {
   blocked_count: number;
   ready_count: number;
   received_count: number;
+  received_with_variance_count?: number;
   records: ControlPlaneReceivingBoardRecord[];
 }
 
@@ -1164,6 +1246,51 @@ export interface ControlPlaneBatchExpiryWriteOff {
   reason: string;
 }
 
+export interface ControlPlaneBatchExpiryReviewSession {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  batch_lot_id: string;
+  product_id: string;
+  session_number: string;
+  status: string;
+  remaining_quantity_snapshot: number;
+  proposed_quantity?: number | null;
+  reason?: string | null;
+  note?: string | null;
+  review_note?: string | null;
+}
+
+export interface ControlPlaneBatchExpiryReviewApproval {
+  session: ControlPlaneBatchExpiryReviewSession;
+  write_off: ControlPlaneBatchExpiryWriteOff;
+}
+
+export interface ControlPlaneBatchExpiryBoardRecord {
+  batch_expiry_session_id: string;
+  session_number: string;
+  batch_lot_id: string;
+  product_id: string;
+  product_name: string;
+  sku_code: string;
+  batch_number: string;
+  status: string;
+  remaining_quantity_snapshot: number;
+  proposed_quantity?: number | null;
+  reason?: string | null;
+  note?: string | null;
+  review_note?: string | null;
+}
+
+export interface ControlPlaneBatchExpiryBoard {
+  branch_id: string;
+  open_count: number;
+  reviewed_count: number;
+  approved_count: number;
+  canceled_count: number;
+  records: ControlPlaneBatchExpiryBoardRecord[];
+}
+
 export interface ControlPlaneStockAdjustment {
   id: string;
   tenant_id: string;
@@ -1185,6 +1312,48 @@ export interface ControlPlaneStockCount {
   variance_quantity: number;
   note?: string | null;
   closing_stock: number;
+}
+
+export interface ControlPlaneStockCountReviewSession {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  product_id: string;
+  session_number: string;
+  status: string;
+  expected_quantity?: number | null;
+  counted_quantity?: number | null;
+  variance_quantity?: number | null;
+  note?: string | null;
+  review_note?: string | null;
+}
+
+export interface ControlPlaneStockCountApproval {
+  session: ControlPlaneStockCountReviewSession;
+  stock_count: ControlPlaneStockCount;
+}
+
+export interface ControlPlaneStockCountBoardRecord {
+  stock_count_session_id: string;
+  session_number: string;
+  product_id: string;
+  product_name: string;
+  sku_code: string;
+  status: string;
+  expected_quantity?: number | null;
+  counted_quantity?: number | null;
+  variance_quantity?: number | null;
+  note?: string | null;
+  review_note?: string | null;
+}
+
+export interface ControlPlaneStockCountBoard {
+  branch_id: string;
+  open_count: number;
+  counted_count: number;
+  approved_count: number;
+  canceled_count: number;
+  records: ControlPlaneStockCountBoardRecord[];
 }
 
 export interface ControlPlaneTransfer {
@@ -1227,6 +1396,13 @@ export interface ControlPlanePayment {
 export interface ControlPlaneCheckoutPaymentQrPayload {
   format: string;
   value: string;
+}
+
+export interface ControlPlaneCheckoutPaymentActionPayload {
+  kind: string;
+  value: string;
+  label?: string | null;
+  description?: string | null;
 }
 
 export interface ControlPlaneSaleLine {
@@ -1289,13 +1465,24 @@ export interface ControlPlaneCheckoutPaymentSession {
   provider_payment_session_id?: string | null;
   provider_payment_id?: string | null;
   payment_method: string;
+  handoff_surface: string;
+  provider_payment_mode: string;
   lifecycle_status: string;
   provider_status: string;
   order_amount: number;
   currency_code: string;
-  qr_payload: ControlPlaneCheckoutPaymentQrPayload;
+  action_payload: ControlPlaneCheckoutPaymentActionPayload;
+  action_expires_at?: string | null;
+  qr_payload?: ControlPlaneCheckoutPaymentQrPayload | null;
   qr_expires_at?: string | null;
+  last_error_message?: string | null;
+  last_reconciled_at?: string | null;
+  recovery_state: string;
   sale?: ControlPlaneSale | null;
+}
+
+export interface ControlPlaneCheckoutPaymentSessionListResponse {
+  records: ControlPlaneCheckoutPaymentSession[];
 }
 
 export interface ControlPlaneCustomerDirectoryRecord {

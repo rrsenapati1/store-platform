@@ -61,6 +61,8 @@ async def upsert_branch_catalog_item(
         product_id=payload.product_id,
         selling_price_override=payload.selling_price_override,
         availability_status=payload.availability_status,
+        reorder_point=payload.reorder_point,
+        target_stock=payload.target_stock,
     )
     return BranchCatalogItemResponse(**item)
 

@@ -121,6 +121,7 @@ describe('store runtime customer display flow', () => {
           },
         ],
       }),
+      jsonResponse({ records: [] }),
       jsonResponse({
         id: 'sale-1',
         tenant_id: 'tenant-acme',
@@ -273,6 +274,7 @@ describe('store runtime customer display flow', () => {
           },
         ],
       }),
+      jsonResponse({ records: [] }),
       jsonResponse({
         id: 'checkout-1',
         tenant_id: 'tenant-acme',
@@ -282,13 +284,58 @@ describe('store runtime customer display flow', () => {
         provider_payment_session_id: 'cf_ps_checkout-1',
         provider_payment_id: null,
         payment_method: 'CASHFREE_UPI_QR',
-        lifecycle_status: 'QR_READY',
+        handoff_surface: 'BRANDED_UPI_QR',
+        provider_payment_mode: 'cashfree_upi',
+        lifecycle_status: 'ACTION_READY',
         provider_status: 'ACTIVE',
         order_amount: 194.25,
         currency_code: 'INR',
+        action_payload: {
+          kind: 'upi_qr',
+          value: 'upi://pay?tr=cf_order_checkout-1',
+          label: 'Korsenex customer UPI QR',
+          description: 'Scan with any UPI app to complete this checkout.',
+        },
+        action_expires_at: '2026-04-15T12:10:00.000Z',
         qr_payload: { format: 'upi_qr', value: 'upi://pay?tr=cf_order_checkout-1' },
         qr_expires_at: '2026-04-15T12:10:00.000Z',
+        last_error_message: null,
+        last_reconciled_at: '2026-04-15T12:01:00.000Z',
+        recovery_state: 'ACTIVE',
         sale: null,
+      }),
+      jsonResponse({
+        records: [
+          {
+            id: 'checkout-1',
+            tenant_id: 'tenant-acme',
+            branch_id: 'branch-1',
+            provider_name: 'cashfree',
+            provider_order_id: 'cf_order_checkout-1',
+            provider_payment_session_id: 'cf_ps_checkout-1',
+            provider_payment_id: null,
+            payment_method: 'CASHFREE_UPI_QR',
+            handoff_surface: 'BRANDED_UPI_QR',
+            provider_payment_mode: 'cashfree_upi',
+            lifecycle_status: 'ACTION_READY',
+            provider_status: 'ACTIVE',
+            order_amount: 194.25,
+            currency_code: 'INR',
+            action_payload: {
+              kind: 'upi_qr',
+              value: 'upi://pay?tr=cf_order_checkout-1',
+              label: 'Korsenex customer UPI QR',
+              description: 'Scan with any UPI app to complete this checkout.',
+            },
+            action_expires_at: '2026-04-15T12:10:00.000Z',
+            qr_payload: { format: 'upi_qr', value: 'upi://pay?tr=cf_order_checkout-1' },
+            qr_expires_at: '2026-04-15T12:10:00.000Z',
+            last_error_message: null,
+            last_reconciled_at: '2026-04-15T12:01:00.000Z',
+            recovery_state: 'ACTIVE',
+            sale: null,
+          },
+        ],
       }),
       jsonResponse({
         id: 'checkout-1',
@@ -299,12 +346,24 @@ describe('store runtime customer display flow', () => {
         provider_payment_session_id: 'cf_ps_checkout-1',
         provider_payment_id: 'cfpay_123456',
         payment_method: 'CASHFREE_UPI_QR',
+        handoff_surface: 'BRANDED_UPI_QR',
+        provider_payment_mode: 'cashfree_upi',
         lifecycle_status: 'FINALIZED',
         provider_status: 'SUCCESS',
         order_amount: 194.25,
         currency_code: 'INR',
+        action_payload: {
+          kind: 'upi_qr',
+          value: 'upi://pay?tr=cf_order_checkout-1',
+          label: 'Korsenex customer UPI QR',
+          description: 'Scan with any UPI app to complete this checkout.',
+        },
+        action_expires_at: '2026-04-15T12:10:00.000Z',
         qr_payload: { format: 'upi_qr', value: 'upi://pay?tr=cf_order_checkout-1' },
         qr_expires_at: '2026-04-15T12:10:00.000Z',
+        last_error_message: null,
+        last_reconciled_at: '2026-04-15T12:02:00.000Z',
+        recovery_state: 'CLOSED',
         sale: {
           id: 'sale-1',
           tenant_id: 'tenant-acme',
@@ -340,6 +399,73 @@ describe('store runtime customer display flow', () => {
             { tax_type: 'SGST', tax_rate: 2.5, taxable_amount: 185, tax_amount: 4.62 },
           ],
         },
+      }),
+      jsonResponse({
+        records: [
+          {
+            id: 'checkout-1',
+            tenant_id: 'tenant-acme',
+            branch_id: 'branch-1',
+            provider_name: 'cashfree',
+            provider_order_id: 'cf_order_checkout-1',
+            provider_payment_session_id: 'cf_ps_checkout-1',
+            provider_payment_id: 'cfpay_123456',
+            payment_method: 'CASHFREE_UPI_QR',
+            handoff_surface: 'BRANDED_UPI_QR',
+            provider_payment_mode: 'cashfree_upi',
+            lifecycle_status: 'FINALIZED',
+            provider_status: 'SUCCESS',
+            order_amount: 194.25,
+            currency_code: 'INR',
+            action_payload: {
+              kind: 'upi_qr',
+              value: 'upi://pay?tr=cf_order_checkout-1',
+              label: 'Korsenex customer UPI QR',
+              description: 'Scan with any UPI app to complete this checkout.',
+            },
+            action_expires_at: '2026-04-15T12:10:00.000Z',
+            qr_payload: { format: 'upi_qr', value: 'upi://pay?tr=cf_order_checkout-1' },
+            qr_expires_at: '2026-04-15T12:10:00.000Z',
+            last_error_message: null,
+            last_reconciled_at: '2026-04-15T12:02:00.000Z',
+            recovery_state: 'CLOSED',
+            sale: {
+              id: 'sale-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              customer_name: 'Acme Traders',
+              customer_gstin: '29AAEPM0111C1Z3',
+              invoice_kind: 'B2B',
+              irn_status: 'IRN_PENDING',
+              invoice_number: 'SINV-BLRFLAGSHIP-0001',
+              issued_on: '2026-04-15T12:04:00.000Z',
+              subtotal: 185,
+              cgst_total: 4.63,
+              sgst_total: 4.62,
+              igst_total: 0,
+              grand_total: 194.25,
+              payment: { payment_method: 'CASHFREE_UPI_QR', amount: 194.25 },
+              lines: [
+                {
+                  product_id: 'product-1',
+                  product_name: 'Classic Tea',
+                  sku_code: 'tea-classic-250g',
+                  hsn_sac_code: '0902',
+                  quantity: 2,
+                  unit_price: 92.5,
+                  gst_rate: 5,
+                  line_subtotal: 185,
+                  tax_total: 9.25,
+                  line_total: 194.25,
+                },
+              ],
+              tax_lines: [
+                { tax_type: 'CGST', tax_rate: 2.5, taxable_amount: 185, tax_amount: 4.63 },
+                { tax_type: 'SGST', tax_rate: 2.5, taxable_amount: 185, tax_amount: 4.62 },
+              ],
+            },
+          },
+        ],
       }),
       jsonResponse({
         records: [
@@ -389,12 +515,12 @@ describe('store runtime customer display flow', () => {
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'CASHFREE_UPI_QR' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open customer display' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Start Cashfree UPI QR' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start branded UPI QR' }));
     await waitFor(() => {
       const activePayload = loadCustomerDisplayPayload();
       expect(activePayload?.state).toBe('payment_in_progress');
       expect(activePayload?.payment_qr?.value).toBe('upi://pay?tr=cf_order_checkout-1');
-      expect(activePayload?.message).toContain('Scan to pay');
+      expect(activePayload?.message).toContain('UPI app');
     });
 
     await waitFor(() => {

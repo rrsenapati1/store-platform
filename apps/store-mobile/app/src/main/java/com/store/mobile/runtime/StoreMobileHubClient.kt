@@ -38,6 +38,8 @@ class FakeStoreMobileHubClient : StoreMobileHubClient {
             staffProfileId = "staff-demo-1",
             runtimeProfile = runtimeProfile,
             sessionSurface = requestedSessionSurface,
+            tenantId = "tenant-demo-1",
+            branchId = "branch-demo-1",
         )
     }
 }

@@ -4,9 +4,11 @@ import type {
   ControlPlaneGoodsReceiptRecord,
   ControlPlaneInventoryLedgerRecord,
   ControlPlaneInventorySnapshotRecord,
+  ControlPlaneStockCountBoard,
   ControlPlaneReceivingBoard,
   ControlPlaneStockAdjustment,
   ControlPlaneStockCount,
+  ControlPlaneStockCountReviewSession,
   ControlPlaneTransfer,
   ControlPlaneTransferBoard,
 } from '@store/types';
@@ -19,6 +21,8 @@ export async function runCreateGoodsReceipt(params: {
   tenantId: string;
   branchId: string;
   purchaseOrderId: string;
+  note: string;
+  lines: Array<{ product_id: string; received_quantity: number; discrepancy_note: string }>;
   setIsBusy: (value: boolean) => void;
   setErrorMessage: SetString;
   setLatestGoodsReceipt: (value: ControlPlaneGoodsReceipt | null) => void;
@@ -26,12 +30,15 @@ export async function runCreateGoodsReceipt(params: {
   setReceivingBoard: (value: ControlPlaneReceivingBoard | null) => void;
   setInventoryLedger: (value: ControlPlaneInventoryLedgerRecord[]) => void;
   setInventorySnapshot: (value: ControlPlaneInventorySnapshotRecord[]) => void;
+  resetForm: () => void;
 }) {
   const {
     accessToken,
     tenantId,
     branchId,
     purchaseOrderId,
+    note,
+    lines,
     setIsBusy,
     setErrorMessage,
     setLatestGoodsReceipt,
@@ -39,6 +46,7 @@ export async function runCreateGoodsReceipt(params: {
     setReceivingBoard,
     setInventoryLedger,
     setInventorySnapshot,
+    resetForm,
   } = params;
 
   setIsBusy(true);
@@ -46,6 +54,12 @@ export async function runCreateGoodsReceipt(params: {
   try {
     const goodsReceipt = await ownerControlPlaneClient.createGoodsReceipt(accessToken, tenantId, branchId, {
       purchase_order_id: purchaseOrderId,
+      note: note || null,
+      lines: lines.map((line) => ({
+        product_id: line.product_id,
+        received_quantity: line.received_quantity,
+        discrepancy_note: line.discrepancy_note || null,
+      })),
     });
     const [goodsReceiptList, board, ledger, snapshot] = await Promise.all([
       ownerControlPlaneClient.listGoodsReceipts(accessToken, tenantId, branchId),
@@ -59,6 +73,7 @@ export async function runCreateGoodsReceipt(params: {
       setReceivingBoard(board);
       setInventoryLedger(ledger.records);
       setInventorySnapshot(snapshot.records);
+      resetForm();
     });
   } catch (error) {
     setErrorMessage(error instanceof Error ? error.message : 'Unable to create goods receipt');
@@ -171,6 +186,190 @@ export async function runCreateStockCount(params: {
     });
   } catch (error) {
     setErrorMessage(error instanceof Error ? error.message : 'Unable to record stock count');
+  } finally {
+    setIsBusy(false);
+  }
+}
+
+export async function runCreateStockCountSession(params: {
+  accessToken: string;
+  tenantId: string;
+  branchId: string;
+  productId: string;
+  note: string;
+  setIsBusy: (value: boolean) => void;
+  setErrorMessage: SetString;
+  setLatestStockCountSession: (value: ControlPlaneStockCountReviewSession | null) => void;
+  setStockCountBoard: (value: ControlPlaneStockCountBoard | null) => void;
+}) {
+  const {
+    accessToken,
+    tenantId,
+    branchId,
+    productId,
+    note,
+    setIsBusy,
+    setErrorMessage,
+    setLatestStockCountSession,
+    setStockCountBoard,
+  } = params;
+
+  setIsBusy(true);
+  setErrorMessage('');
+  try {
+    const sessionRecord = await ownerControlPlaneClient.createStockCountSession(accessToken, tenantId, branchId, {
+      product_id: productId,
+      note: note || null,
+    });
+    const board = await ownerControlPlaneClient.getStockCountBoard(accessToken, tenantId, branchId);
+    startTransition(() => {
+      setLatestStockCountSession(sessionRecord);
+      setStockCountBoard(board);
+    });
+  } catch (error) {
+    setErrorMessage(error instanceof Error ? error.message : 'Unable to open stock count session');
+  } finally {
+    setIsBusy(false);
+  }
+}
+
+export async function runRecordStockCountSession(params: {
+  accessToken: string;
+  tenantId: string;
+  branchId: string;
+  stockCountSessionId: string;
+  countedQuantity: number;
+  note: string;
+  setIsBusy: (value: boolean) => void;
+  setErrorMessage: SetString;
+  setLatestStockCountSession: (value: ControlPlaneStockCountReviewSession | null) => void;
+  setStockCountBoard: (value: ControlPlaneStockCountBoard | null) => void;
+  resetForm: () => void;
+}) {
+  const {
+    accessToken,
+    tenantId,
+    branchId,
+    stockCountSessionId,
+    countedQuantity,
+    note,
+    setIsBusy,
+    setErrorMessage,
+    setLatestStockCountSession,
+    setStockCountBoard,
+    resetForm,
+  } = params;
+
+  setIsBusy(true);
+  setErrorMessage('');
+  try {
+    const sessionRecord = await ownerControlPlaneClient.recordStockCountSession(accessToken, tenantId, branchId, stockCountSessionId, {
+      counted_quantity: countedQuantity,
+      note: note || null,
+    });
+    const board = await ownerControlPlaneClient.getStockCountBoard(accessToken, tenantId, branchId);
+    startTransition(() => {
+      setLatestStockCountSession(sessionRecord);
+      setStockCountBoard(board);
+      resetForm();
+    });
+  } catch (error) {
+    setErrorMessage(error instanceof Error ? error.message : 'Unable to record blind count');
+  } finally {
+    setIsBusy(false);
+  }
+}
+
+export async function runApproveStockCountSession(params: {
+  accessToken: string;
+  tenantId: string;
+  branchId: string;
+  stockCountSessionId: string;
+  reviewNote: string;
+  setIsBusy: (value: boolean) => void;
+  setErrorMessage: SetString;
+  setLatestStockCountSession: (value: ControlPlaneStockCountReviewSession | null) => void;
+  setLatestStockCount: (value: ControlPlaneStockCount | null) => void;
+  setStockCountBoard: (value: ControlPlaneStockCountBoard | null) => void;
+  setInventoryLedger: (value: ControlPlaneInventoryLedgerRecord[]) => void;
+  setInventorySnapshot: (value: ControlPlaneInventorySnapshotRecord[]) => void;
+}) {
+  const {
+    accessToken,
+    tenantId,
+    branchId,
+    stockCountSessionId,
+    reviewNote,
+    setIsBusy,
+    setErrorMessage,
+    setLatestStockCountSession,
+    setLatestStockCount,
+    setStockCountBoard,
+    setInventoryLedger,
+    setInventorySnapshot,
+  } = params;
+
+  setIsBusy(true);
+  setErrorMessage('');
+  try {
+    const approval = await ownerControlPlaneClient.approveStockCountSession(accessToken, tenantId, branchId, stockCountSessionId, {
+      review_note: reviewNote || null,
+    });
+    const [board, ledger, snapshot] = await Promise.all([
+      ownerControlPlaneClient.getStockCountBoard(accessToken, tenantId, branchId),
+      ownerControlPlaneClient.listInventoryLedger(accessToken, tenantId, branchId),
+      ownerControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId),
+    ]);
+    startTransition(() => {
+      setLatestStockCountSession(approval.session);
+      setLatestStockCount(approval.stock_count);
+      setStockCountBoard(board);
+      setInventoryLedger(ledger.records);
+      setInventorySnapshot(snapshot.records);
+    });
+  } catch (error) {
+    setErrorMessage(error instanceof Error ? error.message : 'Unable to approve stock count session');
+  } finally {
+    setIsBusy(false);
+  }
+}
+
+export async function runCancelStockCountSession(params: {
+  accessToken: string;
+  tenantId: string;
+  branchId: string;
+  stockCountSessionId: string;
+  reviewNote: string;
+  setIsBusy: (value: boolean) => void;
+  setErrorMessage: SetString;
+  setLatestStockCountSession: (value: ControlPlaneStockCountReviewSession | null) => void;
+  setStockCountBoard: (value: ControlPlaneStockCountBoard | null) => void;
+}) {
+  const {
+    accessToken,
+    tenantId,
+    branchId,
+    stockCountSessionId,
+    reviewNote,
+    setIsBusy,
+    setErrorMessage,
+    setLatestStockCountSession,
+    setStockCountBoard,
+  } = params;
+
+  setIsBusy(true);
+  setErrorMessage('');
+  try {
+    const sessionRecord = await ownerControlPlaneClient.cancelStockCountSession(accessToken, tenantId, branchId, stockCountSessionId, {
+      review_note: reviewNote || null,
+    });
+    const board = await ownerControlPlaneClient.getStockCountBoard(accessToken, tenantId, branchId);
+    startTransition(() => {
+      setLatestStockCountSession(sessionRecord);
+      setStockCountBoard(board);
+    });
+  } catch (error) {
+    setErrorMessage(error instanceof Error ? error.message : 'Unable to cancel stock count session');
   } finally {
     setIsBusy(false);
   }

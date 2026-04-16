@@ -2,6 +2,9 @@ import type {
   ControlPlaneActor,
   ControlPlaneAuditRecord,
   ControlPlaneBatchExpiryReport,
+  ControlPlaneBatchExpiryBoard,
+  ControlPlaneBatchExpiryReviewApproval,
+  ControlPlaneBatchExpiryReviewSession,
   ControlPlaneBatchExpiryWriteOff,
   ControlPlaneGoodsReceiptBatchLotIntake,
   ControlPlaneBarcodeAllocation,
@@ -33,6 +36,9 @@ import type {
   ControlPlanePurchaseInvoiceRecord,
   ControlPlanePurchaseOrder,
   ControlPlanePurchaseOrderRecord,
+  ControlPlaneReplenishmentBoard,
+  ControlPlaneRestockBoard,
+  ControlPlaneRestockTask,
   ControlPlaneReceivingBoard,
   ControlPlaneSaleRecord,
   ControlPlaneSubscriptionBootstrap,
@@ -43,7 +49,10 @@ import type {
   ControlPlaneSaleReturnRecord,
   ControlPlaneSession,
   ControlPlaneStockAdjustment,
+  ControlPlaneStockCountApproval,
+  ControlPlaneStockCountBoard,
   ControlPlaneStockCount,
+  ControlPlaneStockCountReviewSession,
   ControlPlaneStaffProfile,
   ControlPlaneStaffProfileRecord,
   ControlPlaneSupplier,
@@ -259,10 +268,93 @@ export const ownerControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-    payload: { product_id: string; selling_price_override?: number | null; availability_status: string },
+    payload: {
+      product_id: string;
+      selling_price_override?: number | null;
+      availability_status: string;
+      reorder_point?: number | null;
+      target_stock?: number | null;
+    },
   ) {
     return request<ControlPlaneBranchCatalogItem>(
       `/v1/tenants/${tenantId}/branches/${branchId}/catalog-items`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  getReplenishmentBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneReplenishmentBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/replenishment-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  getRestockBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneRestockBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  createRestockTask(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: { product_id: string; requested_quantity: number; source_posture: string; note?: string | null },
+  ) {
+    return request<ControlPlaneRestockTask>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-tasks`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  pickRestockTask(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    restockTaskId: string,
+    payload: { picked_quantity: number; note?: string | null },
+  ) {
+    return request<ControlPlaneRestockTask>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-tasks/${restockTaskId}/pick`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  completeRestockTask(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    restockTaskId: string,
+    payload: { completion_note?: string | null },
+  ) {
+    return request<ControlPlaneRestockTask>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-tasks/${restockTaskId}/complete`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  cancelRestockTask(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    restockTaskId: string,
+    payload: { cancel_note?: string | null },
+  ) {
+    return request<ControlPlaneRestockTask>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-tasks/${restockTaskId}/cancel`,
       {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -441,7 +533,11 @@ export const ownerControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-    payload: { purchase_order_id: string },
+    payload: {
+      purchase_order_id: string;
+      note?: string | null;
+      lines?: Array<{ product_id: string; received_quantity: number; discrepancy_note?: string | null }>;
+    },
   ) {
     return request<ControlPlaneGoodsReceipt>(
       `/v1/tenants/${tenantId}/branches/${branchId}/goods-receipts`,
@@ -481,6 +577,76 @@ export const ownerControlPlaneClient = {
     return request<ControlPlaneBatchExpiryReport>(
       `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-report`,
       undefined,
+      accessToken,
+    );
+  },
+  getBatchExpiryBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneBatchExpiryBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  createBatchExpirySession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: { batch_lot_id: string; note?: string | null },
+  ) {
+    return request<ControlPlaneBatchExpiryReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-sessions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  recordBatchExpirySession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    batchExpirySessionId: string,
+    payload: { quantity: number; reason: string },
+  ) {
+    return request<ControlPlaneBatchExpiryReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-sessions/${batchExpirySessionId}/review`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  approveBatchExpirySession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    batchExpirySessionId: string,
+    payload: { review_note?: string | null },
+  ) {
+    return request<ControlPlaneBatchExpiryReviewApproval>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-sessions/${batchExpirySessionId}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  cancelBatchExpirySession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    batchExpirySessionId: string,
+    payload: { review_note?: string | null },
+  ) {
+    return request<ControlPlaneBatchExpiryReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-sessions/${batchExpirySessionId}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
       accessToken,
     );
   },
@@ -662,6 +828,76 @@ export const ownerControlPlaneClient = {
         method: 'POST',
         body: JSON.stringify(payload),
       },
+      accessToken,
+    );
+  },
+  createStockCountSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: { product_id: string; note?: string | null },
+  ) {
+    return request<ControlPlaneStockCountReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-sessions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  recordStockCountSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    stockCountSessionId: string,
+    payload: { counted_quantity: number; note?: string | null },
+  ) {
+    return request<ControlPlaneStockCountReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-sessions/${stockCountSessionId}/record`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  approveStockCountSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    stockCountSessionId: string,
+    payload: { review_note?: string | null },
+  ) {
+    return request<ControlPlaneStockCountApproval>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-sessions/${stockCountSessionId}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  cancelStockCountSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    stockCountSessionId: string,
+    payload: { review_note?: string | null },
+  ) {
+    return request<ControlPlaneStockCountReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-sessions/${stockCountSessionId}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  getStockCountBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneStockCountBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/stock-count-board`,
+      undefined,
       accessToken,
     );
   },

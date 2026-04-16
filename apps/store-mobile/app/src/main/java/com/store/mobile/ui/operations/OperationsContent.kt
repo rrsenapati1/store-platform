@@ -1,9 +1,6 @@
 package com.store.mobile.ui.operations
 
 import androidx.compose.runtime.Composable
-import com.store.mobile.operations.ExpiryReport
-import com.store.mobile.operations.ReceivingBoard
-import com.store.mobile.operations.StockCountContext
 import com.store.mobile.ui.runtime.RuntimeStatusScreen
 import com.store.mobile.ui.runtime.RuntimeStatusUiState
 import com.store.mobile.ui.scan.ScanLookupScreen
@@ -12,6 +9,7 @@ import com.store.mobile.ui.scan.ScanLookupUiState
 fun mobileOperationsSectionLabel(section: MobileOperationsSection): String {
     return when (section) {
         MobileOperationsSection.SCAN -> "Scan"
+        MobileOperationsSection.RESTOCK -> "Restock"
         MobileOperationsSection.RECEIVING -> "Receiving"
         MobileOperationsSection.STOCK_COUNT -> "Count"
         MobileOperationsSection.EXPIRY -> "Expiry"
@@ -30,9 +28,14 @@ fun MobileOperationsContent(
     onCameraPermissionResolved: (Boolean) -> Unit,
     onCameraPreviewFailure: (String) -> Unit,
     onCameraBarcodeDetected: (String) -> Unit,
-    receivingBoard: ReceivingBoard,
-    stockCountContext: StockCountContext,
-    expiryReport: ExpiryReport,
+    receivingState: ReceivingUiState,
+    receivingActions: ReceivingScreenActions,
+    stockCountState: StockCountUiState,
+    stockCountActions: StockCountScreenActions,
+    restockState: RestockUiState,
+    restockActions: RestockScreenActions,
+    expiryState: ExpiryUiState,
+    expiryActions: ExpiryScreenActions,
     runtimeStatusState: RuntimeStatusUiState,
 ) {
     when (activeSection) {
@@ -49,9 +52,23 @@ fun MobileOperationsContent(
             )
         }
 
-        MobileOperationsSection.RECEIVING -> ReceivingScreen(board = receivingBoard)
-        MobileOperationsSection.STOCK_COUNT -> StockCountScreen(context = stockCountContext)
-        MobileOperationsSection.EXPIRY -> ExpiryScreen(report = expiryReport)
+        MobileOperationsSection.RESTOCK -> RestockScreen(
+            state = restockState,
+            isTabletLayout = isTabletLayout,
+            actions = restockActions,
+        )
+        MobileOperationsSection.RECEIVING -> ReceivingScreen(
+            state = receivingState,
+            actions = receivingActions,
+        )
+        MobileOperationsSection.STOCK_COUNT -> StockCountScreen(
+            state = stockCountState,
+            actions = stockCountActions,
+        )
+        MobileOperationsSection.EXPIRY -> ExpiryScreen(
+            state = expiryState,
+            actions = expiryActions,
+        )
         MobileOperationsSection.RUNTIME -> RuntimeStatusScreen(state = runtimeStatusState)
     }
 }

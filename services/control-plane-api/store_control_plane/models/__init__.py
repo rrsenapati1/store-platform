@@ -1,5 +1,5 @@
 from .audit import AuditEvent
-from .batches import BatchExpiryWriteOff, BatchLot
+from .batches import BatchExpiryReviewSession, BatchExpiryWriteOff, BatchLot
 from .billing import CheckoutPaymentSession, CreditNote, CreditNoteTaxLine, ExchangeOrder, InvoiceTaxLine, Payment, Sale, SaleLine, SaleReturn, SaleReturnLine, SalesInvoice
 from .catalog import BranchCatalogItem, CatalogProduct
 from .compliance import BranchIrpProfile, GstExportJob, IrnAttachment
@@ -7,7 +7,7 @@ from .commerce import BillingPlan, SubscriptionWebhookEvent, TenantBillingOverri
 from .customers import CustomerExchangeSnapshot, CustomerSaleReturnSnapshot, CustomerSaleSnapshot
 from .identity import AppSession, PlatformAdminAccount, User
 from .operations import OperationsJob
-from .inventory import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, StockAdjustment, StockCountSession, TransferOrder
+from .inventory import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, RestockTaskSession, StockAdjustment, StockCountReviewSession, StockCountSession, TransferOrder
 from .membership import BranchMembership, TenantMembership
 from .procurement_finance import PurchaseInvoice, PurchaseInvoiceLine, SupplierPayment, SupplierReturn, SupplierReturnLine
 from .purchasing import PurchaseOrder, PurchaseOrderLine, Supplier
@@ -22,6 +22,7 @@ __all__ = [
     "AppSession",
     "AuditEvent",
     "BatchExpiryWriteOff",
+    "BatchExpiryReviewSession",
     "BatchLot",
     "BillingPlan",
     "BranchIrpProfile",
@@ -45,6 +46,7 @@ __all__ = [
     "HubSyncStatus",
     "HubSpokeObservation",
     "InventoryLedgerEntry",
+    "RestockTaskSession",
     "OwnerInvite",
     "OperationsJob",
     "Payment",
@@ -62,6 +64,7 @@ __all__ = [
     "SaleReturnLine",
     "SalesInvoice",
     "StockAdjustment",
+    "StockCountReviewSession",
     "StockCountSession",
     "SubscriptionWebhookEvent",
     "SyncConflict",

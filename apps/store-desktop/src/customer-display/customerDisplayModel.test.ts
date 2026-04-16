@@ -89,4 +89,42 @@ describe('customer display payload model', () => {
     expect(payload.change_due).toBe(111.5);
     expect(payload.message).toContain('SINV-BLRFLAGSHIP-0001');
   });
+
+  test('returns hosted phone handoff posture from an active hosted checkout session', () => {
+    const payload = buildCustomerDisplayPayload({
+      branchName: 'Bengaluru Flagship',
+      selectedItem: {
+        product_name: 'Classic Tea',
+        effective_selling_price: 92.5,
+        gst_rate: 5,
+      },
+      saleQuantity: '2',
+      paymentMethod: 'CASHFREE_HOSTED_PHONE',
+      latestSale: null,
+      checkoutPaymentSession: {
+        payment_method: 'CASHFREE_HOSTED_PHONE',
+        handoff_surface: 'HOSTED_PHONE',
+        lifecycle_status: 'ACTION_READY',
+        order_amount: 194.25,
+        currency_code: 'INR',
+        action_payload: {
+          kind: 'hosted_url',
+          value: 'https://payments.store.local/checkout/cf_order_checkout-1?surface=hosted_phone',
+          label: 'Customer phone checkout',
+          description: 'Scan or open this link on the customer phone.',
+        },
+        qr_payload: {
+          format: 'hosted_url',
+          value: 'https://payments.store.local/checkout/cf_order_checkout-1?surface=hosted_phone',
+        },
+        qr_expires_at: '2026-04-15T12:10:00.000Z',
+      },
+      isBusy: false,
+    });
+
+    expect(payload.state).toBe('payment_in_progress');
+    expect(payload.title).toBe('Continue on phone');
+    expect(payload.payment_qr?.format).toBe('hosted_url');
+    expect(payload.payment_qr?.value).toContain('surface=hosted_phone');
+  });
 });

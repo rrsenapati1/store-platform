@@ -282,6 +282,7 @@ describe('store desktop packaged activation flow', () => {
   const originalTauriInternals = (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__;
 
   beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-04-14T12:00:00.000Z'));
     (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ = {};
     mockInvoke.mockClear();
     tauriState.cache = null;

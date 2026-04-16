@@ -19,24 +19,135 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.store.mobile.StoreMobileApplication
 import com.store.mobile.MainActivity
+import com.store.mobile.controlplane.StoreMobileControlPlaneClient
 import com.store.mobile.operations.InMemoryExpiryRepository
 import com.store.mobile.operations.InMemoryReceivingRepository
+import com.store.mobile.operations.InMemoryRestockRepository
 import com.store.mobile.operations.InMemoryStockCountRepository
+import com.store.mobile.operations.ExpiryRepository
+import com.store.mobile.operations.ReceivingRepository
+import com.store.mobile.operations.RemoteExpiryRepository
+import com.store.mobile.operations.RemoteReceivingRepository
+import com.store.mobile.operations.RemoteRestockRepository
+import com.store.mobile.operations.RemoteStockCountRepository
+import com.store.mobile.operations.RestockRepository
+import com.store.mobile.operations.StockCountRepository
 import com.store.mobile.runtime.FakeStoreMobileHubClient
 import com.store.mobile.runtime.InMemoryStoreMobilePairingRepository
 import com.store.mobile.runtime.InMemoryStoreMobileSessionRepository
+import com.store.mobile.runtime.StoreMobilePairedDevice
 import com.store.mobile.runtime.StoreMobilePairingRepository
+import com.store.mobile.runtime.StoreMobileRuntimeSession
 import com.store.mobile.runtime.StoreMobileSessionRepository
 import com.store.mobile.scan.ExternalScannerEvent
 import com.store.mobile.scan.InMemoryScanLookupRepository
+import com.store.mobile.scan.RemoteScanLookupRepository
+import com.store.mobile.scan.ScanLookupRepository
 import com.store.mobile.scan.ZebraDataWedgeResult
 import com.store.mobile.ui.handheld.HandheldStoreShell
+import com.store.mobile.ui.operations.ExpiryScreenActions
+import com.store.mobile.ui.operations.ExpiryViewModel
 import com.store.mobile.ui.operations.MobileOperationsSection
+import com.store.mobile.ui.operations.ReceivingScreenActions
+import com.store.mobile.ui.operations.ReceivingViewModel
+import com.store.mobile.ui.operations.RestockScreenActions
+import com.store.mobile.ui.operations.RestockViewModel
+import com.store.mobile.ui.operations.StockCountScreenActions
+import com.store.mobile.ui.operations.StockCountViewModel
 import com.store.mobile.ui.pairing.PairingScreen
 import com.store.mobile.ui.pairing.PairingViewModel
 import com.store.mobile.ui.runtime.buildRuntimeStatusState
 import com.store.mobile.ui.scan.ScanLookupViewModel
 import com.store.mobile.ui.tablet.InventoryTabletShell
+
+internal fun resolveStoreMobileOperationsBranchId(
+    pairedDevice: StoreMobilePairedDevice?,
+    session: StoreMobileRuntimeSession?,
+): String? {
+    return session?.branchId?.takeIf { it.isNotBlank() }
+        ?: pairedDevice?.branchId?.takeIf { it.isNotBlank() }
+}
+
+internal fun buildStoreMobileStockCountRepository(
+    pairedDevice: StoreMobilePairedDevice?,
+    session: StoreMobileRuntimeSession?,
+): StockCountRepository {
+    if (pairedDevice != null && session != null && session.accessToken.isNotBlank()) {
+        return RemoteStockCountRepository(
+            tenantId = session.tenantId,
+            client = StoreMobileControlPlaneClient(
+                baseUrl = pairedDevice.hubBaseUrl,
+                accessToken = session.accessToken,
+            ),
+        )
+    }
+    return InMemoryStockCountRepository()
+}
+
+internal fun buildStoreMobileReceivingRepository(
+    pairedDevice: StoreMobilePairedDevice?,
+    session: StoreMobileRuntimeSession?,
+): ReceivingRepository {
+    if (pairedDevice != null && session != null && session.accessToken.isNotBlank()) {
+        return RemoteReceivingRepository(
+            tenantId = session.tenantId,
+            client = StoreMobileControlPlaneClient(
+                baseUrl = pairedDevice.hubBaseUrl,
+                accessToken = session.accessToken,
+            ),
+        )
+    }
+    return InMemoryReceivingRepository()
+}
+
+internal fun buildStoreMobileExpiryRepository(
+    pairedDevice: StoreMobilePairedDevice?,
+    session: StoreMobileRuntimeSession?,
+): ExpiryRepository {
+    if (pairedDevice != null && session != null && session.accessToken.isNotBlank()) {
+        return RemoteExpiryRepository(
+            tenantId = session.tenantId,
+            client = StoreMobileControlPlaneClient(
+                baseUrl = pairedDevice.hubBaseUrl,
+                accessToken = session.accessToken,
+            ),
+        )
+    }
+    return InMemoryExpiryRepository()
+}
+
+internal fun buildStoreMobileRestockRepository(
+    pairedDevice: StoreMobilePairedDevice?,
+    session: StoreMobileRuntimeSession?,
+): RestockRepository {
+    if (pairedDevice != null && session != null && session.accessToken.isNotBlank()) {
+        return RemoteRestockRepository(
+            tenantId = session.tenantId,
+            client = StoreMobileControlPlaneClient(
+                baseUrl = pairedDevice.hubBaseUrl,
+                accessToken = session.accessToken,
+            ),
+        )
+    }
+    return InMemoryRestockRepository()
+}
+
+internal fun buildStoreMobileScanLookupRepository(
+    pairedDevice: StoreMobilePairedDevice?,
+    session: StoreMobileRuntimeSession?,
+): ScanLookupRepository {
+    if (pairedDevice != null && session != null && session.accessToken.isNotBlank()) {
+        return RemoteScanLookupRepository(
+            tenantId = session.tenantId,
+            branchId = session.branchId,
+            client = StoreMobileControlPlaneClient(
+                baseUrl = pairedDevice.hubBaseUrl,
+                accessToken = session.accessToken,
+            ),
+        )
+    }
+    return InMemoryScanLookupRepository()
+}
 
 @Composable
 fun StoreMobileApp() {
@@ -52,16 +163,196 @@ fun StoreMobileApp() {
             hubClient = FakeStoreMobileHubClient(),
         )
     }
-    val scanLookupViewModel = remember {
-        ScanLookupViewModel(repository = InMemoryScanLookupRepository())
-    }
-    val receivingRepository = remember { InMemoryReceivingRepository() }
-    val stockCountRepository = remember { InMemoryStockCountRepository() }
-    val expiryRepository = remember { InMemoryExpiryRepository() }
     var pairingState by remember { mutableStateOf(pairingViewModel.state) }
-    var scanLookupState by remember { mutableStateOf(scanLookupViewModel.state) }
+    val currentSession = sessionRepository.loadSession()
+    val operationsBranchId = resolveStoreMobileOperationsBranchId(
+        pairedDevice = pairingState.pairedDevice,
+        session = currentSession,
+    )
+    val stockCountRepository = remember(pairingState.pairedDevice, currentSession) {
+        buildStoreMobileStockCountRepository(
+            pairedDevice = pairingState.pairedDevice,
+            session = currentSession,
+        )
+    }
+    val receivingRepository = remember(pairingState.pairedDevice, currentSession) {
+        buildStoreMobileReceivingRepository(
+            pairedDevice = pairingState.pairedDevice,
+            session = currentSession,
+        )
+    }
+    val expiryRepository = remember(pairingState.pairedDevice, currentSession) {
+        buildStoreMobileExpiryRepository(
+            pairedDevice = pairingState.pairedDevice,
+            session = currentSession,
+        )
+    }
+    val restockRepository = remember(pairingState.pairedDevice, currentSession) {
+        buildStoreMobileRestockRepository(
+            pairedDevice = pairingState.pairedDevice,
+            session = currentSession,
+        )
+    }
+    val scanLookupRepository = remember(pairingState.pairedDevice, currentSession) {
+        buildStoreMobileScanLookupRepository(
+            pairedDevice = pairingState.pairedDevice,
+            session = currentSession,
+        )
+    }
+    val scanLookupViewModel = remember(scanLookupRepository) {
+        ScanLookupViewModel(repository = scanLookupRepository)
+    }
+    val receivingViewModel = remember(receivingRepository) {
+        ReceivingViewModel(repository = receivingRepository)
+    }
+    val restockViewModel = remember(restockRepository) {
+        RestockViewModel(repository = restockRepository)
+    }
+    val stockCountViewModel = remember(stockCountRepository) {
+        StockCountViewModel(repository = stockCountRepository)
+    }
+    val expiryViewModel = remember(expiryRepository) {
+        ExpiryViewModel(repository = expiryRepository)
+    }
+    var scanLookupState by remember(scanLookupViewModel) { mutableStateOf(scanLookupViewModel.state) }
+    var receivingState by remember(receivingViewModel) { mutableStateOf(receivingViewModel.state) }
+    var stockCountState by remember(stockCountViewModel) { mutableStateOf(stockCountViewModel.state) }
+    var restockState by remember { mutableStateOf(restockViewModel.state) }
+    var expiryState by remember { mutableStateOf(expiryViewModel.state) }
     var handheldSection by remember { mutableStateOf(MobileOperationsSection.SCAN) }
     var tabletSection by remember { mutableStateOf(MobileOperationsSection.RECEIVING) }
+    val receivingActions = remember(receivingViewModel) {
+        ReceivingScreenActions(
+            onLineReceivedQuantityChange = { productId, value ->
+                receivingViewModel.updateLineReceivedQuantity(productId, value)
+                receivingState = receivingViewModel.state
+            },
+            onLineDiscrepancyNoteChange = { productId, value ->
+                receivingViewModel.updateLineDiscrepancyNote(productId, value)
+                receivingState = receivingViewModel.state
+            },
+            onReceiptNoteChange = { value ->
+                receivingViewModel.updateReceiptNote(value)
+                receivingState = receivingViewModel.state
+            },
+            onSubmitReviewedReceipt = {
+                receivingViewModel.submitReviewedReceipt()
+                receivingState = receivingViewModel.state
+            },
+        )
+    }
+    val stockCountActions = remember(stockCountViewModel) {
+        StockCountScreenActions(
+            onCreateSession = { productId, note ->
+                stockCountViewModel.createSessionForProduct(productId, note)
+                stockCountState = stockCountViewModel.state
+            },
+            onBlindCountQuantityChange = { value ->
+                stockCountViewModel.updateBlindCountQuantity(value)
+                stockCountState = stockCountViewModel.state
+            },
+            onBlindCountNoteChange = { value ->
+                stockCountViewModel.updateBlindCountNote(value)
+                stockCountState = stockCountViewModel.state
+            },
+            onReviewNoteChange = { value ->
+                stockCountViewModel.updateReviewNote(value)
+                stockCountState = stockCountViewModel.state
+            },
+            onRecordBlindCount = {
+                stockCountViewModel.recordBlindCountForActiveSession()
+                stockCountState = stockCountViewModel.state
+            },
+            onApproveSession = {
+                stockCountViewModel.approveActiveSession()
+                stockCountState = stockCountViewModel.state
+            },
+            onCancelSession = {
+                stockCountViewModel.cancelActiveSession()
+                stockCountState = stockCountViewModel.state
+            },
+        )
+    }
+    val restockActions = remember(restockViewModel) {
+        RestockScreenActions(
+            onRefreshBoard = {
+                restockViewModel.refreshBoard()
+                restockState = restockViewModel.state
+            },
+            onRequestedQuantityChange = { value ->
+                restockViewModel.updateRequestedQuantity(value)
+                restockState = restockViewModel.state
+            },
+            onPickedQuantityChange = { value ->
+                restockViewModel.updatePickedQuantity(value)
+                restockState = restockViewModel.state
+            },
+            onNoteChange = { value ->
+                restockViewModel.updateNote(value)
+                restockState = restockViewModel.state
+            },
+            onCompletionNoteChange = { value ->
+                restockViewModel.updateCompletionNote(value)
+                restockState = restockViewModel.state
+            },
+            onSourcePostureChange = { value ->
+                restockViewModel.updateSourcePosture(value)
+                restockState = restockViewModel.state
+            },
+            onCreateTask = {
+                restockViewModel.createRestockTaskForCurrentProduct()
+                restockState = restockViewModel.state
+            },
+            onPickTask = {
+                restockViewModel.pickActiveTaskForCurrentProduct()
+                restockState = restockViewModel.state
+            },
+            onCompleteTask = {
+                restockViewModel.completeActiveTaskForCurrentProduct()
+                restockState = restockViewModel.state
+            },
+            onCancelTask = {
+                restockViewModel.cancelActiveTaskForCurrentProduct()
+                restockState = restockViewModel.state
+            },
+        )
+    }
+    val expiryActions = remember(expiryViewModel) {
+        ExpiryScreenActions(
+            onCreateSession = { batchLotId, note ->
+                expiryViewModel.createSessionForBatch(batchLotId, note)
+                expiryState = expiryViewModel.state
+            },
+            onProposedQuantityChange = { value ->
+                expiryViewModel.updateProposedQuantity(value)
+                expiryState = expiryViewModel.state
+            },
+            onWriteOffReasonChange = { value ->
+                expiryViewModel.updateWriteOffReason(value)
+                expiryState = expiryViewModel.state
+            },
+            onSessionNoteChange = { value ->
+                expiryViewModel.updateSessionNote(value)
+                expiryState = expiryViewModel.state
+            },
+            onReviewNoteChange = { value ->
+                expiryViewModel.updateReviewNote(value)
+                expiryState = expiryViewModel.state
+            },
+            onRecordReview = {
+                expiryViewModel.recordReviewForActiveSession()
+                expiryState = expiryViewModel.state
+            },
+            onApproveSession = {
+                expiryViewModel.approveActiveSession()
+                expiryState = expiryViewModel.state
+            },
+            onCancelSession = {
+                expiryViewModel.cancelActiveSession()
+                expiryState = expiryViewModel.state
+            },
+        )
+    }
 
     DisposableEffect(application, pairingState.pairedDevice?.deviceId, handheldSection, tabletSection) {
         val mobileApp = application
@@ -128,6 +419,37 @@ fun StoreMobileApp() {
         }
     }
 
+    LaunchedEffect(pairingState.pairedDevice?.deviceId, operationsBranchId, stockCountViewModel) {
+        if (pairingState.pairedDevice == null || operationsBranchId == null) {
+            receivingViewModel.clearBranch()
+            stockCountViewModel.clearBranch()
+            restockViewModel.clearBranch()
+            expiryViewModel.clearBranch()
+        } else {
+            receivingViewModel.loadBranch(branchId = operationsBranchId)
+            stockCountViewModel.loadBranch(branchId = operationsBranchId)
+            restockViewModel.loadBranch(branchId = operationsBranchId)
+            expiryViewModel.loadBranch(branchId = operationsBranchId)
+        }
+        receivingState = receivingViewModel.state
+        stockCountState = stockCountViewModel.state
+        restockState = restockViewModel.state
+        expiryState = expiryViewModel.state
+    }
+
+    LaunchedEffect(
+        scanLookupState.productId,
+        scanLookupState.productName,
+        scanLookupState.skuCode,
+        scanLookupState.barcode,
+        scanLookupState.stockOnHand,
+        scanLookupState.reorderPoint,
+        scanLookupState.targetStock,
+    ) {
+        restockViewModel.syncScannedLookup(scanLookupState)
+        restockState = restockViewModel.state
+    }
+
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -167,15 +489,12 @@ fun StoreMobileApp() {
                     )
                 } else {
                     val shellMode = resolveStoreMobileShellMode(pairingState.pairedDevice?.runtimeProfile)
-                    val receivingBoard = receivingRepository.loadReceivingBoard(branchId = "branch-demo-1")
-                    val stockCountContext = stockCountRepository.loadStockCountContext(branchId = "branch-demo-1")
-                    val expiryReport = expiryRepository.loadExpiryReport(branchId = "branch-demo-1")
                     val runtimeStatusState = buildRuntimeStatusState(
                         connected = true,
                         pendingSyncCount = 0,
                         deviceId = pairingState.pairedDevice?.deviceId,
                         hubBaseUrl = pairingState.pairedDevice?.hubBaseUrl,
-                        sessionExpiresAt = sessionRepository.loadSession()?.expiresAt,
+                        sessionExpiresAt = currentSession?.expiresAt,
                         externalScannerStatus = scanLookupState.externalScannerStatus,
                         lastExternalScanAt = scanLookupState.lastExternalScanAt,
                         externalScannerMessage = scanLookupState.externalScannerMessage,
@@ -223,9 +542,14 @@ fun StoreMobileApp() {
                                 )
                                 scanLookupState = scanLookupViewModel.state
                             },
-                            receivingBoard = receivingBoard,
-                            stockCountContext = stockCountContext,
-                            expiryReport = expiryReport,
+                            receivingState = receivingState,
+                            receivingActions = receivingActions,
+                            stockCountState = stockCountState,
+                            stockCountActions = stockCountActions,
+                            restockState = restockState,
+                            restockActions = restockActions,
+                            expiryState = expiryState,
+                            expiryActions = expiryActions,
                             runtimeStatusState = runtimeStatusState,
                         )
                     } else {
@@ -268,9 +592,14 @@ fun StoreMobileApp() {
                                 )
                                 scanLookupState = scanLookupViewModel.state
                             },
-                            receivingBoard = receivingBoard,
-                            stockCountContext = stockCountContext,
-                            expiryReport = expiryReport,
+                            receivingState = receivingState,
+                            receivingActions = receivingActions,
+                            stockCountState = stockCountState,
+                            stockCountActions = stockCountActions,
+                            restockState = restockState,
+                            restockActions = restockActions,
+                            expiryState = expiryState,
+                            expiryActions = expiryActions,
                             runtimeStatusState = runtimeStatusState,
                         )
                     }

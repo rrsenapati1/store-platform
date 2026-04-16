@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   ControlPlaneActor,
+  ControlPlaneBatchExpiryBoard,
   ControlPlaneBatchExpiryReport,
+  ControlPlaneBatchExpiryReviewSession,
   ControlPlaneBatchExpiryWriteOff,
   ControlPlaneBarcodeScanLookup,
   ControlPlaneBranchCatalogItem,
@@ -10,6 +12,8 @@ import type {
   ControlPlaneDeviceRecord,
   ControlPlaneInventorySnapshotRecord,
   ControlPlanePrintJob,
+  ControlPlaneRestockBoard,
+  ControlPlaneRestockTask,
   ControlPlaneRuntimeDeviceClaimResolution,
   ControlPlaneRuntimeHeartbeat,
   ControlPlaneSale,
@@ -40,6 +44,13 @@ import {
   type StoreRuntimeSessionRecord,
 } from './storeRuntimeSessionStore';
 import { resolveStoreRuntimeSessionRestorePolicy } from './storeRuntimeSessionRestorePolicy';
+import {
+  runCancelRestockTask,
+  runCompleteRestockTask,
+  runCreateRestockTask,
+  runLoadRestockBoard,
+  runPickRestockTask,
+} from './storeRestockActions';
 import {
   clearStoreRuntimeLocalAuth,
   isStoreRuntimeLocalAuthOfflineExpired,
@@ -95,6 +106,7 @@ export function useStoreRuntimeWorkspace() {
   const [branches, setBranches] = useState<ControlPlaneBranchRecord[]>([]);
   const [branchCatalogItems, setBranchCatalogItems] = useState<ControlPlaneBranchCatalogItem[]>([]);
   const [batchExpiryReport, setBatchExpiryReport] = useState<ControlPlaneBatchExpiryReport | null>(null);
+  const [batchExpiryBoard, setBatchExpiryBoard] = useState<ControlPlaneBatchExpiryBoard | null>(null);
   const [inventorySnapshot, setInventorySnapshot] = useState<ControlPlaneInventorySnapshotRecord[]>([]);
   const [sales, setSales] = useState<ControlPlaneSaleRecord[]>([]);
   const [runtimeDevices, setRuntimeDevices] = useState<ControlPlaneDeviceRecord[]>([]);
@@ -103,8 +115,11 @@ export function useStoreRuntimeWorkspace() {
   const [runtimeHeartbeat, setRuntimeHeartbeat] = useState<ControlPlaneRuntimeHeartbeat | null>(null);
   const [printJobs, setPrintJobs] = useState<ControlPlanePrintJob[]>([]);
   const [latestPrintJob, setLatestPrintJob] = useState<ControlPlanePrintJob | null>(null);
+  const [activeBatchExpirySession, setActiveBatchExpirySession] = useState<ControlPlaneBatchExpiryReviewSession | null>(null);
   const [latestBatchWriteOff, setLatestBatchWriteOff] = useState<ControlPlaneBatchExpiryWriteOff | null>(null);
   const [latestScanLookup, setLatestScanLookup] = useState<ControlPlaneBarcodeScanLookup | null>(null);
+  const [restockBoard, setRestockBoard] = useState<ControlPlaneRestockBoard | null>(null);
+  const [latestRestockTask, setLatestRestockTask] = useState<ControlPlaneRestockTask | null>(null);
   const [latestSale, setLatestSale] = useState<ControlPlaneSale | null>(null);
   const [latestSaleReturn, setLatestSaleReturn] = useState<ControlPlaneSaleReturn | null>(null);
   const [latestExchange, setLatestExchange] = useState<ControlPlaneExchange | null>(null);
@@ -124,6 +139,11 @@ export function useStoreRuntimeWorkspace() {
   const [customerGstin, setCustomerGstin] = useState('');
   const [saleQuantity, setSaleQuantity] = useState('1');
   const [scannedBarcode, setScannedBarcode] = useState('');
+  const [restockRequestedQuantity, setRestockRequestedQuantity] = useState('');
+  const [restockPickedQuantity, setRestockPickedQuantity] = useState('');
+  const [restockSourcePosture, setRestockSourcePosture] = useState('BACKROOM_AVAILABLE');
+  const [restockNote, setRestockNote] = useState('');
+  const [restockCompletionNote, setRestockCompletionNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [returnQuantity, setReturnQuantity] = useState('1');
   const [refundAmount, setRefundAmount] = useState('');
@@ -131,8 +151,10 @@ export function useStoreRuntimeWorkspace() {
   const [exchangeReturnQuantity, setExchangeReturnQuantity] = useState('1');
   const [replacementQuantity, setReplacementQuantity] = useState('1');
   const [exchangeSettlementMethod, setExchangeSettlementMethod] = useState('Cash');
+  const [expirySessionNote, setExpirySessionNote] = useState('');
   const [expiryWriteOffQuantity, setExpiryWriteOffQuantity] = useState('1');
   const [expiryWriteOffReason, setExpiryWriteOffReason] = useState('');
+  const [expiryReviewNote, setExpiryReviewNote] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const sessionRecordRef = useRef<StoreRuntimeSessionRecord | null>(null);
@@ -276,6 +298,7 @@ export function useStoreRuntimeWorkspace() {
       setBranches([]);
       setBranchCatalogItems([]);
       setBatchExpiryReport(null);
+      setBatchExpiryBoard(null);
       setInventorySnapshot([]);
       setSales([]);
       setRuntimeDevices([]);
@@ -284,8 +307,11 @@ export function useStoreRuntimeWorkspace() {
       setRuntimeHeartbeat(null);
       setPrintJobs([]);
       setLatestPrintJob(null);
+      setActiveBatchExpirySession(null);
       setLatestBatchWriteOff(null);
       setLatestScanLookup(null);
+      setRestockBoard(null);
+      setLatestRestockTask(null);
       setLatestSale(null);
       setLatestSaleReturn(null);
       setLatestExchange(null);
@@ -293,7 +319,26 @@ export function useStoreRuntimeWorkspace() {
       setPendingMutationCount(0);
       setCacheStatus('EMPTY');
       setLastCachedAt(null);
+      setRestockRequestedQuantity('');
+      setRestockPickedQuantity('');
+      setRestockSourcePosture('BACKROOM_AVAILABLE');
+      setRestockNote('');
+      setRestockCompletionNote('');
+      setExpirySessionNote('');
+      setExpiryWriteOffQuantity('1');
+      setExpiryWriteOffReason('');
+      setExpiryReviewNote('');
       setErrorMessage('');
+    });
+  }
+
+  function resetRestockForm() {
+    applyStateTransition(() => {
+      setRestockRequestedQuantity('');
+      setRestockPickedQuantity('');
+      setRestockSourcePosture('BACKROOM_AVAILABLE');
+      setRestockNote('');
+      setRestockCompletionNote('');
     });
   }
 
@@ -858,9 +903,14 @@ export function useStoreRuntimeWorkspace() {
         if (!isStoreRuntimeLocalAuthOfflineExpired(localAuthRecord)) {
           const updatedLocalAuth = recordSuccessfulStoreRuntimePinUnlock(localAuthRecord);
           await saveStoreRuntimeLocalAuth(updatedLocalAuth);
+          const runtimeCache = createResolvedStoreRuntimeCache();
+          const cachedSnapshot = await runtimeCache.load();
           setLocalAuthRecord(updatedLocalAuth);
           setIsLocalUnlocked(true);
           setUnlockPin('');
+          if (cachedSnapshot) {
+            applyCachedRuntimeSnapshot(cachedSnapshot);
+          }
           setErrorMessage('Control plane unavailable. Cached runtime unlocked locally.');
           return;
         }
@@ -927,7 +977,9 @@ export function useStoreRuntimeWorkspace() {
     if (!catalogItem || !actor) {
       return;
     }
-    if (paymentMethod === 'CASHFREE_UPI_QR') {
+    if (paymentMethod === 'CASHFREE_UPI_QR'
+      || paymentMethod === 'CASHFREE_HOSTED_TERMINAL'
+      || paymentMethod === 'CASHFREE_HOSTED_PHONE') {
       applyStateTransition(() => {
         setErrorMessage('');
       });
@@ -1018,18 +1070,32 @@ export function useStoreRuntimeWorkspace() {
     }
   }
 
-  async function retryCheckoutPaymentSession() {
+  async function retryCheckoutPaymentSession(checkoutPaymentSessionId?: string) {
     applyStateTransition(() => {
       setErrorMessage('');
     });
-    await runtimeCheckoutPayment.retryCheckoutPaymentSession();
+    await runtimeCheckoutPayment.retryCheckoutPaymentSession(checkoutPaymentSessionId);
   }
 
-  async function cancelCheckoutPaymentSession() {
+  async function refreshCheckoutPaymentSession(checkoutPaymentSessionId?: string) {
     applyStateTransition(() => {
       setErrorMessage('');
     });
-    await runtimeCheckoutPayment.cancelCheckoutPaymentSession();
+    await runtimeCheckoutPayment.refreshCheckoutPaymentSession(checkoutPaymentSessionId);
+  }
+
+  async function finalizeCheckoutPaymentSession(checkoutPaymentSessionId?: string) {
+    applyStateTransition(() => {
+      setErrorMessage('');
+    });
+    await runtimeCheckoutPayment.finalizeCheckoutPaymentSession(checkoutPaymentSessionId);
+  }
+
+  async function cancelCheckoutPaymentSession(checkoutPaymentSessionId?: string) {
+    applyStateTransition(() => {
+      setErrorMessage('');
+    });
+    await runtimeCheckoutPayment.cancelCheckoutPaymentSession(checkoutPaymentSessionId);
   }
 
   async function useManualCheckoutFallback() {
@@ -1064,6 +1130,104 @@ export function useStoreRuntimeWorkspace() {
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function loadRestockBoard() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    await runLoadRestockBoard({
+      accessToken,
+      tenantId,
+      branchId,
+      setIsBusy,
+      setErrorMessage,
+      setRestockBoard,
+    });
+  }
+
+  async function createRestockTaskForLatestScanLookup() {
+    if (!accessToken || !tenantId || !branchId || !latestScanLookup || !restockRequestedQuantity) {
+      return;
+    }
+    await runCreateRestockTask({
+      accessToken,
+      tenantId,
+      branchId,
+      productId: latestScanLookup.product_id,
+      requestedQuantity: Number(restockRequestedQuantity),
+      sourcePosture: restockSourcePosture,
+      note: restockNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestRestockTask,
+      setRestockBoard,
+      resetForm: resetRestockForm,
+    });
+  }
+
+  async function pickActiveRestockTaskForLatestScanLookup() {
+    const activeTask = restockBoard?.records.find(
+      (record) => record.product_id === latestScanLookup?.product_id && record.has_active_task,
+    );
+    if (!accessToken || !tenantId || !branchId || !activeTask || !restockPickedQuantity) {
+      return;
+    }
+    await runPickRestockTask({
+      accessToken,
+      tenantId,
+      branchId,
+      restockTaskId: activeTask.restock_task_id,
+      pickedQuantity: Number(restockPickedQuantity),
+      note: restockNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestRestockTask,
+      setRestockBoard,
+      resetForm: resetRestockForm,
+    });
+  }
+
+  async function completeActiveRestockTaskForLatestScanLookup() {
+    const activeTask = restockBoard?.records.find(
+      (record) => record.product_id === latestScanLookup?.product_id && record.has_active_task,
+    );
+    if (!accessToken || !tenantId || !branchId || !activeTask) {
+      return;
+    }
+    await runCompleteRestockTask({
+      accessToken,
+      tenantId,
+      branchId,
+      restockTaskId: activeTask.restock_task_id,
+      completionNote: restockCompletionNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestRestockTask,
+      setRestockBoard,
+      resetForm: resetRestockForm,
+    });
+  }
+
+  async function cancelActiveRestockTaskForLatestScanLookup() {
+    const activeTask = restockBoard?.records.find(
+      (record) => record.product_id === latestScanLookup?.product_id && record.has_active_task,
+    );
+    if (!accessToken || !tenantId || !branchId || !activeTask) {
+      return;
+    }
+    await runCancelRestockTask({
+      accessToken,
+      tenantId,
+      branchId,
+      restockTaskId: activeTask.restock_task_id,
+      cancelNote: restockCompletionNote || restockNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestRestockTask,
+      setRestockBoard,
+      resetForm: resetRestockForm,
+    });
   }
 
   async function createExchange() {
@@ -1139,6 +1303,140 @@ export function useStoreRuntimeWorkspace() {
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load branch expiry report');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function loadBatchExpiryBoard() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const board = await storeControlPlaneClient.getBatchExpiryBoard(accessToken, tenantId, branchId);
+      applyStateTransition(() => {
+        setBatchExpiryBoard(board);
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load expiry review board');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function createBatchExpirySession() {
+    const firstBatchLot = batchExpiryReport?.records[0];
+    if (!accessToken || !tenantId || !branchId || !firstBatchLot) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const session = await storeControlPlaneClient.createBatchExpirySession(accessToken, tenantId, branchId, {
+        batch_lot_id: firstBatchLot.batch_lot_id,
+        note: expirySessionNote || null,
+      });
+      const board = await storeControlPlaneClient.getBatchExpiryBoard(accessToken, tenantId, branchId);
+      applyStateTransition(() => {
+        setActiveBatchExpirySession(session);
+        setBatchExpiryBoard(board);
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to open expiry review session');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function recordBatchExpirySession() {
+    if (!accessToken || !tenantId || !branchId || !activeBatchExpirySession) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const session = await storeControlPlaneClient.recordBatchExpirySession(
+        accessToken,
+        tenantId,
+        branchId,
+        activeBatchExpirySession.id,
+        {
+          quantity: Number(expiryWriteOffQuantity),
+          reason: expiryWriteOffReason,
+        },
+      );
+      const board = await storeControlPlaneClient.getBatchExpiryBoard(accessToken, tenantId, branchId);
+      applyStateTransition(() => {
+        setActiveBatchExpirySession(session);
+        setBatchExpiryBoard(board);
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to record expiry review');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function approveBatchExpirySession() {
+    if (!accessToken || !tenantId || !branchId || !activeBatchExpirySession) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const approval = await storeControlPlaneClient.approveBatchExpirySession(
+        accessToken,
+        tenantId,
+        branchId,
+        activeBatchExpirySession.id,
+        {
+          review_note: expiryReviewNote || null,
+        },
+      );
+      const [board, report, snapshot] = await Promise.all([
+        storeControlPlaneClient.getBatchExpiryBoard(accessToken, tenantId, branchId),
+        storeControlPlaneClient.getBatchExpiryReport(accessToken, tenantId, branchId),
+        storeControlPlaneClient.listInventorySnapshot(accessToken, tenantId, branchId),
+      ]);
+      applyStateTransition(() => {
+        setActiveBatchExpirySession(approval.session);
+        setLatestBatchWriteOff(approval.write_off);
+        setBatchExpiryBoard(board);
+        setBatchExpiryReport(report);
+        setInventorySnapshot(snapshot.records);
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to approve expiry session');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function cancelBatchExpirySession() {
+    if (!accessToken || !tenantId || !branchId || !activeBatchExpirySession) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const session = await storeControlPlaneClient.cancelBatchExpirySession(
+        accessToken,
+        tenantId,
+        branchId,
+        activeBatchExpirySession.id,
+        {
+          review_note: expiryReviewNote || null,
+        },
+      );
+      const board = await storeControlPlaneClient.getBatchExpiryBoard(accessToken, tenantId, branchId);
+      applyStateTransition(() => {
+        setActiveBatchExpirySession(session);
+        setBatchExpiryBoard(board);
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to cancel expiry session');
     } finally {
       setIsBusy(false);
     }
@@ -1360,8 +1658,11 @@ export function useStoreRuntimeWorkspace() {
 
   return {
     accessToken,
+    activeBatchExpirySession,
     actor,
+    approveBatchExpirySession,
     batchExpiryReport,
+    batchExpiryBoard,
     branchCatalogItems,
     branchId,
     branches,
@@ -1376,14 +1677,19 @@ export function useStoreRuntimeWorkspace() {
     activateDesktopAccess,
     enrollRuntimePin,
     createExchange,
+    createBatchExpirySession,
     createBatchExpiryWriteOff,
     createSaleReturn,
     createSalesInvoice,
+    cancelBatchExpirySession,
     cancelCheckoutPaymentSession,
     checkoutPaymentSession: runtimeCheckoutPayment.checkoutPaymentSession,
+    checkoutPaymentHistory: runtimeCheckoutPayment.checkoutPaymentHistory,
     customerGstin,
     customerName,
     errorMessage,
+    expiryReviewNote,
+    expirySessionNote,
     expiryWriteOffQuantity,
     expiryWriteOffReason,
     exchangeReturnQuantity,
@@ -1402,6 +1708,7 @@ export function useStoreRuntimeWorkspace() {
     latestPrintJob,
     latestBatchWriteOff,
     latestScanLookup,
+    latestRestockTask,
     latestSale,
     latestSaleReturn,
     latestExchange,
@@ -1417,7 +1724,9 @@ export function useStoreRuntimeWorkspace() {
     pendingMutationCount,
     pendingRuntimeMutations: pendingMutations,
     printJobs,
+    loadBatchExpiryBoard,
     loadBatchExpiryReport,
+    loadRestockBoard,
     queueLatestCreditNotePrint,
     queueLatestInvoicePrint,
     replayOfflineSales: offlineContinuity.replayOfflineSales,
@@ -1430,6 +1739,7 @@ export function useStoreRuntimeWorkspace() {
     assignRuntimeReceiptPrinter: runtimeHardware.assignReceiptPrinter,
     openRuntimeCashDrawer,
     readRuntimeScaleWeight,
+    recordBatchExpirySession,
     runtimeAppVersion: runtimeShellStatus?.app_version ?? null,
     runtimeArchitecture: runtimeShellStatus?.architecture ?? null,
     runtimeCacheDatabasePath: runtimeShellStatus?.cache_db_path ?? null,
@@ -1494,7 +1804,20 @@ export function useStoreRuntimeWorkspace() {
     refundAmount,
     refundMethod,
     refreshRuntimeSession,
+    refreshCheckoutPaymentSession,
     retryCheckoutPaymentSession,
+    finalizeCheckoutPaymentSession,
+    listCheckoutPaymentHistory: runtimeCheckoutPayment.listCheckoutPaymentHistory,
+    restockBoard,
+    restockRequestedQuantity,
+    restockPickedQuantity,
+    restockSourcePosture,
+    restockNote,
+    restockCompletionNote,
+    createRestockTaskForLatestScanLookup,
+    pickActiveRestockTaskForLatestScanLookup,
+    completeActiveRestockTaskForLatestScanLookup,
+    cancelActiveRestockTaskForLatestScanLookup,
     returnQuantity,
     saleQuantity,
     sales,
@@ -1503,6 +1826,8 @@ export function useStoreRuntimeWorkspace() {
     setConfirmPin,
     setCustomerGstin,
     setCustomerName,
+    setExpiryReviewNote,
+    setExpirySessionNote,
     setExpiryWriteOffQuantity,
     setExpiryWriteOffReason,
     setExchangeReturnQuantity,
@@ -1511,6 +1836,11 @@ export function useStoreRuntimeWorkspace() {
     setKorsenexToken,
     setNewPin,
     setPaymentMethod,
+    setRestockRequestedQuantity,
+    setRestockPickedQuantity,
+    setRestockSourcePosture,
+    setRestockNote,
+    setRestockCompletionNote,
     setScannedBarcode,
     setSelectedRuntimeDeviceId,
     setReplacementQuantity,

@@ -1,8 +1,10 @@
-import { startTransition, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import type {
   ControlPlaneActor,
   ControlPlaneAuditRecord,
+  ControlPlaneBatchExpiryBoard,
   ControlPlaneBatchExpiryReport,
+  ControlPlaneBatchExpiryReviewSession,
   ControlPlaneBatchExpiryWriteOff,
   ControlPlaneGoodsReceiptBatchLotIntake,
   ControlPlaneBarcodeAllocation, ControlPlaneBarcodeLabelPreview,
@@ -23,12 +25,17 @@ import type {
   ControlPlanePurchaseInvoiceRecord,
   ControlPlanePurchaseOrder,
   ControlPlanePurchaseOrderRecord,
+  ControlPlaneReplenishmentBoard,
+  ControlPlaneRestockBoard,
+  ControlPlaneRestockTask,
   ControlPlaneReceivingBoard,
   ControlPlaneSupplierPayablesReport, ControlPlaneSupplierPayment, ControlPlaneSupplierReturn,
   ControlPlaneStaffProfile,
   ControlPlaneStaffProfileRecord,
   ControlPlaneStockAdjustment,
+  ControlPlaneStockCountBoard,
   ControlPlaneStockCount,
+  ControlPlaneStockCountReviewSession,
   ControlPlaneSupplier,
   ControlPlaneSupplierRecord,
   ControlPlaneTenant,
@@ -36,13 +43,21 @@ import type {
   ControlPlaneTransferBoard,
 } from '@store/types';
 import { ownerControlPlaneClient } from './client';
-import { runLoadBatchExpiryReport, runRecordBatchLotsOnLatestGoodsReceipt, runWriteOffFirstExpiringLot } from './batchExpiryActions';
+import { runApproveBatchExpirySession, runCancelBatchExpirySession, runCreateBatchExpirySession, runLoadBatchExpiryReport, runRecordBatchExpirySession, runRecordBatchLotsOnLatestGoodsReceipt } from './batchExpiryActions';
 import { runAllocateCatalogBarcode, runAssignFirstProductToBranch, runCreateCatalogProduct, runPreviewBarcodeLabel } from './catalogBarcodeActions';
-import { runCreateBranchTransfer, runCreateGoodsReceipt, runCreateStockAdjustment, runCreateStockCount } from './inventoryActions';
+import { runApproveStockCountSession, runCancelStockCountSession, runCreateBranchTransfer, runCreateGoodsReceipt, runCreateStockAdjustment, runCreateStockCountSession, runRecordStockCountSession } from './inventoryActions';
 import { runAssignBranchRole, runAssignTenantRole } from './membershipActions';
 import { runCreateFirstBranch, runRegisterBranchDevice } from './onboardingActions';
 import { runCreatePurchaseOrder, runCreateSupplier } from './procurementActions';
 import { runCreatePurchaseInvoice, runCreateSupplierPayment, runCreateSupplierReturn } from './procurementFinanceActions';
+import { runLoadReplenishmentBoard, runUpdateFirstBranchReplenishmentPolicy } from './replenishmentActions';
+import { runCancelRestockTask, runCompleteRestockTask, runCreateRestockTask, runLoadRestockBoard, runPickRestockTask } from './restockActions';
+
+type ReceivingLineDraft = {
+  product_id: string;
+  received_quantity: string;
+  discrepancy_note: string;
+};
 
 export function useOwnerWorkspace() {
   const [korsenexToken, setKorsenexToken] = useState('');
@@ -61,10 +76,14 @@ export function useOwnerWorkspace() {
   const [supplierPayablesReport, setSupplierPayablesReport] = useState<ControlPlaneSupplierPayablesReport | null>(null);
   const [goodsReceipts, setGoodsReceipts] = useState<ControlPlaneGoodsReceiptRecord[]>([]);
   const [batchExpiryReport, setBatchExpiryReport] = useState<ControlPlaneBatchExpiryReport | null>(null);
+  const [batchExpiryBoard, setBatchExpiryBoard] = useState<ControlPlaneBatchExpiryBoard | null>(null);
   const [receivingBoard, setReceivingBoard] = useState<ControlPlaneReceivingBoard | null>(null);
   const [inventoryLedger, setInventoryLedger] = useState<ControlPlaneInventoryLedgerRecord[]>([]);
   const [inventorySnapshot, setInventorySnapshot] = useState<ControlPlaneInventorySnapshotRecord[]>([]);
+  const [stockCountBoard, setStockCountBoard] = useState<ControlPlaneStockCountBoard | null>(null);
   const [transferBoard, setTransferBoard] = useState<ControlPlaneTransferBoard | null>(null);
+  const [replenishmentBoard, setReplenishmentBoard] = useState<ControlPlaneReplenishmentBoard | null>(null);
+  const [restockBoard, setRestockBoard] = useState<ControlPlaneRestockBoard | null>(null);
   const [auditEvents, setAuditEvents] = useState<ControlPlaneAuditRecord[]>([]);
   const [branchName, setBranchName] = useState('');
   const [branchCode, setBranchCode] = useState('');
@@ -88,10 +107,14 @@ export function useOwnerWorkspace() {
   const [supplierPaymentAmount, setSupplierPaymentAmount] = useState('');
   const [supplierPaymentMethod, setSupplierPaymentMethod] = useState('bank_transfer');
   const [supplierPaymentReference, setSupplierPaymentReference] = useState('');
+  const [goodsReceiptNote, setGoodsReceiptNote] = useState('');
+  const [receivingLineDrafts, setReceivingLineDrafts] = useState<ReceivingLineDraft[]>([]);
   const [adjustmentDelta, setAdjustmentDelta] = useState('');
   const [adjustmentReason, setAdjustmentReason] = useState('');
   const [countedQuantity, setCountedQuantity] = useState('');
   const [countNote, setCountNote] = useState('');
+  const [blindCountedQuantity, setBlindCountedQuantity] = useState('');
+  const [stockCountReviewNote, setStockCountReviewNote] = useState('Approved after blind count review');
   const [transferQuantity, setTransferQuantity] = useState('');
   const [transferDestinationBranchId, setTransferDestinationBranchId] = useState('');
   const [lotABatchNumber, setLotABatchNumber] = useState('');
@@ -100,8 +123,17 @@ export function useOwnerWorkspace() {
   const [lotBBatchNumber, setLotBBatchNumber] = useState('');
   const [lotBQuantity, setLotBQuantity] = useState('');
   const [lotBExpiryDate, setLotBExpiryDate] = useState('');
+  const [expirySessionNote, setExpirySessionNote] = useState('Shelf check before disposal');
   const [expiryWriteOffQuantity, setExpiryWriteOffQuantity] = useState('');
   const [expiryWriteOffReason, setExpiryWriteOffReason] = useState('');
+  const [expiryReviewNote, setExpiryReviewNote] = useState('Approved after shelf review');
+  const [replenishmentReorderPoint, setReplenishmentReorderPoint] = useState('');
+  const [replenishmentTargetStock, setReplenishmentTargetStock] = useState('');
+  const [restockRequestedQuantity, setRestockRequestedQuantity] = useState('');
+  const [restockPickedQuantity, setRestockPickedQuantity] = useState('');
+  const [restockSourcePosture, setRestockSourcePosture] = useState('BACKROOM_AVAILABLE');
+  const [restockNote, setRestockNote] = useState('');
+  const [restockCompletionNote, setRestockCompletionNote] = useState('');
   const [staffProfileEmail, setStaffProfileEmail] = useState('');
   const [staffProfileFullName, setStaffProfileFullName] = useState('');
   const [staffProfilePhone, setStaffProfilePhone] = useState('');
@@ -121,12 +153,15 @@ export function useOwnerWorkspace() {
   const [latestGoodsReceipt, setLatestGoodsReceipt] = useState<ControlPlaneGoodsReceipt | null>(null);
   const [latestBatchLotIntake, setLatestBatchLotIntake] = useState<ControlPlaneGoodsReceiptBatchLotIntake | null>(null);
   const [latestPurchaseInvoice, setLatestPurchaseInvoice] = useState<ControlPlanePurchaseInvoice | null>(null);
+  const [latestBatchExpirySession, setLatestBatchExpirySession] = useState<ControlPlaneBatchExpiryReviewSession | null>(null);
   const [latestBatchExpiryWriteOff, setLatestBatchExpiryWriteOff] = useState<ControlPlaneBatchExpiryWriteOff | null>(null);
   const [latestSupplierReturn, setLatestSupplierReturn] = useState<ControlPlaneSupplierReturn | null>(null);
   const [latestSupplierPayment, setLatestSupplierPayment] = useState<ControlPlaneSupplierPayment | null>(null);
   const [latestStockAdjustment, setLatestStockAdjustment] = useState<ControlPlaneStockAdjustment | null>(null);
   const [latestStockCount, setLatestStockCount] = useState<ControlPlaneStockCount | null>(null);
+  const [latestStockCountSession, setLatestStockCountSession] = useState<ControlPlaneStockCountReviewSession | null>(null);
   const [latestTransfer, setLatestTransfer] = useState<ControlPlaneTransfer | null>(null);
+  const [latestRestockTask, setLatestRestockTask] = useState<ControlPlaneRestockTask | null>(null);
   const [latestStaffProfile, setLatestStaffProfile] = useState<ControlPlaneStaffProfile | null>(null);
   const [latestTenantMembership, setLatestTenantMembership] = useState<ControlPlaneMembership | null>(null);
   const [latestBranchMembership, setLatestBranchMembership] = useState<ControlPlaneMembership | null>(null);
@@ -136,6 +171,34 @@ export function useOwnerWorkspace() {
 
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? '';
   const branchId = branches[0]?.branch_id ?? '';
+
+  useEffect(() => {
+    if (!latestPurchaseOrder) {
+      setGoodsReceiptNote('');
+      setReceivingLineDrafts([]);
+      return;
+    }
+    setGoodsReceiptNote('');
+    setReceivingLineDrafts(
+      latestPurchaseOrder.lines.map((line) => ({
+        product_id: line.product_id,
+        received_quantity: String(line.quantity),
+        discrepancy_note: '',
+      })),
+    );
+  }, [latestPurchaseOrder?.id]);
+
+  function setReceivingLineQuantity(productId: string, value: string) {
+    setReceivingLineDrafts((current) =>
+      current.map((line) => (line.product_id === productId ? { ...line, received_quantity: value } : line)),
+    );
+  }
+
+  function setReceivingLineDiscrepancyNote(productId: string, value: string) {
+    setReceivingLineDrafts((current) =>
+      current.map((line) => (line.product_id === productId ? { ...line, discrepancy_note: value } : line)),
+    );
+  }
 
   async function startSession() {
     setIsBusy(true);
@@ -492,6 +555,12 @@ export function useOwnerWorkspace() {
       tenantId,
       branchId,
       purchaseOrderId: latestPurchaseOrder.id,
+      note: goodsReceiptNote,
+      lines: receivingLineDrafts.map((line) => ({
+        product_id: line.product_id,
+        received_quantity: Number(line.received_quantity),
+        discrepancy_note: line.discrepancy_note,
+      })),
       setIsBusy,
       setErrorMessage,
       setLatestGoodsReceipt,
@@ -499,6 +568,16 @@ export function useOwnerWorkspace() {
       setReceivingBoard,
       setInventoryLedger,
       setInventorySnapshot,
+      resetForm: () => {
+        setGoodsReceiptNote('');
+        setReceivingLineDrafts(
+          latestPurchaseOrder.lines.map((line) => ({
+            product_id: line.product_id,
+            received_quantity: String(line.quantity),
+            discrepancy_note: '',
+          })),
+        );
+      },
     });
   }
 
@@ -586,27 +665,79 @@ export function useOwnerWorkspace() {
     });
   }
 
-  async function createStockCount() {
+  async function createStockCountSession() {
     const productId = inventorySnapshot[0]?.product_id ?? catalogProducts[0]?.product_id;
     if (!accessToken || !tenantId || !branchId || !productId) {
       return;
     }
-    await runCreateStockCount({
+    await runCreateStockCountSession({
       accessToken,
       tenantId,
       branchId,
       productId,
-      countedQuantity: Number(countedQuantity),
       note: countNote,
       setIsBusy,
       setErrorMessage,
+      setLatestStockCountSession,
+      setStockCountBoard,
+    });
+  }
+
+  async function recordStockCountSession() {
+    if (!accessToken || !tenantId || !branchId || !latestStockCountSession) {
+      return;
+    }
+    await runRecordStockCountSession({
+      accessToken,
+      tenantId,
+      branchId,
+      stockCountSessionId: latestStockCountSession.id,
+      countedQuantity: Number(blindCountedQuantity),
+      note: countNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestStockCountSession,
+      setStockCountBoard,
+      resetForm: () => {
+        setBlindCountedQuantity('');
+      },
+    });
+  }
+
+  async function approveStockCountSession() {
+    if (!accessToken || !tenantId || !branchId || !latestStockCountSession) {
+      return;
+    }
+    await runApproveStockCountSession({
+      accessToken,
+      tenantId,
+      branchId,
+      stockCountSessionId: latestStockCountSession.id,
+      reviewNote: stockCountReviewNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestStockCountSession,
       setLatestStockCount,
+      setStockCountBoard,
       setInventoryLedger,
       setInventorySnapshot,
-      resetForm: () => {
-        setCountedQuantity('');
-        setCountNote('');
-      },
+    });
+  }
+
+  async function cancelStockCountSession() {
+    if (!accessToken || !tenantId || !branchId || !latestStockCountSession) {
+      return;
+    }
+    await runCancelStockCountSession({
+      accessToken,
+      tenantId,
+      branchId,
+      stockCountSessionId: latestStockCountSession.id,
+      reviewNote: stockCountReviewNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestStockCountSession,
+      setStockCountBoard,
     });
   }
 
@@ -684,26 +815,207 @@ export function useOwnerWorkspace() {
     });
   }
 
-  async function writeOffFirstExpiringLot() {
-    if (!accessToken || !tenantId || !branchId) {
+  async function createBatchExpirySession() {
+    const firstBatchRecord = batchExpiryReport?.records[0];
+    if (!accessToken || !tenantId || !branchId || !firstBatchRecord) {
       return;
     }
-    await runWriteOffFirstExpiringLot({
+    await runCreateBatchExpirySession({
       accessToken,
       tenantId,
       branchId,
-      quantity: expiryWriteOffQuantity,
-      reason: expiryWriteOffReason,
-      batchExpiryReport,
+      batchLotId: firstBatchRecord.batch_lot_id,
+      note: expirySessionNote,
       setIsBusy,
       setErrorMessage,
+      setLatestBatchExpirySession,
+      setBatchExpiryBoard,
+    });
+  }
+
+  async function recordBatchExpirySession() {
+    if (!accessToken || !tenantId || !branchId || !latestBatchExpirySession) {
+      return;
+    }
+    await runRecordBatchExpirySession({
+      accessToken,
+      tenantId,
+      branchId,
+      batchExpirySessionId: latestBatchExpirySession.id,
+      quantity: expiryWriteOffQuantity,
+      reason: expiryWriteOffReason,
+      setIsBusy,
+      setErrorMessage,
+      setLatestBatchExpirySession,
+      setBatchExpiryBoard,
+    });
+  }
+
+  async function approveBatchExpirySession() {
+    if (!accessToken || !tenantId || !branchId || !latestBatchExpirySession) {
+      return;
+    }
+    await runApproveBatchExpirySession({
+      accessToken,
+      tenantId,
+      branchId,
+      batchExpirySessionId: latestBatchExpirySession.id,
+      reviewNote: expiryReviewNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestBatchExpirySession,
       setLatestBatchExpiryWriteOff,
+      setBatchExpiryBoard,
       setBatchExpiryReport,
       setInventoryLedger,
       setInventorySnapshot,
+    });
+  }
+
+  async function cancelBatchExpirySession() {
+    if (!accessToken || !tenantId || !branchId || !latestBatchExpirySession) {
+      return;
+    }
+    await runCancelBatchExpirySession({
+      accessToken,
+      tenantId,
+      branchId,
+      batchExpirySessionId: latestBatchExpirySession.id,
+      reviewNote: expiryReviewNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestBatchExpirySession,
+      setBatchExpiryBoard,
+    });
+  }
+
+  async function loadReplenishmentBoard() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    await runLoadReplenishmentBoard({
+      accessToken,
+      tenantId,
+      branchId,
+      setIsBusy,
+      setErrorMessage,
+      setReplenishmentBoard,
+    });
+  }
+
+  async function updateFirstBranchReplenishmentPolicy() {
+    if (!accessToken || !tenantId || !branchId || !branchCatalogItems[0]) {
+      return;
+    }
+    await runUpdateFirstBranchReplenishmentPolicy({
+      accessToken,
+      tenantId,
+      branchId,
+      branchCatalogItem: branchCatalogItems[0],
+      reorderPoint: replenishmentReorderPoint,
+      targetStock: replenishmentTargetStock,
+      setIsBusy,
+      setErrorMessage,
+      setLatestBranchCatalogItem,
+      setReplenishmentBoard,
+    });
+  }
+
+  async function loadRestockBoard() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    await runLoadRestockBoard({
+      accessToken,
+      tenantId,
+      branchId,
+      setIsBusy,
+      setErrorMessage,
+      setRestockBoard,
+    });
+  }
+
+  async function createRestockTask() {
+    const lowStockRecord = replenishmentBoard?.records.find((record) => record.replenishment_status === 'LOW_STOCK');
+    if (!accessToken || !tenantId || !branchId || !lowStockRecord) {
+      return;
+    }
+    await runCreateRestockTask({
+      accessToken,
+      tenantId,
+      branchId,
+      productId: lowStockRecord.product_id,
+      requestedQuantity: Number(restockRequestedQuantity),
+      sourcePosture: restockSourcePosture,
+      note: restockNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestRestockTask,
+      setRestockBoard,
       resetForm: () => {
-        setExpiryWriteOffQuantity('');
-        setExpiryWriteOffReason('');
+        setRestockRequestedQuantity('');
+        setRestockNote('');
+      },
+    });
+  }
+
+  async function pickRestockTask() {
+    if (!accessToken || !tenantId || !branchId || !latestRestockTask) {
+      return;
+    }
+    await runPickRestockTask({
+      accessToken,
+      tenantId,
+      branchId,
+      restockTaskId: latestRestockTask.id,
+      pickedQuantity: Number(restockPickedQuantity),
+      note: restockNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestRestockTask,
+      setRestockBoard,
+      resetForm: () => {
+        setRestockPickedQuantity('');
+      },
+    });
+  }
+
+  async function completeRestockTask() {
+    if (!accessToken || !tenantId || !branchId || !latestRestockTask) {
+      return;
+    }
+    await runCompleteRestockTask({
+      accessToken,
+      tenantId,
+      branchId,
+      restockTaskId: latestRestockTask.id,
+      completionNote: restockCompletionNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestRestockTask,
+      setRestockBoard,
+      resetForm: () => {
+        setRestockCompletionNote('');
+      },
+    });
+  }
+
+  async function cancelRestockTask() {
+    if (!accessToken || !tenantId || !branchId || !latestRestockTask) {
+      return;
+    }
+    await runCancelRestockTask({
+      accessToken,
+      tenantId,
+      branchId,
+      restockTaskId: latestRestockTask.id,
+      cancelNote: restockCompletionNote,
+      setIsBusy,
+      setErrorMessage,
+      setLatestRestockTask,
+      setRestockBoard,
+      resetForm: () => {
+        setRestockCompletionNote('');
       },
     });
   }
@@ -714,10 +1026,12 @@ export function useOwnerWorkspace() {
     adjustmentDelta,
     adjustmentReason,
     approvalNote,
+    approveBatchExpirySession,
     approvePurchaseOrder,
     actor,
     auditEvents,
     assignFirstProductToBranch,
+    batchExpiryBoard,
     batchExpiryReport,
     branches,
     barcodeManualValue,
@@ -728,13 +1042,18 @@ export function useOwnerWorkspace() {
     createSupplier,
     createPurchaseOrder,
     createGoodsReceipt,
+    createBatchExpirySession,
     recordBatchLotsOnLatestGoodsReceipt,
     createPurchaseInvoice,
     createSupplierPayment,
     createSupplierReturn,
     createStockAdjustment,
-    createStockCount,
+    createStockCountSession,
+    recordStockCountSession,
+    approveStockCountSession,
+    cancelStockCountSession,
     createBranchTransfer,
+    blindCountedQuantity,
     branchCode,
     branchGstin,
     branchId,
@@ -747,11 +1066,16 @@ export function useOwnerWorkspace() {
     goodsReceipts,
     countedQuantity,
     countNote,
+    stockCountReviewNote,
+    expirySessionNote,
+    expiryReviewNote,
     expiryWriteOffQuantity,
     expiryWriteOffReason,
     branchStaffEmail,
     branchStaffFullName,
     errorMessage,
+    goodsReceiptNote,
+    receivingLineDrafts,
     isBusy,
     inventoryLedger,
     inventorySnapshot,
@@ -759,6 +1083,7 @@ export function useOwnerWorkspace() {
     latestApprovalState,
     latestBarcodeAllocation,
     latestBarcodeLabelPreview,
+    latestBatchExpirySession,
     latestBatchExpiryWriteOff,
     latestBatchLotIntake,
     latestCatalogProduct,
@@ -767,8 +1092,12 @@ export function useOwnerWorkspace() {
     latestGoodsReceipt,
     latestPurchaseInvoice,
     latestPurchaseOrder,
+    latestRestockTask,
+    loadReplenishmentBoard,
+    loadRestockBoard,
     latestStockAdjustment,
     latestStockCount,
+    latestStockCountSession,
     latestStaffProfile,
     latestSupplier,
     latestSupplierPayment,
@@ -781,6 +1110,15 @@ export function useOwnerWorkspace() {
     purchaseOrders,
     purchaseQuantity,
     purchaseUnitCost,
+    replenishmentBoard,
+    replenishmentReorderPoint,
+    replenishmentTargetStock,
+    restockBoard,
+    restockCompletionNote,
+    restockNote,
+    restockPickedQuantity,
+    restockRequestedQuantity,
+    restockSourcePosture,
     lotABatchNumber,
     lotAExpiryDate,
     lotAQuantity,
@@ -790,31 +1128,47 @@ export function useOwnerWorkspace() {
     loadBatchExpiryReport,
     previewFirstProductBarcodeLabel,
     receivingBoard,
+    recordBatchExpirySession,
+    stockCountBoard,
     registerBranchDevice,
     setAdjustmentDelta,
     setAdjustmentReason,
     setApprovalNote,
     setBarcodeManualValue,
+    setBlindCountedQuantity,
     setDeviceCode,
     setDeviceName,
     setBranchCatalogPriceOverride,
     setDecisionNote,
     setCountedQuantity,
     setCountNote,
+    setStockCountReviewNote,
+    setExpirySessionNote,
+    setExpiryReviewNote,
     setExpiryWriteOffQuantity,
     setExpiryWriteOffReason,
+    setGoodsReceiptNote,
     setLotABatchNumber,
     setLotAExpiryDate,
     setLotAQuantity,
     setLotBBatchNumber,
     setLotBExpiryDate,
     setLotBQuantity,
+    setReceivingLineDiscrepancyNote,
+    setReceivingLineQuantity,
     setProductBarcode,
     setProductGstRate,
     setProductHsnSacCode,
     setProductName,
     setProductSellingPrice,
     setProductSkuCode,
+    setReplenishmentReorderPoint,
+    setReplenishmentTargetStock,
+    setRestockCompletionNote,
+    setRestockNote,
+    setRestockPickedQuantity,
+    setRestockRequestedQuantity,
+    setRestockSourcePosture,
     setPurchaseQuantity,
     setPurchaseUnitCost,
     setStaffProfileEmail,
@@ -844,6 +1198,11 @@ export function useOwnerWorkspace() {
     transferBoard,
     transferDestinationBranchId,
     transferQuantity,
+    createRestockTask,
+    pickRestockTask,
+    completeRestockTask,
+    cancelRestockTask,
+    updateFirstBranchReplenishmentPolicy,
     productBarcode,
     productGstRate,
     productHsnSacCode,
@@ -866,9 +1225,9 @@ export function useOwnerWorkspace() {
     setTenantStaffFullName,
     assignBranchRole,
     assignTenantRole,
+    cancelBatchExpirySession,
     createFirstBranch,
     startSession,
-    writeOffFirstExpiringLot,
   };
 }
 

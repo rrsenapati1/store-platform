@@ -130,16 +130,132 @@ describe('owner batch expiry flow', () => {
         ],
       }),
       jsonResponse({
+        id: 'expiry-session-1',
+        tenant_id: 'tenant-acme',
+        branch_id: 'branch-1',
         batch_lot_id: 'lot-1',
         product_id: 'product-1',
-        product_name: 'Classic Tea',
-        batch_number: 'BATCH-A',
-        expiry_date: '2026-04-21',
-        received_quantity: 6,
-        written_off_quantity: 1,
-        remaining_quantity: 5,
-        status: 'EXPIRING_SOON',
+        session_number: 'EWS-BLRFLAGSHIP-0001',
+        status: 'OPEN',
+        remaining_quantity_snapshot: 6,
+        proposed_quantity: null,
+        reason: null,
+        note: 'Shelf check before disposal',
+        review_note: null,
+      }),
+      jsonResponse({
+        branch_id: 'branch-1',
+        open_count: 1,
+        reviewed_count: 0,
+        approved_count: 0,
+        canceled_count: 0,
+        records: [
+          {
+            batch_expiry_session_id: 'expiry-session-1',
+            session_number: 'EWS-BLRFLAGSHIP-0001',
+            batch_lot_id: 'lot-1',
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            batch_number: 'BATCH-A',
+            status: 'OPEN',
+            remaining_quantity_snapshot: 6,
+            proposed_quantity: null,
+            reason: null,
+            note: 'Shelf check before disposal',
+            review_note: null,
+          },
+        ],
+      }),
+      jsonResponse({
+        id: 'expiry-session-1',
+        tenant_id: 'tenant-acme',
+        branch_id: 'branch-1',
+        batch_lot_id: 'lot-1',
+        product_id: 'product-1',
+        session_number: 'EWS-BLRFLAGSHIP-0001',
+        status: 'REVIEWED',
+        remaining_quantity_snapshot: 6,
+        proposed_quantity: 1,
         reason: 'Expired on shelf',
+        note: 'Shelf check before disposal',
+        review_note: null,
+      }),
+      jsonResponse({
+        branch_id: 'branch-1',
+        open_count: 0,
+        reviewed_count: 1,
+        approved_count: 0,
+        canceled_count: 0,
+        records: [
+          {
+            batch_expiry_session_id: 'expiry-session-1',
+            session_number: 'EWS-BLRFLAGSHIP-0001',
+            batch_lot_id: 'lot-1',
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            batch_number: 'BATCH-A',
+            status: 'REVIEWED',
+            remaining_quantity_snapshot: 6,
+            proposed_quantity: 1,
+            reason: 'Expired on shelf',
+            note: 'Shelf check before disposal',
+            review_note: null,
+          },
+        ],
+      }),
+      jsonResponse({
+        session: {
+          id: 'expiry-session-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          batch_lot_id: 'lot-1',
+          product_id: 'product-1',
+          session_number: 'EWS-BLRFLAGSHIP-0001',
+          status: 'APPROVED',
+          remaining_quantity_snapshot: 6,
+          proposed_quantity: 1,
+          reason: 'Expired on shelf',
+          note: 'Shelf check before disposal',
+          review_note: 'Approved after shelf review',
+        },
+        write_off: {
+          batch_lot_id: 'lot-1',
+          product_id: 'product-1',
+          product_name: 'Classic Tea',
+          batch_number: 'BATCH-A',
+          expiry_date: '2026-04-21',
+          received_quantity: 6,
+          written_off_quantity: 1,
+          remaining_quantity: 5,
+          status: 'EXPIRING_SOON',
+          reason: 'Expired on shelf',
+        },
+      }),
+      jsonResponse({
+        branch_id: 'branch-1',
+        open_count: 0,
+        reviewed_count: 0,
+        approved_count: 1,
+        canceled_count: 0,
+        records: [
+          {
+            batch_expiry_session_id: 'expiry-session-1',
+            session_number: 'EWS-BLRFLAGSHIP-0001',
+            batch_lot_id: 'lot-1',
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            batch_number: 'BATCH-A',
+            status: 'APPROVED',
+            remaining_quantity_snapshot: 6,
+            proposed_quantity: 1,
+            reason: 'Expired on shelf',
+            note: 'Shelf check before disposal',
+            review_note: 'Approved after shelf review',
+          },
+        ],
       }),
       jsonResponse({
         branch_id: 'branch-1',
@@ -215,7 +331,7 @@ describe('owner batch expiry flow', () => {
     vi.restoreAllMocks();
   });
 
-  test('records batch lots for the latest goods receipt and writes off the first expiring lot', async () => {
+  test('records batch lots and approves a reviewed expiry write-off session', async () => {
     render(<App />);
 
     fireEvent.change(screen.getByLabelText('Korsenex token'), {
@@ -239,14 +355,32 @@ describe('owner batch expiry flow', () => {
       expect(screen.getAllByText('2').length).toBeGreaterThan(0);
     });
 
-    fireEvent.change(screen.getByLabelText('Expiry write-off quantity'), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('Expiry write-off reason'), { target: { value: 'Expired on shelf' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Write off first expiring lot' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open expiry review session' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Latest expiry review session')).toBeInTheDocument();
+      expect(screen.getByText('EWS-BLRFLAGSHIP-0001')).toBeInTheDocument();
+      expect(screen.queryByText('Proposed quantity')).not.toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('Proposed write-off quantity'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Expiry review reason'), { target: { value: 'Expired on shelf' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record expiry review' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Review expiry session')).toBeInTheDocument();
+      expect(screen.getByText('Expired on shelf')).toBeInTheDocument();
+      expect(screen.getAllByText('REVIEWED').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.change(screen.getByLabelText('Expiry review note'), { target: { value: 'Approved after shelf review' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve expiry session' }));
 
     await waitFor(() => {
       expect(screen.getByText('Latest expiry write-off')).toBeInTheDocument();
+      expect(screen.getByText('Approved after shelf review')).toBeInTheDocument();
       expect(screen.getByText('5')).toBeInTheDocument();
-      expect(screen.getAllByText('EXPIRING_SOON').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('APPROVED').length).toBeGreaterThan(0);
     });
   });
 });

@@ -99,6 +99,22 @@ class ScanLookupViewModelTest {
     }
 
     @Test
+    fun repositoryFailureSurfacesAsLookupError() {
+        val repository = object : ScanLookupRepository {
+            override fun lookupBarcode(barcode: String): ScanLookupRecord? {
+                throw IllegalArgumentException("Control-plane request failed (500).")
+            }
+        }
+        val viewModel = ScanLookupViewModel(repository)
+
+        viewModel.updateDraftBarcode("1234567890123")
+        viewModel.lookupDraftBarcode()
+
+        assertEquals("1234567890123", viewModel.state.barcode)
+        assertEquals("Control-plane request failed (500).", viewModel.state.errorMessage)
+    }
+
+    @Test
     fun recognizedScannerCanReturnToReadyAfterRecentWindowExpires() {
         val repository = InMemoryScanLookupRepository(
             records = listOf(

@@ -78,6 +78,8 @@ class CatalogService:
         product_id: str,
         selling_price_override: float | None,
         availability_status: str,
+        reorder_point: float | None,
+        target_stock: float | None,
     ) -> dict[str, object]:
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
         if branch is None:
@@ -85,12 +87,24 @@ class CatalogService:
         product = await self._catalog_repo.get_product(tenant_id=tenant_id, product_id=product_id)
         if product is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catalog product not found")
+        if (reorder_point is None) != (target_stock is None):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Replenishment policy requires both reorder point and target stock",
+            )
+        if reorder_point is not None and target_stock is not None and target_stock < reorder_point:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Target stock must be greater than or equal to reorder point",
+            )
         item = await self._catalog_repo.upsert_branch_catalog_item(
             tenant_id=tenant_id,
             branch_id=branch_id,
             product_id=product_id,
             selling_price_override=selling_price_override,
             availability_status=availability_status,
+            reorder_point=reorder_point,
+            target_stock=target_stock,
         )
         await self._audit_repo.record(
             tenant_id=tenant_id,
@@ -116,6 +130,8 @@ class CatalogService:
             "selling_price_override": item.selling_price_override,
             "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,
             "availability_status": item.availability_status,
+            "reorder_point": item.reorder_point,
+            "target_stock": item.target_stock,
         }
 
     async def list_branch_catalog_items(self, *, tenant_id: str, branch_id: str) -> list[dict[str, object]]:
@@ -147,6 +163,8 @@ class CatalogService:
                     "selling_price_override": item.selling_price_override,
                     "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,
                     "availability_status": item.availability_status,
+                    "reorder_point": item.reorder_point,
+                    "target_stock": item.target_stock,
                 }
             )
         return records

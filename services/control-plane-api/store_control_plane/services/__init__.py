@@ -1,7 +1,16 @@
 from .authority import build_authority_boundary
 from .auth import ActorContext, AuthService, assert_branch_any_capability, assert_branch_capability, assert_platform_admin, assert_tenant_capability, branch_has_capability
 from .batches import BatchService
-from .batches_policy import build_batch_expiry_report, ensure_expiry_write_off_allowed, validate_goods_receipt_batch_lots
+from .batches_policy import (
+    batch_expiry_session_number,
+    build_batch_expiry_board,
+    build_batch_expiry_report,
+    ensure_batch_expiry_review_approvable,
+    ensure_batch_expiry_review_cancelable,
+    ensure_batch_expiry_review_recordable,
+    ensure_expiry_write_off_allowed,
+    validate_goods_receipt_batch_lots,
+)
 from .barcode import BarcodeService
 from .barcode_policy import allocate_barcode, build_barcode_label_preview, normalize_barcode
 from .billing import BillingService
@@ -60,6 +69,8 @@ __all__ = [
     "WorkforceService",
     "build_subscription_provider",
     "build_authority_boundary",
+    "batch_expiry_session_number",
+    "build_batch_expiry_board",
     "build_batch_expiry_report",
     "build_hsn_sac_summary",
     "assert_branch_any_capability",
@@ -68,6 +79,9 @@ __all__ = [
     "assert_tenant_capability",
     "build_supplier_payables_report",
     "branch_has_capability",
+    "ensure_batch_expiry_review_approvable",
+    "ensure_batch_expiry_review_cancelable",
+    "ensure_batch_expiry_review_recordable",
     "ensure_gst_export_allowed",
     "ensure_irn_attachment_allowed",
     "ensure_expiry_write_off_allowed",

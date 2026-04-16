@@ -21,6 +21,8 @@ class BarcodeScanLookupResponse(BaseModel):
     selling_price: float
     stock_on_hand: float
     availability_status: str
+    reorder_point: float | None = None
+    target_stock: float | None = None
 
 
 class BarcodeLabelPreviewResponse(BaseModel):

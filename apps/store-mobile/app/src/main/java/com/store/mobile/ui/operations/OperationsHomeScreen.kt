@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 
 enum class MobileOperationsSection {
     SCAN,
+    RESTOCK,
     RECEIVING,
     STOCK_COUNT,
     EXPIRY,

@@ -315,7 +315,7 @@ describe('owner procurement foundation flow', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Latest purchase order')).toBeInTheDocument();
-      expect(screen.getByText('PO-BLRFLAGSHIP-0001')).toBeInTheDocument();
+      expect(screen.getAllByText('PO-BLRFLAGSHIP-0001').length).toBeGreaterThan(0);
     });
 
     fireEvent.change(screen.getByLabelText('Approval note'), {

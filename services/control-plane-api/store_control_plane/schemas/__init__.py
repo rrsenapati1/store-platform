@@ -1,8 +1,8 @@
 from .audit import AuditListResponse, AuditRecord
 from .auth import ActorBranchMembership, ActorResponse, ActorTenantMembership, OIDCExchangeRequest, RuntimeActivationRedeemRequest, RuntimeActivationRedeemResponse, SessionTokenResponse, SignOutResponse
-from .batches import BatchExpiryReportRecord, BatchExpiryReportResponse, BatchExpiryWriteOffCreateRequest, BatchExpiryWriteOffResponse, BatchLotResponse, GoodsReceiptBatchLotCreateRequest, GoodsReceiptBatchLotResponse
+from .batches import BatchExpiryBoardRecord, BatchExpiryBoardResponse, BatchExpiryReportRecord, BatchExpiryReportResponse, BatchExpiryReviewApprovalResponse, BatchExpiryReviewSessionApproveRequest, BatchExpiryReviewSessionCancelRequest, BatchExpiryReviewSessionCreateRequest, BatchExpiryReviewSessionRecordRequest, BatchExpiryReviewSessionResponse, BatchExpiryWriteOffCreateRequest, BatchExpiryWriteOffResponse, BatchLotResponse, GoodsReceiptBatchLotCreateRequest, GoodsReceiptBatchLotResponse
 from .barcode import BarcodeAllocationRequest, BarcodeAllocationResponse, BarcodeLabelPreviewResponse, BarcodeScanLookupResponse
-from .billing import CheckoutPaymentQrPayloadResponse, CheckoutPaymentSessionCreateRequest, CheckoutPaymentSessionResponse, CheckoutPaymentWebhookResponse, CreditNoteResponse, CreditNoteTaxLineResponse, InvoiceTaxLineResponse, PaymentResponse, RefundApprovalRequest, SaleCreateRequest, SaleLineCreateRequest, SaleLineResponse, SaleListResponse, SaleRecord, SaleResponse, SaleReturnCreateRequest, SaleReturnLineCreateRequest, SaleReturnLineResponse, SaleReturnListResponse, SaleReturnRecord, SaleReturnResponse
+from .billing import CheckoutPaymentQrPayloadResponse, CheckoutPaymentSessionCreateRequest, CheckoutPaymentSessionListResponse, CheckoutPaymentSessionResponse, CheckoutPaymentWebhookResponse, CreditNoteResponse, CreditNoteTaxLineResponse, InvoiceTaxLineResponse, PaymentResponse, RefundApprovalRequest, SaleCreateRequest, SaleLineCreateRequest, SaleLineResponse, SaleListResponse, SaleRecord, SaleResponse, SaleReturnCreateRequest, SaleReturnLineCreateRequest, SaleReturnLineResponse, SaleReturnListResponse, SaleReturnRecord, SaleReturnResponse
 from .exchanges import ExchangeCreateRequest, ExchangePaymentAllocationResponse, ExchangeResponse
 from .catalog import BranchCatalogItemListResponse, BranchCatalogItemRecord, BranchCatalogItemResponse, BranchCatalogItemUpsertRequest, CatalogProductCreateRequest, CatalogProductListResponse, CatalogProductRecord, CatalogProductResponse
 from .compliance import AttachIrnRequest, BranchIrpProfileResponse, BranchIrpProfileUpsertRequest, GstExportCreateRequest, GstExportJobListResponse, GstExportJobResponse
@@ -20,7 +20,7 @@ from .commerce import (
     TenantSubscriptionSummaryResponse,
 )
 from .customers import BranchCustomerReportResponse, BranchCustomerReturnRecord, BranchCustomerTopRecord, CustomerDirectoryRecord, CustomerDirectoryResponse, CustomerExchangeHistoryRecord, CustomerHistoryCustomer, CustomerHistoryResponse, CustomerHistorySummary, CustomerReturnHistoryRecord, CustomerSaleHistoryRecord
-from .inventory import GoodsReceiptCreateRequest, GoodsReceiptLineResponse, GoodsReceiptListResponse, GoodsReceiptRecord, GoodsReceiptResponse, InventoryLedgerListResponse, InventoryLedgerRecord, InventorySnapshotListResponse, InventorySnapshotRecord, ReceivingBoardRecord, ReceivingBoardResponse, StockAdjustmentCreateRequest, StockAdjustmentResponse, StockCountCreateRequest, StockCountResponse, TransferBoardRecord, TransferBoardResponse, TransferCreateRequest, TransferResponse
+from .inventory import GoodsReceiptCreateRequest, GoodsReceiptLineReceiveRequest, GoodsReceiptLineResponse, GoodsReceiptListResponse, GoodsReceiptRecord, GoodsReceiptResponse, InventoryLedgerListResponse, InventoryLedgerRecord, InventorySnapshotListResponse, InventorySnapshotRecord, ReceivingBoardRecord, ReceivingBoardResponse, ReplenishmentBoardRecord, ReplenishmentBoardResponse, RestockBoardRecord, RestockBoardResponse, RestockTaskCancelRequest, RestockTaskCompleteRequest, RestockTaskCreateRequest, RestockTaskPickRequest, RestockTaskResponse, StockAdjustmentCreateRequest, StockAdjustmentResponse, StockCountApprovalResponse, StockCountBoardRecord, StockCountBoardResponse, StockCountCreateRequest, StockCountResponse, StockCountReviewSessionApproveRequest, StockCountReviewSessionCancelRequest, StockCountReviewSessionCreateRequest, StockCountReviewSessionRecordRequest, StockCountReviewSessionResponse, TransferBoardRecord, TransferBoardResponse, TransferCreateRequest, TransferResponse
 from .memberships import BranchMembershipCreateRequest, MembershipResponse, TenantMembershipCreateRequest
 from .operations import OperationsJobListResponse, OperationsJobResponse
 from .platform import OwnerInviteCreateRequest, OwnerInviteResponse, PlatformTenantListResponse, PlatformTenantRecord, TenantCreateRequest, TenantCreatedResponse
@@ -72,6 +72,14 @@ __all__ = [
     "AuditRecord",
     "BatchExpiryReportRecord",
     "BatchExpiryReportResponse",
+    "BatchExpiryBoardRecord",
+    "BatchExpiryBoardResponse",
+    "BatchExpiryReviewApprovalResponse",
+    "BatchExpiryReviewSessionApproveRequest",
+    "BatchExpiryReviewSessionCancelRequest",
+    "BatchExpiryReviewSessionCreateRequest",
+    "BatchExpiryReviewSessionRecordRequest",
+    "BatchExpiryReviewSessionResponse",
     "BatchExpiryWriteOffCreateRequest",
     "BatchExpiryWriteOffResponse",
     "BatchLotResponse",
@@ -97,6 +105,7 @@ __all__ = [
     "CatalogProductResponse",
     "CheckoutPaymentQrPayloadResponse",
     "CheckoutPaymentSessionCreateRequest",
+    "CheckoutPaymentSessionListResponse",
     "CheckoutPaymentSessionResponse",
     "CheckoutPaymentWebhookResponse",
     "CreditNoteResponse",
@@ -124,6 +133,7 @@ __all__ = [
     "GoodsReceiptBatchLotCreateRequest",
     "GoodsReceiptBatchLotResponse",
     "GoodsReceiptLineResponse",
+    "GoodsReceiptLineReceiveRequest",
     "GoodsReceiptListResponse",
     "GoodsReceiptRecord",
     "GoodsReceiptResponse",
@@ -133,8 +143,16 @@ __all__ = [
     "InventorySnapshotRecord",
     "StockAdjustmentCreateRequest",
     "StockAdjustmentResponse",
+    "StockCountApprovalResponse",
+    "StockCountBoardRecord",
+    "StockCountBoardResponse",
     "StockCountCreateRequest",
     "StockCountResponse",
+    "StockCountReviewSessionApproveRequest",
+    "StockCountReviewSessionCancelRequest",
+    "StockCountReviewSessionCreateRequest",
+    "StockCountReviewSessionRecordRequest",
+    "StockCountReviewSessionResponse",
     "MembershipResponse",
     "OIDCExchangeRequest",
     "OperationsJobListResponse",
@@ -219,6 +237,15 @@ __all__ = [
     "TenantSummaryResponse",
     "ReceivingBoardRecord",
     "ReceivingBoardResponse",
+    "ReplenishmentBoardRecord",
+    "ReplenishmentBoardResponse",
+    "RestockBoardRecord",
+    "RestockBoardResponse",
+    "RestockTaskCancelRequest",
+    "RestockTaskCompleteRequest",
+    "RestockTaskCreateRequest",
+    "RestockTaskPickRequest",
+    "RestockTaskResponse",
     "TransferBoardRecord",
     "TransferBoardResponse",
     "TransferCreateRequest",

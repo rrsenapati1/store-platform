@@ -88,6 +88,7 @@ describe('store runtime print queue flow', () => {
           },
         ],
       }),
+      jsonResponse({ records: [] }),
       jsonResponse({
         id: 'sale-1',
         tenant_id: 'tenant-acme',

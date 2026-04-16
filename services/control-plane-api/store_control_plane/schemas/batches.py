@@ -67,3 +67,66 @@ class BatchExpiryWriteOffResponse(BaseModel):
     remaining_quantity: float
     status: str
     reason: str
+
+
+class BatchExpiryReviewSessionCreateRequest(BaseModel):
+    batch_lot_id: str
+    note: str | None = None
+
+
+class BatchExpiryReviewSessionRecordRequest(BaseModel):
+    quantity: float
+    reason: str = Field(min_length=1)
+
+
+class BatchExpiryReviewSessionApproveRequest(BaseModel):
+    review_note: str | None = None
+
+
+class BatchExpiryReviewSessionCancelRequest(BaseModel):
+    review_note: str | None = None
+
+
+class BatchExpiryReviewSessionResponse(BaseModel):
+    id: str
+    tenant_id: str
+    branch_id: str
+    batch_lot_id: str
+    product_id: str
+    session_number: str
+    status: str
+    remaining_quantity_snapshot: float
+    proposed_quantity: float | None = None
+    reason: str | None = None
+    note: str | None = None
+    review_note: str | None = None
+
+
+class BatchExpiryReviewApprovalResponse(BaseModel):
+    session: BatchExpiryReviewSessionResponse
+    write_off: BatchExpiryWriteOffResponse
+
+
+class BatchExpiryBoardRecord(BaseModel):
+    batch_expiry_session_id: str
+    session_number: str
+    batch_lot_id: str
+    product_id: str
+    product_name: str
+    sku_code: str
+    batch_number: str
+    status: str
+    remaining_quantity_snapshot: float
+    proposed_quantity: float | None = None
+    reason: str | None = None
+    note: str | None = None
+    review_note: str | None = None
+
+
+class BatchExpiryBoardResponse(BaseModel):
+    branch_id: str
+    open_count: int
+    reviewed_count: int
+    approved_count: int
+    canceled_count: int
+    records: list[BatchExpiryBoardRecord]

@@ -29,7 +29,7 @@ export function useCustomerDisplayController(workspace: StoreRuntimeWorkspaceSta
         igst_total: workspace.latestSale.igst_total,
         grand_total: workspace.latestSale.grand_total,
         payment: workspace.latestSale.payment,
-        lines: workspace.latestSale.lines.map((line) => ({
+        lines: (workspace.latestSale.lines ?? []).map((line) => ({
           product_name: line.product_name,
           quantity: line.quantity,
           line_total: line.line_total,
@@ -45,11 +45,25 @@ export function useCustomerDisplayController(workspace: StoreRuntimeWorkspaceSta
     checkoutPaymentSession: workspace.checkoutPaymentSession
       ? {
           payment_method: workspace.checkoutPaymentSession.payment_method,
+          handoff_surface: workspace.checkoutPaymentSession.handoff_surface,
           lifecycle_status: workspace.checkoutPaymentSession.lifecycle_status,
           order_amount: workspace.checkoutPaymentSession.order_amount,
           currency_code: workspace.checkoutPaymentSession.currency_code,
-          qr_payload: workspace.checkoutPaymentSession.qr_payload,
-          qr_expires_at: workspace.checkoutPaymentSession.qr_expires_at,
+          action_payload: {
+            kind: workspace.checkoutPaymentSession.action_payload.kind,
+            value: workspace.checkoutPaymentSession.action_payload.value,
+            label: workspace.checkoutPaymentSession.action_payload.label ?? null,
+            description: workspace.checkoutPaymentSession.action_payload.description ?? null,
+            handoff_surface: workspace.checkoutPaymentSession.handoff_surface,
+          },
+          action_expires_at: workspace.checkoutPaymentSession.action_expires_at ?? null,
+          qr_payload: workspace.checkoutPaymentSession.qr_payload
+            ? {
+                format: workspace.checkoutPaymentSession.qr_payload.format,
+                value: workspace.checkoutPaymentSession.qr_payload.value,
+              }
+            : null,
+          qr_expires_at: workspace.checkoutPaymentSession.qr_expires_at ?? null,
         }
       : null,
     isBusy: workspace.isBusy,

@@ -9,6 +9,8 @@ interface StoreMobilePairingRepository {
         runtimeProfile: String,
         sessionSurface: String,
         hubBaseUrl: String,
+        tenantId: String,
+        branchId: String,
     )
     fun loadPairedDevice(): StoreMobilePairedDevice?
     fun clear()
@@ -30,6 +32,8 @@ class InMemoryStoreMobilePairingRepository : StoreMobilePairingRepository {
         runtimeProfile: String,
         sessionSurface: String,
         hubBaseUrl: String,
+        tenantId: String,
+        branchId: String,
     ) {
         pairedDevice = StoreMobilePairedDevice(
             deviceId = deviceId,
@@ -37,6 +41,8 @@ class InMemoryStoreMobilePairingRepository : StoreMobilePairingRepository {
             runtimeProfile = runtimeProfile,
             sessionSurface = sessionSurface,
             hubBaseUrl = hubBaseUrl,
+            tenantId = tenantId,
+            branchId = branchId,
         )
     }
 

@@ -47,6 +47,7 @@ describe('store runtime sync monitoring', () => {
       jsonResponse({ records: [] }),
       jsonResponse({ records: [] }),
       jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
       jsonResponse({
         hub_device_id: 'device-hub-1',
         source_device_id: 'BLR-HUB-01',

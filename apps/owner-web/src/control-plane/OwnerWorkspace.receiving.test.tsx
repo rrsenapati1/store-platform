@@ -280,14 +280,22 @@ describe('owner receiving foundation flow', () => {
         supplier_id: 'supplier-1',
         goods_receipt_number: 'GRN-BLRFLAGSHIP-0001',
         received_on: '2026-04-13',
+        note: 'Four cartons short from supplier dispatch',
+        ordered_quantity_total: 24,
+        received_quantity_total: 20,
+        variance_quantity_total: 4,
+        has_discrepancy: true,
         lines: [
           {
             product_id: 'product-1',
             product_name: 'Classic Tea',
             sku_code: 'tea-classic-250g',
-            quantity: 24,
+            ordered_quantity: 24,
+            quantity: 20,
+            variance_quantity: 4,
             unit_cost: 61.5,
-            line_total: 1476,
+            line_total: 1230,
+            discrepancy_note: 'Four cartons short from supplier dispatch',
           },
         ],
       }),
@@ -302,7 +310,11 @@ describe('owner receiving foundation flow', () => {
             supplier_name: 'Acme Tea Traders',
             received_on: '2026-04-13',
             line_count: 1,
-            received_quantity: 24,
+            received_quantity: 20,
+            ordered_quantity: 24,
+            variance_quantity: 4,
+            has_discrepancy: true,
+            note: 'Four cartons short from supplier dispatch',
           },
         ],
       }),
@@ -311,14 +323,17 @@ describe('owner receiving foundation flow', () => {
         blocked_count: 0,
         ready_count: 0,
         received_count: 1,
+        received_with_variance_count: 1,
         records: [
           {
             purchase_order_id: 'purchase-order-1',
             purchase_order_number: 'PO-BLRFLAGSHIP-0001',
             supplier_name: 'Acme Tea Traders',
             approval_status: 'APPROVED',
-            receiving_status: 'RECEIVED',
+            receiving_status: 'RECEIVED_WITH_VARIANCE',
             can_receive: false,
+            has_discrepancy: true,
+            variance_quantity: 4,
             blocked_reason: null,
             goods_receipt_id: 'goods-receipt-1',
           },
@@ -332,7 +347,7 @@ describe('owner receiving foundation flow', () => {
             product_name: 'Classic Tea',
             sku_code: 'tea-classic-250g',
             entry_type: 'PURCHASE_RECEIPT',
-            quantity: 24,
+            quantity: 20,
             reference_type: 'goods_receipt',
             reference_id: 'goods-receipt-1',
           },
@@ -344,7 +359,7 @@ describe('owner receiving foundation flow', () => {
             product_id: 'product-1',
             product_name: 'Classic Tea',
             sku_code: 'tea-classic-250g',
-            stock_on_hand: 24,
+            stock_on_hand: 20,
             last_entry_type: 'PURCHASE_RECEIPT',
           },
         ],
@@ -365,7 +380,7 @@ describe('owner receiving foundation flow', () => {
     vi.restoreAllMocks();
   });
 
-  test('receives an approved purchase order and updates inventory visibility', async () => {
+  test('posts a reviewed partial goods receipt and updates discrepancy visibility', async () => {
     render(<App />);
 
     fireEvent.change(screen.getByLabelText('Korsenex token'), {
@@ -400,13 +415,24 @@ describe('owner receiving foundation flow', () => {
       expect(screen.getByText('Acme Tea Traders :: APPROVED')).toBeInTheDocument();
     });
 
+    fireEvent.change(screen.getByLabelText('Received quantity for Classic Tea'), {
+      target: { value: '20' },
+    });
+    fireEvent.change(screen.getByLabelText('Discrepancy note for Classic Tea'), {
+      target: { value: 'Four cartons short from supplier dispatch' },
+    });
+    fireEvent.change(screen.getByLabelText('Receipt note'), {
+      target: { value: 'Four cartons short from supplier dispatch' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Create goods receipt' }));
 
     await waitFor(() => {
       expect(screen.getByText('Latest goods receipt')).toBeInTheDocument();
       expect(screen.getByText('GRN-BLRFLAGSHIP-0001')).toBeInTheDocument();
       expect(screen.getByText('Receiving board')).toBeInTheDocument();
-      expect(screen.getByText('Classic Tea -> 24')).toBeInTheDocument();
+      expect(screen.getByText('Classic Tea -> 20')).toBeInTheDocument();
+      expect(screen.getAllByText('RECEIVED_WITH_VARIANCE').length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/variance 4/i).length).toBeGreaterThan(0);
     });
   });
 });

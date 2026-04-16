@@ -2,10 +2,12 @@ import hashlib
 import hmac
 import json
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from conftest import sqlite_test_database_url
 from store_control_plane.main import create_app
+from store_control_plane.services.billing import BillingService
 
 
 def _stub_token(*, subject: str, email: str, name: str) -> str:
@@ -132,10 +134,18 @@ def _seed_checkout_context(client: TestClient) -> dict[str, object]:
     }
 
 
-def _payment_session_payload(*, product_id: str) -> dict[str, object]:
+def _payment_session_payload(
+    *,
+    product_id: str,
+    payment_method: str = "CASHFREE_UPI_QR",
+    handoff_surface: str | None = None,
+    provider_payment_mode: str | None = None,
+) -> dict[str, object]:
     return {
         "provider_name": "cashfree",
-        "payment_method": "CASHFREE_UPI_QR",
+        "payment_method": payment_method,
+        "handoff_surface": handoff_surface,
+        "provider_payment_mode": provider_payment_mode,
         "customer_name": "Acme Traders",
         "customer_gstin": "29AAEPM0111C1Z3",
         "lines": [{"product_id": product_id, "quantity": 4}],
@@ -246,8 +256,11 @@ def test_cashier_creates_checkout_payment_session_and_receives_qr_ready_state(mo
     assert response.status_code == 200
     assert response.json()["provider_name"] == "cashfree"
     assert response.json()["payment_method"] == "CASHFREE_UPI_QR"
-    assert response.json()["lifecycle_status"] == "QR_READY"
+    assert response.json()["handoff_surface"] == "BRANDED_UPI_QR"
+    assert response.json()["provider_payment_mode"] == "cashfree_upi"
+    assert response.json()["lifecycle_status"] == "ACTION_READY"
     assert response.json()["order_amount"] == 388.5
+    assert response.json()["action_payload"]["kind"] == "upi_qr"
     assert response.json()["qr_payload"]["format"] == "upi_qr"
     assert response.json()["qr_payload"]["value"].startswith("upi://")
 
@@ -264,6 +277,48 @@ def test_cashier_creates_checkout_payment_session_and_receives_qr_ready_state(mo
     )
     assert inventory_snapshot.status_code == 200
     assert inventory_snapshot.json()["records"][0]["stock_on_hand"] == 24.0
+
+
+def test_cashier_can_create_hosted_terminal_and_phone_checkout_payment_sessions(monkeypatch) -> None:
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", "cashfree-secret")
+    database_url = sqlite_test_database_url("checkout-payment-session-hosted-actions")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+
+    terminal_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(product_id=str(context["product_id"]), payment_method="CASHFREE_HOSTED_TERMINAL"),
+    )
+    assert terminal_response.status_code == 200
+    assert terminal_response.json()["handoff_surface"] == "HOSTED_TERMINAL"
+    assert terminal_response.json()["provider_payment_mode"] == "cashfree_checkout"
+    assert terminal_response.json()["lifecycle_status"] == "ACTION_READY"
+    assert terminal_response.json()["action_payload"]["kind"] == "hosted_url"
+    assert terminal_response.json()["action_payload"]["value"].startswith("https://")
+    assert terminal_response.json()["qr_payload"] is None
+
+    phone_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(product_id=str(context["product_id"]), payment_method="CASHFREE_HOSTED_PHONE"),
+    )
+    assert phone_response.status_code == 200
+    assert phone_response.json()["handoff_surface"] == "HOSTED_PHONE"
+    assert phone_response.json()["provider_payment_mode"] == "cashfree_checkout"
+    assert phone_response.json()["lifecycle_status"] == "ACTION_READY"
+    assert phone_response.json()["action_payload"]["kind"] == "hosted_url"
+    assert phone_response.json()["action_payload"]["value"].startswith("https://")
+    assert phone_response.json()["qr_payload"]["format"] == "hosted_url"
+    assert phone_response.json()["qr_payload"]["value"].startswith("https://")
 
 
 def test_confirmed_cashfree_checkout_session_finalizes_single_sale_and_decrements_stock_once(monkeypatch) -> None:
@@ -341,6 +396,148 @@ def test_confirmed_cashfree_checkout_session_finalizes_single_sale_and_decrement
     )
     assert inventory_snapshot.status_code == 200
     assert inventory_snapshot.json()["records"][0]["stock_on_hand"] == 20.0
+
+
+def test_confirmed_checkout_payment_session_can_be_recovered_and_history_lists_recent_records(monkeypatch) -> None:
+    secret = "cashfree-secret"
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", secret)
+    database_url = sqlite_test_database_url("checkout-payment-session-recovery")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+    create_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(product_id=str(context["product_id"])),
+    )
+    assert create_response.status_code == 200
+    session_id = create_response.json()["id"]
+    provider_order_id = create_response.json()["provider_order_id"]
+
+    original_create_sale = BillingService.create_sale
+    failed_once = {"value": False}
+
+    async def fail_first_finalize(self, *args, **kwargs):
+        if not failed_once["value"]:
+            failed_once["value"] = True
+            raise HTTPException(status_code=503, detail="Simulated sale finalization outage")
+        return await original_create_sale(self, *args, **kwargs)
+
+    monkeypatch.setattr(BillingService, "create_sale", fail_first_finalize)
+
+    payload = _cashfree_success_webhook(provider_order_id=provider_order_id)
+    payload_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    timestamp = "1744699203000"
+    signature = _cashfree_signature(secret, payload_bytes, timestamp)
+
+    webhook = client.post(
+        "/v1/billing/webhooks/cashfree/payments",
+        headers={
+            "x-webhook-signature": signature,
+            "x-webhook-timestamp": timestamp,
+            "x-webhook-version": "2023-08-01",
+            "content-type": "application/json",
+        },
+        content=payload_bytes,
+    )
+    assert webhook.status_code == 200
+    assert webhook.json()["lifecycle_status"] == "CONFIRMED"
+
+    confirmed_session = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions/{session_id}",
+        headers=context["cashier_headers"],
+    )
+    assert confirmed_session.status_code == 200
+    assert confirmed_session.json()["lifecycle_status"] == "CONFIRMED"
+    assert confirmed_session.json()["recovery_state"] == "FINALIZE_REQUIRED"
+    assert confirmed_session.json()["sale"] is None
+
+    finalized = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions/{session_id}/finalize",
+        headers=context["cashier_headers"],
+    )
+    assert finalized.status_code == 200
+    assert finalized.json()["lifecycle_status"] == "FINALIZED"
+    assert finalized.json()["sale"]["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
+
+    history = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+    )
+    assert history.status_code == 200
+    assert history.json()["records"][0]["id"] == session_id
+    assert history.json()["records"][0]["recovery_state"] == "CLOSED"
+    assert history.json()["records"][0]["sale"]["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
+
+
+def test_failed_checkout_payment_session_can_be_retried_into_a_fresh_session(monkeypatch) -> None:
+    secret = "cashfree-secret"
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", secret)
+    database_url = sqlite_test_database_url("checkout-payment-session-retry")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+    create_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(product_id=str(context["product_id"]), payment_method="CASHFREE_HOSTED_PHONE"),
+    )
+    assert create_response.status_code == 200
+    original_session_id = create_response.json()["id"]
+    provider_order_id = create_response.json()["provider_order_id"]
+
+    payload = _cashfree_failure_webhook(
+        provider_order_id=provider_order_id,
+        webhook_type="PAYMENT_FAILED_WEBHOOK",
+        payment_status="FAILED",
+    )
+    payload_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    timestamp = "1744699204000"
+    signature = _cashfree_signature(secret, payload_bytes, timestamp)
+    webhook = client.post(
+        "/v1/billing/webhooks/cashfree/payments",
+        headers={
+            "x-webhook-signature": signature,
+            "x-webhook-timestamp": timestamp,
+            "x-webhook-version": "2023-08-01",
+            "content-type": "application/json",
+        },
+        content=payload_bytes,
+    )
+    assert webhook.status_code == 200
+    assert webhook.json()["lifecycle_status"] == "FAILED"
+
+    retried = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions/{original_session_id}/retry",
+        headers=context["cashier_headers"],
+    )
+    assert retried.status_code == 200
+    assert retried.json()["id"] != original_session_id
+    assert retried.json()["handoff_surface"] == "HOSTED_PHONE"
+    assert retried.json()["action_payload"]["kind"] == "hosted_url"
+    assert retried.json()["action_payload"]["value"].startswith("https://")
+
+    original_status = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions/{original_session_id}",
+        headers=context["cashier_headers"],
+    )
+    assert original_status.status_code == 200
+    assert original_status.json()["lifecycle_status"] == "FAILED"
+    assert original_status.json()["recovery_state"] == "RETRYABLE"
 
 
 def test_failed_or_expired_checkout_payment_sessions_never_create_sales(monkeypatch) -> None:

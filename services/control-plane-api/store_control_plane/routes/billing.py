@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..dependencies import get_current_actor, get_session
 from ..schemas import (
     CheckoutPaymentSessionCreateRequest,
+    CheckoutPaymentSessionListResponse,
     CheckoutPaymentSessionResponse,
     CheckoutPaymentWebhookResponse,
     RefundApprovalRequest,
@@ -71,11 +72,35 @@ async def create_checkout_payment_session(
         actor_user_id=actor.user_id,
         provider_name=payload.provider_name,
         payment_method=payload.payment_method,
+        handoff_surface=payload.handoff_surface,
+        provider_payment_mode=payload.provider_payment_mode,
         customer_name=payload.customer_name,
         customer_gstin=payload.customer_gstin,
         lines=[line.model_dump() for line in payload.lines],
     )
     return CheckoutPaymentSessionResponse(**checkout_payment_session)
+
+
+@branch_router.get(
+    "/{tenant_id}/branches/{branch_id}/checkout-payment-sessions",
+    response_model=CheckoutPaymentSessionListResponse,
+)
+async def list_checkout_payment_sessions(
+    tenant_id: str,
+    branch_id: str,
+    request: Request,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CheckoutPaymentSessionListResponse:
+    assert_branch_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capability="sales.bill")
+    service = CheckoutPaymentsService(session, request.app.state.settings)
+    checkout_payment_sessions = await service.list_checkout_payment_sessions(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+    )
+    return CheckoutPaymentSessionListResponse(
+        records=[CheckoutPaymentSessionResponse(**record) for record in checkout_payment_sessions]
+    )
 
 
 @branch_router.get(
@@ -115,6 +140,75 @@ async def cancel_checkout_payment_session(
     assert_branch_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capability="sales.bill")
     service = CheckoutPaymentsService(session, request.app.state.settings)
     checkout_payment_session = await service.cancel_checkout_payment_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        checkout_payment_session_id=checkout_payment_session_id,
+        actor_user_id=actor.user_id,
+    )
+    return CheckoutPaymentSessionResponse(**checkout_payment_session)
+
+
+@branch_router.post(
+    "/{tenant_id}/branches/{branch_id}/checkout-payment-sessions/{checkout_payment_session_id}/refresh",
+    response_model=CheckoutPaymentSessionResponse,
+)
+async def refresh_checkout_payment_session(
+    tenant_id: str,
+    branch_id: str,
+    checkout_payment_session_id: str,
+    request: Request,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CheckoutPaymentSessionResponse:
+    assert_branch_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capability="sales.bill")
+    service = CheckoutPaymentsService(session, request.app.state.settings)
+    checkout_payment_session = await service.refresh_checkout_payment_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        checkout_payment_session_id=checkout_payment_session_id,
+        actor_user_id=actor.user_id,
+    )
+    return CheckoutPaymentSessionResponse(**checkout_payment_session)
+
+
+@branch_router.post(
+    "/{tenant_id}/branches/{branch_id}/checkout-payment-sessions/{checkout_payment_session_id}/finalize",
+    response_model=CheckoutPaymentSessionResponse,
+)
+async def finalize_checkout_payment_session(
+    tenant_id: str,
+    branch_id: str,
+    checkout_payment_session_id: str,
+    request: Request,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CheckoutPaymentSessionResponse:
+    assert_branch_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capability="sales.bill")
+    service = CheckoutPaymentsService(session, request.app.state.settings)
+    checkout_payment_session = await service.finalize_checkout_payment_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        checkout_payment_session_id=checkout_payment_session_id,
+        actor_user_id=actor.user_id,
+    )
+    return CheckoutPaymentSessionResponse(**checkout_payment_session)
+
+
+@branch_router.post(
+    "/{tenant_id}/branches/{branch_id}/checkout-payment-sessions/{checkout_payment_session_id}/retry",
+    response_model=CheckoutPaymentSessionResponse,
+)
+async def retry_checkout_payment_session(
+    tenant_id: str,
+    branch_id: str,
+    checkout_payment_session_id: str,
+    request: Request,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CheckoutPaymentSessionResponse:
+    assert_branch_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capability="sales.bill")
+    service = CheckoutPaymentsService(session, request.app.state.settings)
+    checkout_payment_session = await service.retry_checkout_payment_session(
         tenant_id=tenant_id,
         branch_id=branch_id,
         checkout_payment_session_id=checkout_payment_session_id,

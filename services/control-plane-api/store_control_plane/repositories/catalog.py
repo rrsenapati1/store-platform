@@ -60,6 +60,8 @@ class CatalogRepository:
         product_id: str,
         selling_price_override: float | None,
         availability_status: str,
+        reorder_point: float | None,
+        target_stock: float | None,
     ) -> BranchCatalogItem:
         statement = select(BranchCatalogItem).where(
             BranchCatalogItem.tenant_id == tenant_id,
@@ -75,11 +77,15 @@ class CatalogRepository:
                 product_id=product_id,
                 selling_price_override=selling_price_override,
                 availability_status=availability_status,
+                reorder_point=reorder_point,
+                target_stock=target_stock,
             )
             self._session.add(item)
         else:
             item.selling_price_override = selling_price_override
             item.availability_status = availability_status
+            item.reorder_point = reorder_point
+            item.target_stock = target_stock
         await self._session.flush()
         return item
 

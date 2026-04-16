@@ -105,6 +105,24 @@ def test_owner_runs_procurement_finance_flow_on_control_plane() -> None:
     )
     assert approved.status_code == 200
 
+    purchase_order_detail = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}",
+        headers=owner_headers,
+    )
+    assert purchase_order_detail.status_code == 200
+    assert purchase_order_detail.json()["id"] == purchase_order_id
+    assert purchase_order_detail.json()["purchase_order_number"].startswith("PO-")
+    assert purchase_order_detail.json()["lines"] == [
+        {
+            "product_id": product_id,
+            "product_name": "Notebook",
+            "sku_code": "SKU-001",
+            "quantity": 6.0,
+            "unit_cost": 50.0,
+            "line_total": 300.0,
+        }
+    ]
+
     goods_receipt = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/goods-receipts",
         headers=owner_headers,

@@ -20,7 +20,7 @@ def _exchange(client: TestClient, *, subject: str, email: str, name: str) -> dic
     return response.json()
 
 
-def test_owner_records_goods_receipt_batch_lots_and_posts_expiry_write_off() -> None:
+def test_owner_records_goods_receipt_batch_lots_and_approves_reviewed_expiry_write_off() -> None:
     database_url = sqlite_test_database_url("batch-expiry-foundation")
     client = TestClient(
         create_app(
@@ -166,14 +166,51 @@ def test_owner_records_goods_receipt_batch_lots_and_posts_expiry_write_off() -> 
     assert report_after_sale.json()["records"][0]["remaining_quantity"] == 1.0
     assert report_after_sale.json()["records"][1]["remaining_quantity"] == 4.0
 
-    write_off = client.post(
-        f"/v1/tenants/{tenant_id}/branches/{branch_id}/batch-lots/{batch_lots.json()['records'][0]['id']}/expiry-write-offs",
+    expiry_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/batch-expiry-sessions",
+        headers=owner_headers,
+        json={"batch_lot_id": batch_lots.json()["records"][0]["id"], "note": "Shelf check before disposal"},
+    )
+    assert expiry_session.status_code == 200
+    assert expiry_session.json()["status"] == "OPEN"
+    assert expiry_session.json()["remaining_quantity_snapshot"] == 1.0
+
+    expiry_board = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/batch-expiry-board",
+        headers=owner_headers,
+    )
+    assert expiry_board.status_code == 200
+    assert expiry_board.json()["open_count"] == 1
+    assert expiry_board.json()["reviewed_count"] == 0
+
+    reviewed_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/batch-expiry-sessions/{expiry_session.json()['id']}/review",
         headers=owner_headers,
         json={"quantity": 1, "reason": "Expired on shelf"},
     )
-    assert write_off.status_code == 200
-    assert write_off.json()["written_off_quantity"] == 1.0
-    assert write_off.json()["remaining_quantity"] == 0.0
+    assert reviewed_session.status_code == 200
+    assert reviewed_session.json()["status"] == "REVIEWED"
+    assert reviewed_session.json()["proposed_quantity"] == 1.0
+    assert reviewed_session.json()["reason"] == "Expired on shelf"
+
+    reviewed_board = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/batch-expiry-board",
+        headers=owner_headers,
+    )
+    assert reviewed_board.status_code == 200
+    assert reviewed_board.json()["open_count"] == 0
+    assert reviewed_board.json()["reviewed_count"] == 1
+
+    approval = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/batch-expiry-sessions/{expiry_session.json()['id']}/approve",
+        headers=owner_headers,
+        json={"review_note": "Approved after shelf check"},
+    )
+    assert approval.status_code == 200
+    assert approval.json()["session"]["status"] == "APPROVED"
+    assert approval.json()["session"]["review_note"] == "Approved after shelf check"
+    assert approval.json()["write_off"]["written_off_quantity"] == 1.0
+    assert approval.json()["write_off"]["remaining_quantity"] == 0.0
 
     report_after_write_off = client.get(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/batch-expiry-report",
@@ -195,6 +232,14 @@ def test_owner_records_goods_receipt_batch_lots_and_posts_expiry_write_off() -> 
             "status": "FRESH",
         }
     ]
+
+    approved_board = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/batch-expiry-board",
+        headers=owner_headers,
+    )
+    assert approved_board.status_code == 200
+    assert approved_board.json()["approved_count"] == 1
+    assert approved_board.json()["records"][0]["status"] == "APPROVED"
 
     inventory_ledger = client.get(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/inventory-ledger",

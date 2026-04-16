@@ -171,3 +171,168 @@ def test_owner_receives_approved_purchase_order_into_inventory_ledger():
     assert inventory_snapshot.status_code == 200
     assert inventory_snapshot.json()["records"][0]["product_id"] == product_id
     assert inventory_snapshot.json()["records"][0]["stock_on_hand"] == 24.0
+
+
+def test_owner_can_post_reviewed_partial_goods_receipt_with_discrepancy():
+    database_url = sqlite_test_database_url("receiving-reviewed")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    admin_session = _exchange(client, subject="platform-admin-1", email="admin@store.local", name="Platform Admin")
+    admin_headers = {"authorization": f"Bearer {admin_session['access_token']}"}
+
+    tenant = client.post(
+        "/v1/platform/tenants",
+        headers=admin_headers,
+        json={"name": "Acme Retail", "slug": "acme-retail-reviewed"},
+    )
+    assert tenant.status_code == 200
+    tenant_id = tenant.json()["id"]
+
+    owner_invite = client.post(
+        f"/v1/platform/tenants/{tenant_id}/owner-invites",
+        headers=admin_headers,
+        json={"email": "owner@acme.local", "full_name": "Acme Owner"},
+    )
+    assert owner_invite.status_code == 200
+
+    owner_session = _exchange(client, subject="owner-1", email="owner@acme.local", name="Acme Owner")
+    owner_headers = {"authorization": f"Bearer {owner_session['access_token']}"}
+
+    branch = client.post(
+        f"/v1/tenants/{tenant_id}/branches",
+        headers=owner_headers,
+        json={"name": "Bengaluru Flagship", "code": "blr-flagship", "gstin": "29ABCDE1234F1Z5"},
+    )
+    assert branch.status_code == 200
+    branch_id = branch.json()["id"]
+
+    first_product = client.post(
+        f"/v1/tenants/{tenant_id}/catalog/products",
+        headers=owner_headers,
+        json={
+            "name": "Classic Tea",
+            "sku_code": "tea-classic-250g",
+            "barcode": "8901234567890",
+            "hsn_sac_code": "0902",
+            "gst_rate": 5.0,
+            "selling_price": 92.5,
+        },
+    )
+    assert first_product.status_code == 200
+    first_product_id = first_product.json()["id"]
+
+    second_product = client.post(
+        f"/v1/tenants/{tenant_id}/catalog/products",
+        headers=owner_headers,
+        json={
+            "name": "Ginger Tea",
+            "sku_code": "tea-ginger-100g",
+            "barcode": "8901234567891",
+            "hsn_sac_code": "0902",
+            "gst_rate": 5.0,
+            "selling_price": 48.0,
+        },
+    )
+    assert second_product.status_code == 200
+    second_product_id = second_product.json()["id"]
+
+    supplier = client.post(
+        f"/v1/tenants/{tenant_id}/suppliers",
+        headers=owner_headers,
+        json={"name": "Acme Tea Traders", "gstin": "29AAEPM0111C1Z3", "payment_terms_days": 14},
+    )
+    assert supplier.status_code == 200
+    supplier_id = supplier.json()["id"]
+
+    purchase_order = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders",
+        headers=owner_headers,
+        json={
+            "supplier_id": supplier_id,
+            "lines": [
+                {"product_id": first_product_id, "quantity": 24, "unit_cost": 61.5},
+                {"product_id": second_product_id, "quantity": 10, "unit_cost": 12.0},
+            ],
+        },
+    )
+    assert purchase_order.status_code == 200
+    purchase_order_id = purchase_order.json()["id"]
+
+    submitted = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}/submit-approval",
+        headers=owner_headers,
+        json={"note": "Need replenishment before the weekend rush"},
+    )
+    assert submitted.status_code == 200
+
+    approved = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/purchase-orders/{purchase_order_id}/approve",
+        headers=owner_headers,
+        json={"note": "Approved for branch restock"},
+    )
+    assert approved.status_code == 200
+
+    goods_receipt = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/goods-receipts",
+        headers=owner_headers,
+        json={
+            "purchase_order_id": purchase_order_id,
+            "note": "Second product held back pending supplier replacement",
+            "lines": [
+                {
+                    "product_id": first_product_id,
+                    "received_quantity": 20,
+                    "discrepancy_note": "Four cartons short",
+                },
+                {
+                    "product_id": second_product_id,
+                    "received_quantity": 0,
+                    "discrepancy_note": "Supplier held dispatch",
+                },
+            ],
+        },
+    )
+    assert goods_receipt.status_code == 200
+    assert goods_receipt.json()["has_discrepancy"] is True
+    assert goods_receipt.json()["note"] == "Second product held back pending supplier replacement"
+    assert goods_receipt.json()["variance_quantity_total"] == 14.0
+    assert goods_receipt.json()["received_quantity_total"] == 20.0
+    assert goods_receipt.json()["lines"][0]["ordered_quantity"] == 24.0
+    assert goods_receipt.json()["lines"][0]["quantity"] == 20.0
+    assert goods_receipt.json()["lines"][0]["variance_quantity"] == 4.0
+    assert goods_receipt.json()["lines"][1]["quantity"] == 0.0
+    assert goods_receipt.json()["lines"][1]["variance_quantity"] == 10.0
+
+    receiving_after = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/receiving-board",
+        headers=owner_headers,
+    )
+    assert receiving_after.status_code == 200
+    assert receiving_after.json()["received_count"] == 1
+    assert receiving_after.json()["received_with_variance_count"] == 1
+    assert receiving_after.json()["records"][0]["receiving_status"] == "RECEIVED_WITH_VARIANCE"
+    assert receiving_after.json()["records"][0]["variance_quantity"] == 14.0
+
+    inventory_ledger = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/inventory-ledger",
+        headers=owner_headers,
+    )
+    assert inventory_ledger.status_code == 200
+    assert len(inventory_ledger.json()["records"]) == 1
+    assert inventory_ledger.json()["records"][0]["product_id"] == first_product_id
+    assert inventory_ledger.json()["records"][0]["quantity"] == 20.0
+
+    inventory_snapshot = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/inventory-snapshot",
+        headers=owner_headers,
+    )
+    assert inventory_snapshot.status_code == 200
+    assert inventory_snapshot.json()["records"][0]["product_id"] == first_product_id
+    assert inventory_snapshot.json()["records"][0]["stock_on_hand"] == 20.0

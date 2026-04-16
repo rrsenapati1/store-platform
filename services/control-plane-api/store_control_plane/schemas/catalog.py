@@ -44,6 +44,8 @@ class BranchCatalogItemUpsertRequest(BaseModel):
     product_id: str
     selling_price_override: float | None = Field(default=None, gt=0)
     availability_status: str = "ACTIVE"
+    reorder_point: float | None = Field(default=None, ge=0)
+    target_stock: float | None = Field(default=None, gt=0)
 
 
 class BranchCatalogItemResponse(BaseModel):
@@ -60,6 +62,8 @@ class BranchCatalogItemResponse(BaseModel):
     selling_price_override: float | None
     effective_selling_price: float
     availability_status: str
+    reorder_point: float | None = None
+    target_stock: float | None = None
 
 
 class BranchCatalogItemRecord(BranchCatalogItemResponse):

@@ -17,7 +17,9 @@ class CheckoutPaymentCreateResult:
     provider_order_id: str
     provider_payment_session_id: str | None
     provider_status: str
-    qr_payload: dict[str, object]
+    action_payload: dict[str, object]
+    action_expires_at: datetime | None
+    qr_payload: dict[str, object] | None
     qr_expires_at: datetime | None
     provider_response_payload: dict[str, object]
 
@@ -39,6 +41,8 @@ class StubCashfreeCheckoutPaymentProvider:
         self,
         *,
         checkout_payment_session_id: str,
+        handoff_surface: str,
+        provider_payment_mode: str,
         order_amount: float,
         currency_code: str,
         customer_name: str,
@@ -46,35 +50,67 @@ class StubCashfreeCheckoutPaymentProvider:
     ) -> CheckoutPaymentCreateResult:
         provider_order_id = f"cf_order_{checkout_payment_session_id}"
         provider_payment_session_id = f"cf_ps_{checkout_payment_session_id}"
-        qr_payload = {
-            "format": "upi_qr",
-            "value": (
+        action_expires_at = utc_now() + timedelta(minutes=10)
+        qr_payload: dict[str, object] | None = None
+        if handoff_surface == "BRANDED_UPI_QR":
+            qr_value = (
                 "upi://pay"
                 f"?pa={quote('store.collect@cashfree')}"
-                f"&pn={quote('Store Checkout')}"
+                f"&pn={quote('Korsenex Checkout')}"
                 f"&tr={quote(provider_order_id)}"
                 f"&am={order_amount:.2f}"
                 f"&cu={quote(currency_code)}"
                 f"&tn={quote(customer_name or 'Store Checkout')}"
-            ),
-        }
-        qr_expires_at = utc_now() + timedelta(minutes=10)
+            )
+            action_payload = {
+                "kind": "upi_qr",
+                "value": qr_value,
+                "label": "Korsenex customer UPI QR",
+                "description": "Scan with any UPI app to complete this checkout.",
+            }
+            qr_payload = {
+                "format": "upi_qr",
+                "value": qr_value,
+            }
+        else:
+            hosted_value = f"https://payments.store.local/checkout/{provider_order_id}?surface={quote(handoff_surface.lower())}"
+            action_payload = {
+                "kind": "hosted_url",
+                "value": hosted_value,
+                "label": "Cashfree hosted checkout",
+                "description": (
+                    "Continue payment on this terminal."
+                    if handoff_surface == "HOSTED_TERMINAL"
+                    else "Scan or open this link on the customer's phone."
+                ),
+            }
+            if handoff_surface == "HOSTED_PHONE":
+                qr_payload = {
+                    "format": "hosted_url",
+                    "value": hosted_value,
+                }
         return CheckoutPaymentCreateResult(
             provider_order_id=provider_order_id,
             provider_payment_session_id=provider_payment_session_id,
             provider_status="ACTIVE",
+            action_payload=action_payload,
+            action_expires_at=action_expires_at,
             qr_payload=qr_payload,
-            qr_expires_at=qr_expires_at,
+            qr_expires_at=action_expires_at if qr_payload else None,
             provider_response_payload={
                 "mode": "stub",
                 "order_id": provider_order_id,
                 "payment_session_id": provider_payment_session_id,
+                "handoff_surface": handoff_surface,
+                "provider_payment_mode": provider_payment_mode,
                 "order_amount": order_amount,
                 "currency_code": currency_code,
                 "customer_name": customer_name,
                 "customer_gstin": customer_gstin,
+                "action_payload": action_payload,
+                "action_expires_at": action_expires_at.isoformat(),
                 "qr_payload": qr_payload,
-                "qr_expires_at": qr_expires_at.isoformat(),
+                "qr_expires_at": action_expires_at.isoformat() if qr_payload else None,
             },
         )
 
@@ -109,6 +145,30 @@ class StubCashfreeCheckoutPaymentProvider:
             payload=payload,
         )
 
+    def normalize_polled_payments(
+        self,
+        *,
+        provider_order_id: str,
+        payload: list[dict[str, object]],
+    ) -> NormalizedCheckoutPaymentEvent:
+        latest_payment = payload[0] if payload else {}
+        provider_status = str(latest_payment.get("payment_status") or latest_payment.get("status") or "PENDING").strip().upper()
+        lifecycle_status = "PENDING_CUSTOMER_PAYMENT"
+        if provider_status == "SUCCESS":
+            lifecycle_status = "CONFIRMED"
+        elif provider_status in {"FAILED", "CANCELLED"}:
+            lifecycle_status = "FAILED"
+        elif provider_status in {"USER_DROPPED", "EXPIRED"}:
+            lifecycle_status = "EXPIRED"
+        return NormalizedCheckoutPaymentEvent(
+            provider_name="cashfree",
+            provider_order_id=provider_order_id,
+            provider_payment_id=str(latest_payment.get("cf_payment_id")) if latest_payment.get("cf_payment_id") else None,
+            provider_status=provider_status,
+            lifecycle_status=lifecycle_status,
+            payload={"payments": payload},
+        )
+
 
 class CashfreeCheckoutPaymentProvider(StubCashfreeCheckoutPaymentProvider):
     def __init__(self, settings: Settings):
@@ -118,6 +178,8 @@ class CashfreeCheckoutPaymentProvider(StubCashfreeCheckoutPaymentProvider):
         self,
         *,
         checkout_payment_session_id: str,
+        handoff_surface: str,
+        provider_payment_mode: str,
         order_amount: float,
         currency_code: str,
         customer_name: str,
@@ -153,39 +215,76 @@ class CashfreeCheckoutPaymentProvider(StubCashfreeCheckoutPaymentProvider):
             order_response.raise_for_status()
             order_payload = order_response.json()
             payment_session_id = str(order_payload.get("payment_session_id") or "")
+            qr_payload: dict[str, object] | None = None
+            if handoff_surface == "BRANDED_UPI_QR":
+                qr_response = await client.post(
+                    f"{self._settings.cashfree_payment_api_base_url}/pg/orders/sessions",
+                    headers=headers,
+                    json={
+                        "payment_session_id": payment_session_id,
+                        "payment_method": {"upi": {"channel": "qrcode"}},
+                    },
+                )
+                qr_response.raise_for_status()
+                qr_payload = qr_response.json()
 
-            qr_response = await client.post(
-                f"{self._settings.cashfree_payment_api_base_url}/pg/orders/sessions",
-                headers=headers,
-                json={
-                    "payment_session_id": payment_session_id,
-                    "payment_method": {"upi": {"channel": "qrcode"}},
-                },
-            )
-            qr_response.raise_for_status()
-            qr_payload = qr_response.json()
-
-        qr_value = (
-            qr_payload.get("data", {}).get("url")
-            if isinstance(qr_payload.get("data"), dict)
-            else None
-        ) or (
-            qr_payload.get("payment_method", {}).get("upi", {}).get("qr_code")
-            if isinstance(qr_payload.get("payment_method"), dict)
-            else None
-        ) or (
+        action_expires_at = utc_now() + timedelta(minutes=10)
+        hosted_value = (
             order_payload.get("payment_link")
             if isinstance(order_payload, dict)
             else None
+        ) or (
+            f"{self._settings.cashfree_payment_api_base_url}/pg/orders/{provider_order_id}/payments"
+            if payment_session_id
+            else None
         )
-        qr_expires_at = utc_now() + timedelta(minutes=10)
+        qr_value = (
+            qr_payload.get("data", {}).get("url")
+            if isinstance(qr_payload, dict) and isinstance(qr_payload.get("data"), dict)
+            else None
+        ) or (
+            qr_payload.get("payment_method", {}).get("upi", {}).get("qr_code")
+            if isinstance(qr_payload, dict) and isinstance(qr_payload.get("payment_method"), dict)
+            else None
+        ) or hosted_value
+        if handoff_surface == "BRANDED_UPI_QR":
+            action_payload = {
+                "kind": "upi_qr",
+                "value": str(qr_value or ""),
+                "label": "Korsenex customer UPI QR",
+                "description": "Scan with any UPI app to complete this checkout.",
+            }
+            normalized_qr_payload = {"format": "upi_qr", "value": str(qr_value or "")}
+        else:
+            action_payload = {
+                "kind": "hosted_url",
+                "value": str(hosted_value or ""),
+                "label": "Cashfree hosted checkout",
+                "description": (
+                    "Continue payment on this terminal."
+                    if handoff_surface == "HOSTED_TERMINAL"
+                    else "Scan or open this link on the customer's phone."
+                ),
+            }
+            normalized_qr_payload = (
+                {"format": "hosted_url", "value": str(hosted_value or "")}
+                if handoff_surface == "HOSTED_PHONE"
+                else None
+            )
         return CheckoutPaymentCreateResult(
             provider_order_id=provider_order_id,
             provider_payment_session_id=payment_session_id or None,
             provider_status="ACTIVE",
-            qr_payload={"format": "upi_qr", "value": str(qr_value or "")},
-            qr_expires_at=qr_expires_at,
-            provider_response_payload={"order": order_payload, "qr": qr_payload},
+            action_payload=action_payload,
+            action_expires_at=action_expires_at,
+            qr_payload=normalized_qr_payload,
+            qr_expires_at=action_expires_at if normalized_qr_payload else None,
+            provider_response_payload={
+                "order": order_payload,
+                "qr": qr_payload,
+                "handoff_surface": handoff_surface,
+                "provider_payment_mode": provider_payment_mode,
+            },
         )
 
     async def fetch_order_payments(self, *, provider_order_id: str) -> list[dict[str, object]]:

@@ -1,12 +1,17 @@
 package com.store.mobile.ui.handheld
 
 import androidx.compose.runtime.Composable
-import com.store.mobile.operations.ExpiryReport
-import com.store.mobile.operations.ReceivingBoard
-import com.store.mobile.operations.StockCountContext
 import com.store.mobile.ui.operations.MobileOperationsContent
 import com.store.mobile.ui.operations.MobileOperationsSection
+import com.store.mobile.ui.operations.ExpiryScreenActions
+import com.store.mobile.ui.operations.ExpiryUiState
 import com.store.mobile.ui.operations.OperationsHomeScreen
+import com.store.mobile.ui.operations.ReceivingScreenActions
+import com.store.mobile.ui.operations.ReceivingUiState
+import com.store.mobile.ui.operations.RestockScreenActions
+import com.store.mobile.ui.operations.RestockUiState
+import com.store.mobile.ui.operations.StockCountScreenActions
+import com.store.mobile.ui.operations.StockCountUiState
 import com.store.mobile.ui.runtime.RuntimeStatusUiState
 import com.store.mobile.ui.scan.ScanLookupUiState
 
@@ -21,9 +26,14 @@ fun HandheldStoreShell(
     onCameraPermissionResolved: (Boolean) -> Unit,
     onCameraPreviewFailure: (String) -> Unit,
     onCameraBarcodeDetected: (String) -> Unit,
-    receivingBoard: ReceivingBoard,
-    stockCountContext: StockCountContext,
-    expiryReport: ExpiryReport,
+    receivingState: ReceivingUiState,
+    receivingActions: ReceivingScreenActions,
+    stockCountState: StockCountUiState,
+    stockCountActions: StockCountScreenActions,
+    restockState: RestockUiState,
+    restockActions: RestockScreenActions,
+    expiryState: ExpiryUiState,
+    expiryActions: ExpiryScreenActions,
     runtimeStatusState: RuntimeStatusUiState,
 ) {
     OperationsHomeScreen(
@@ -40,9 +50,14 @@ fun HandheldStoreShell(
         onCameraPermissionResolved = onCameraPermissionResolved,
         onCameraPreviewFailure = onCameraPreviewFailure,
         onCameraBarcodeDetected = onCameraBarcodeDetected,
-        receivingBoard = receivingBoard,
-        stockCountContext = stockCountContext,
-        expiryReport = expiryReport,
+        receivingState = receivingState,
+        receivingActions = receivingActions,
+        stockCountState = stockCountState,
+        stockCountActions = stockCountActions,
+        restockState = restockState,
+        restockActions = restockActions,
+        expiryState = expiryState,
+        expiryActions = expiryActions,
         runtimeStatusState = runtimeStatusState,
     )
 }

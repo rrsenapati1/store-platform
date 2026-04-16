@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import BatchExpiryWriteOff, BatchLot
+from ..models import BatchExpiryReviewSession, BatchExpiryWriteOff, BatchLot
 from ..utils import new_id
 
 
@@ -99,3 +99,62 @@ class BatchRepository:
         self._session.add(record)
         await self._session.flush()
         return record
+
+    async def next_branch_batch_expiry_review_sequence(self, *, tenant_id: str, branch_id: str) -> int:
+        statement = select(func.count(BatchExpiryReviewSession.id)).where(
+            BatchExpiryReviewSession.tenant_id == tenant_id,
+            BatchExpiryReviewSession.branch_id == branch_id,
+        )
+        count = await self._session.scalar(statement)
+        return int(count or 0) + 1
+
+    async def create_batch_expiry_review_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        batch_lot_id: str,
+        product_id: str,
+        session_number: str,
+        remaining_quantity_snapshot: float,
+        note: str | None,
+    ) -> BatchExpiryReviewSession:
+        record = BatchExpiryReviewSession(
+            id=new_id(),
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            batch_lot_id=batch_lot_id,
+            product_id=product_id,
+            session_number=session_number,
+            status="OPEN",
+            remaining_quantity_snapshot=remaining_quantity_snapshot,
+            note=note,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def get_batch_expiry_review_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        batch_expiry_session_id: str,
+    ) -> BatchExpiryReviewSession | None:
+        statement = select(BatchExpiryReviewSession).where(
+            BatchExpiryReviewSession.tenant_id == tenant_id,
+            BatchExpiryReviewSession.branch_id == branch_id,
+            BatchExpiryReviewSession.id == batch_expiry_session_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def list_branch_batch_expiry_review_sessions(self, *, tenant_id: str, branch_id: str) -> list[BatchExpiryReviewSession]:
+        statement = (
+            select(BatchExpiryReviewSession)
+            .where(
+                BatchExpiryReviewSession.tenant_id == tenant_id,
+                BatchExpiryReviewSession.branch_id == branch_id,
+            )
+            .order_by(BatchExpiryReviewSession.created_at.desc(), BatchExpiryReviewSession.id.desc())
+        )
+        return list((await self._session.scalars(statement)).all())

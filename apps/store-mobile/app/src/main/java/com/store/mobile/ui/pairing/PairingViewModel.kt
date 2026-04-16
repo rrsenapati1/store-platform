@@ -60,6 +60,8 @@ class PairingViewModel(
             runtimeProfile = session.runtimeProfile,
             sessionSurface = session.sessionSurface,
             hubBaseUrl = state.hubBaseUrl,
+            tenantId = session.tenantId,
+            branchId = session.branchId,
         )
         sessionRepository.saveSession(session)
         state = state.copy(

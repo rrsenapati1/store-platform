@@ -7,7 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import AuditRepository, BatchRepository, CatalogRepository, InventoryRepository, TenantRepository
 from ..utils import utc_now
-from .batches_policy import build_batch_expiry_report, ensure_expiry_write_off_allowed, validate_goods_receipt_batch_lots
+from .batches_policy import (
+    batch_expiry_session_number,
+    build_batch_expiry_board,
+    build_batch_expiry_report,
+    ensure_batch_expiry_review_approvable,
+    ensure_batch_expiry_review_cancelable,
+    ensure_batch_expiry_review_recordable,
+    ensure_expiry_write_off_allowed,
+    validate_goods_receipt_batch_lots,
+)
 
 
 class BatchService:
@@ -138,6 +147,254 @@ class BatchService:
         )
         return {"branch_id": branch_id, **report}
 
+    async def batch_expiry_board(self, *, tenant_id: str, branch_id: str) -> dict[str, object]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+
+        review_sessions = await self._batch_repo.list_branch_batch_expiry_review_sessions(tenant_id=tenant_id, branch_id=branch_id)
+        products_by_id = {
+            product.id: {"product_name": product.name, "sku_code": product.sku_code}
+            for product in await self._catalog_repo.list_products(tenant_id=tenant_id)
+        }
+        batch_lots = {
+            lot.id: lot
+            for lot in await self._batch_repo.list_branch_batch_lots(tenant_id=tenant_id, branch_id=branch_id)
+        }
+        return build_batch_expiry_board(
+            branch_id=branch_id,
+            review_sessions=[
+                {
+                    "batch_expiry_session_id": session.id,
+                    "session_number": session.session_number,
+                    "batch_lot_id": session.batch_lot_id,
+                    "product_id": session.product_id,
+                    "batch_number": batch_lots.get(session.batch_lot_id).batch_number if batch_lots.get(session.batch_lot_id) is not None else session.batch_lot_id,
+                    "status": session.status,
+                    "remaining_quantity_snapshot": session.remaining_quantity_snapshot,
+                    "proposed_quantity": session.proposed_quantity,
+                    "reason": session.reason,
+                    "note": session.note,
+                    "review_note": session.review_note,
+                }
+                for session in review_sessions
+            ],
+            products_by_id=products_by_id,
+        )
+
+    async def create_batch_expiry_review_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        batch_lot_id: str,
+        actor_user_id: str,
+        note: str | None,
+    ) -> dict[str, object]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+
+        batch_lot = await self._batch_repo.get_batch_lot(tenant_id=tenant_id, branch_id=branch_id, batch_lot_id=batch_lot_id)
+        if batch_lot is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch lot not found")
+
+        current_report = await self.batch_expiry_report(tenant_id=tenant_id, branch_id=branch_id)
+        current_record = next((record for record in current_report["records"] if record["batch_lot_id"] == batch_lot_id), None)
+        remaining_quantity = 0.0 if current_record is None else float(current_record["remaining_quantity"])
+        if remaining_quantity <= 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No remaining batch quantity available for write-off")
+
+        existing_sessions = await self._batch_repo.list_branch_batch_expiry_review_sessions(tenant_id=tenant_id, branch_id=branch_id)
+        if any(session.batch_lot_id == batch_lot_id and session.status in {"OPEN", "REVIEWED"} for session in existing_sessions):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Batch lot already has an active expiry review session")
+
+        sequence_number = await self._batch_repo.next_branch_batch_expiry_review_sequence(tenant_id=tenant_id, branch_id=branch_id)
+        record = await self._batch_repo.create_batch_expiry_review_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            batch_lot_id=batch_lot_id,
+            product_id=batch_lot.product_id,
+            session_number=batch_expiry_session_number(branch_code=branch.code, sequence_number=sequence_number),
+            remaining_quantity_snapshot=remaining_quantity,
+            note=note.strip() if note is not None and note.strip() else None,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="batch_expiry_session.created",
+            entity_type="batch_lot",
+            entity_id=batch_lot_id,
+            payload={"batch_expiry_session_id": record.id},
+        )
+        await self._session.commit()
+        return self._serialize_batch_expiry_review_session(record)
+
+    async def record_batch_expiry_review_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        batch_expiry_session_id: str,
+        actor_user_id: str,
+        quantity: float,
+        reason: str,
+    ) -> dict[str, object]:
+        session_record = await self._batch_repo.get_batch_expiry_review_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            batch_expiry_session_id=batch_expiry_session_id,
+        )
+        if session_record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch expiry review session not found")
+
+        try:
+            ensure_batch_expiry_review_recordable(status=session_record.status)
+            ensure_expiry_write_off_allowed(remaining_quantity=session_record.remaining_quantity_snapshot, quantity=quantity)
+        except ValueError as error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+        session_record.proposed_quantity = round(float(quantity), 2)
+        session_record.reason = reason.strip()
+        session_record.status = "REVIEWED"
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="batch_expiry_session.reviewed",
+            entity_type="batch_expiry_session",
+            entity_id=batch_expiry_session_id,
+            payload={"quantity": session_record.proposed_quantity, "reason": session_record.reason},
+        )
+        await self._session.commit()
+        return self._serialize_batch_expiry_review_session(session_record)
+
+    async def approve_batch_expiry_review_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        batch_expiry_session_id: str,
+        actor_user_id: str,
+        review_note: str | None,
+    ) -> dict[str, object]:
+        session_record = await self._batch_repo.get_batch_expiry_review_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            batch_expiry_session_id=batch_expiry_session_id,
+        )
+        if session_record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch expiry review session not found")
+
+        try:
+            ensure_batch_expiry_review_approvable(status=session_record.status)
+        except ValueError as error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+        current_report = await self.batch_expiry_report(tenant_id=tenant_id, branch_id=branch_id)
+        current_record = next((record for record in current_report["records"] if record["batch_lot_id"] == session_record.batch_lot_id), None)
+        remaining_quantity = 0.0 if current_record is None else float(current_record["remaining_quantity"])
+        try:
+            ensure_expiry_write_off_allowed(remaining_quantity=remaining_quantity, quantity=float(session_record.proposed_quantity or 0.0))
+        except ValueError as error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+        batch_lot = await self._batch_repo.get_batch_lot(tenant_id=tenant_id, branch_id=branch_id, batch_lot_id=session_record.batch_lot_id)
+        if batch_lot is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch lot not found")
+
+        write_off = await self._batch_repo.create_batch_expiry_write_off(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            batch_lot_id=session_record.batch_lot_id,
+            product_id=session_record.product_id,
+            quantity=float(session_record.proposed_quantity or 0.0),
+            reason=str(session_record.reason or ""),
+        )
+        await self._inventory_repo.create_inventory_ledger_entries(
+            entries=[
+                {
+                    "tenant_id": tenant_id,
+                    "branch_id": branch_id,
+                    "product_id": session_record.product_id,
+                    "entry_type": "EXPIRY_WRITE_OFF",
+                    "quantity": -abs(float(session_record.proposed_quantity or 0.0)),
+                    "reference_type": "batch_expiry_write_off",
+                    "reference_id": write_off.id,
+                }
+            ]
+        )
+
+        session_record.status = "APPROVED"
+        session_record.review_note = review_note.strip() if review_note is not None and review_note.strip() else None
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="batch_expiry_session.approved",
+            entity_type="batch_expiry_session",
+            entity_id=batch_expiry_session_id,
+            payload={"write_off_id": write_off.id},
+        )
+        await self._session.commit()
+
+        updated_report = await self.batch_expiry_report(tenant_id=tenant_id, branch_id=branch_id)
+        updated_record = next((record for record in updated_report["records"] if record["batch_lot_id"] == session_record.batch_lot_id), None)
+        products = await self._catalog_repo.list_products(tenant_id=tenant_id)
+        product = next((item for item in products if item.id == session_record.product_id), None)
+        return {
+            "session": self._serialize_batch_expiry_review_session(session_record),
+            "write_off": {
+                "batch_lot_id": session_record.batch_lot_id,
+                "product_id": session_record.product_id,
+                "product_name": product.name if product is not None else session_record.product_id,
+                "batch_number": batch_lot.batch_number,
+                "expiry_date": batch_lot.expiry_date,
+                "received_quantity": round(batch_lot.quantity, 2),
+                "written_off_quantity": round(sum(record.quantity for record in (await self._batch_repo.list_write_offs_for_batch_lots(batch_lot_ids=[session_record.batch_lot_id])).get(session_record.batch_lot_id, [])), 2),
+                "remaining_quantity": 0.0 if updated_record is None else updated_record["remaining_quantity"],
+                "status": "WRITTEN_OFF" if updated_record is None else updated_record["status"],
+                "reason": session_record.reason,
+            },
+        }
+
+    async def cancel_batch_expiry_review_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        batch_expiry_session_id: str,
+        actor_user_id: str,
+        review_note: str | None,
+    ) -> dict[str, object]:
+        session_record = await self._batch_repo.get_batch_expiry_review_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            batch_expiry_session_id=batch_expiry_session_id,
+        )
+        if session_record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch expiry review session not found")
+
+        try:
+            ensure_batch_expiry_review_cancelable(status=session_record.status)
+        except ValueError as error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+        session_record.status = "CANCELED"
+        session_record.review_note = review_note.strip() if review_note is not None and review_note.strip() else None
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="batch_expiry_session.canceled",
+            entity_type="batch_expiry_session",
+            entity_id=batch_expiry_session_id,
+            payload={"review_note": session_record.review_note},
+        )
+        await self._session.commit()
+        return self._serialize_batch_expiry_review_session(session_record)
+
     async def create_batch_expiry_write_off(
         self,
         *,
@@ -208,4 +465,21 @@ class BatchService:
             "remaining_quantity": 0.0 if updated_record is None else updated_record["remaining_quantity"],
             "status": "WRITTEN_OFF" if updated_record is None else updated_record["status"],
             "reason": reason,
+        }
+
+    @staticmethod
+    def _serialize_batch_expiry_review_session(session_record: object) -> dict[str, object]:
+        return {
+            "id": session_record.id,
+            "tenant_id": session_record.tenant_id,
+            "branch_id": session_record.branch_id,
+            "batch_lot_id": session_record.batch_lot_id,
+            "product_id": session_record.product_id,
+            "session_number": session_record.session_number,
+            "status": session_record.status,
+            "remaining_quantity_snapshot": round(float(session_record.remaining_quantity_snapshot), 2),
+            "proposed_quantity": None if session_record.proposed_quantity is None else round(float(session_record.proposed_quantity), 2),
+            "reason": session_record.reason,
+            "note": session_record.note,
+            "review_note": session_record.review_note,
         }

@@ -34,12 +34,16 @@ enum class ZebraDataWedgeSetupStatus {
 }
 
 data class ScanLookupUiState(
+    val productId: String? = null,
     val draftBarcode: String = "",
     val barcode: String = "",
     val productName: String = "",
     val skuCode: String = "",
     val priceLabel: String = "",
     val stockLabel: String = "",
+    val stockOnHand: Double? = null,
+    val reorderPoint: Double? = null,
+    val targetStock: Double? = null,
     val availabilityStatus: String = "",
     val cameraStatus: ScanCameraStatus = ScanCameraStatus.CHECKING,
     val cameraMessage: String? = null,
@@ -196,11 +200,15 @@ class ScanLookupViewModel(
         val normalizedBarcode = scanner.normalizeDetectedValue(rawBarcode)
         if (normalizedBarcode == null) {
             state = state.copy(
+                productId = null,
                 barcode = "",
                 productName = "",
                 skuCode = "",
                 priceLabel = "",
                 stockLabel = "",
+                stockOnHand = null,
+                reorderPoint = null,
+                targetStock = null,
                 availabilityStatus = "",
                 errorMessage = "Scan a valid barcode to continue.",
                 lastScanSource = source,
@@ -212,15 +220,38 @@ class ScanLookupViewModel(
     }
 
     private fun lookupResolvedBarcode(normalizedBarcode: String, source: ScanLookupSource) {
-        val record = repository.lookupBarcode(normalizedBarcode)
-        if (record == null) {
+        val record = try {
+            repository.lookupBarcode(normalizedBarcode)
+        } catch (error: IllegalArgumentException) {
             state = state.copy(
                 draftBarcode = normalizedBarcode,
+                productId = null,
                 barcode = normalizedBarcode,
                 productName = "",
                 skuCode = "",
                 priceLabel = "",
                 stockLabel = "",
+                stockOnHand = null,
+                reorderPoint = null,
+                targetStock = null,
+                availabilityStatus = "",
+                lastScanSource = source,
+                errorMessage = error.message ?: "Control-plane request failed.",
+            )
+            return
+        }
+        if (record == null) {
+            state = state.copy(
+                draftBarcode = normalizedBarcode,
+                productId = null,
+                barcode = normalizedBarcode,
+                productName = "",
+                skuCode = "",
+                priceLabel = "",
+                stockLabel = "",
+                stockOnHand = null,
+                reorderPoint = null,
+                targetStock = null,
                 availabilityStatus = "",
                 lastScanSource = source,
                 errorMessage = "No catalog match found for this barcode.",
@@ -230,11 +261,15 @@ class ScanLookupViewModel(
 
         state = state.copy(
             draftBarcode = normalizedBarcode,
+            productId = record.productId,
             barcode = record.barcode,
             productName = record.productName,
             skuCode = record.skuCode,
             priceLabel = "Rs. %.2f".format(record.sellingPrice),
             stockLabel = record.stockOnHand.toInt().toString(),
+            stockOnHand = record.stockOnHand,
+            reorderPoint = record.reorderPoint,
+            targetStock = record.targetStock,
             availabilityStatus = record.availabilityStatus,
             lastScanSource = source,
             errorMessage = null,

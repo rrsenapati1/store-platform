@@ -73,6 +73,7 @@ describe('store runtime exchange flow', () => {
         ],
       }),
       jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
       jsonResponse({
         records: [
           {

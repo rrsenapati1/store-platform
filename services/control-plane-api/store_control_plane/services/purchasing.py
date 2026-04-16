@@ -173,6 +173,22 @@ class PurchasingService:
             for purchase_order in purchase_orders
         ]
 
+    async def get_purchase_order(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        purchase_order_id: str,
+    ) -> dict[str, object]:
+        purchase_order = await self._purchasing_repo.get_purchase_order(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            purchase_order_id=purchase_order_id,
+        )
+        if purchase_order is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase order not found")
+        return await self._purchase_order_response(tenant_id=tenant_id, purchase_order=purchase_order)
+
     async def submit_purchase_order(
         self,
         *,

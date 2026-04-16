@@ -1,12 +1,16 @@
 import type {
   ControlPlaneActor,
+  ControlPlaneBatchExpiryBoard,
   ControlPlaneBatchExpiryReport,
+  ControlPlaneBatchExpiryReviewApproval,
+  ControlPlaneBatchExpiryReviewSession,
   ControlPlaneBatchExpiryWriteOff,
   ControlPlaneBarcodeScanLookup,
   ControlPlaneBranchCatalogItem,
   ControlPlaneBranchRecord,
   ControlPlaneBranchCustomerReport,
   ControlPlaneCheckoutPaymentSession,
+  ControlPlaneCheckoutPaymentSessionListResponse,
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
   ControlPlaneDeviceRecord,
@@ -15,6 +19,8 @@ import type {
   ControlPlaneOfflineSaleReplayRequest,
   ControlPlaneOfflineSaleReplayResponse,
   ControlPlanePrintJob,
+  ControlPlaneRestockBoard,
+  ControlPlaneRestockTask,
   ControlPlaneRuntimeDeviceClaimResolution,
   ControlPlaneRuntimeHubBootstrap,
   ControlPlaneRuntimeHeartbeat,
@@ -198,6 +204,158 @@ export const storeControlPlaneClient = {
     return request<ControlPlaneBatchExpiryReport>(
       `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-report`,
       undefined,
+      accessToken,
+    );
+  },
+  getBatchExpiryBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneBatchExpiryBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  createBatchExpirySession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: { batch_lot_id: string; note?: string | null },
+  ) {
+    return request<ControlPlaneBatchExpiryReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-sessions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  recordBatchExpirySession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    batchExpirySessionId: string,
+    payload: { quantity: number; reason: string },
+  ) {
+    return request<ControlPlaneBatchExpiryReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-sessions/${batchExpirySessionId}/review`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  approveBatchExpirySession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    batchExpirySessionId: string,
+    payload: { review_note?: string | null },
+  ) {
+    return request<ControlPlaneBatchExpiryReviewApproval>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-sessions/${batchExpirySessionId}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  cancelBatchExpirySession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    batchExpirySessionId: string,
+    payload: { review_note?: string | null },
+  ) {
+    return request<ControlPlaneBatchExpiryReviewSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/batch-expiry-sessions/${batchExpirySessionId}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  getRestockBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneRestockBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  createRestockTask(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      product_id: string;
+      requested_quantity: number;
+      source_posture: string;
+      note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneRestockTask>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-tasks`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  pickRestockTask(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    restockTaskId: string,
+    payload: {
+      picked_quantity: number;
+      note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneRestockTask>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-tasks/${restockTaskId}/pick`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  completeRestockTask(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    restockTaskId: string,
+    payload: {
+      completion_note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneRestockTask>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-tasks/${restockTaskId}/complete`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  cancelRestockTask(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    restockTaskId: string,
+    payload: {
+      cancel_note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneRestockTask>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/restock-tasks/${restockTaskId}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
       accessToken,
     );
   },
@@ -415,6 +573,8 @@ export const storeControlPlaneClient = {
     payload: {
       provider_name: string;
       payment_method: string;
+      handoff_surface?: string | null;
+      provider_payment_mode?: string | null;
       customer_name: string;
       customer_gstin?: string | null;
       lines: Array<{ product_id: string; quantity: number }>;
@@ -429,6 +589,13 @@ export const storeControlPlaneClient = {
       accessToken,
     );
   },
+  listCheckoutPaymentSessions(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneCheckoutPaymentSessionListResponse>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions`,
+      undefined,
+      accessToken,
+    );
+  },
   getCheckoutPaymentSession(
     accessToken: string,
     tenantId: string,
@@ -438,6 +605,48 @@ export const storeControlPlaneClient = {
     return request<ControlPlaneCheckoutPaymentSession>(
       `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions/${checkoutPaymentSessionId}`,
       undefined,
+      accessToken,
+    );
+  },
+  refreshCheckoutPaymentSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    checkoutPaymentSessionId: string,
+  ) {
+    return request<ControlPlaneCheckoutPaymentSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions/${checkoutPaymentSessionId}/refresh`,
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  finalizeCheckoutPaymentSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    checkoutPaymentSessionId: string,
+  ) {
+    return request<ControlPlaneCheckoutPaymentSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions/${checkoutPaymentSessionId}/finalize`,
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  retryCheckoutPaymentSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    checkoutPaymentSessionId: string,
+  ) {
+    return request<ControlPlaneCheckoutPaymentSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions/${checkoutPaymentSessionId}/retry`,
+      {
+        method: 'POST',
+      },
       accessToken,
     );
   },

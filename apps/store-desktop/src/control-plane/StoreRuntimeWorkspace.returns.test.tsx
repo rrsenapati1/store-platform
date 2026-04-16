@@ -73,6 +73,7 @@ describe('store runtime sale return flow', () => {
         ],
       }),
       jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
       jsonResponse({
         records: [
           {

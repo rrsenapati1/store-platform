@@ -10,6 +10,7 @@ import { StoreRuntimeCacheSection } from './StoreRuntimeCacheSection';
 import { StoreRuntimeOutboxSection } from './StoreRuntimeOutboxSection';
 import { StoreExchangeSection } from './StoreExchangeSection';
 import { StorePrintQueueSection } from './StorePrintQueueSection';
+import { StoreRestockSection } from './StoreRestockSection';
 import { StoreRuntimeReleaseSection } from './StoreRuntimeReleaseSection';
 import { StoreReturnsSection } from './StoreReturnsSection';
 import { StoreRuntimeShellSection } from './StoreRuntimeShellSection';
@@ -31,6 +32,9 @@ function buildMetrics(args: { branchCount: number; isSessionLive: boolean; cache
 
 export function StoreRuntimeWorkspace() {
   const workspace = useStoreRuntimeWorkspace();
+  const branches = workspace.branches ?? [];
+  const inventorySnapshot = workspace.inventorySnapshot ?? [];
+  const cacheStatus = workspace.cacheStatus ?? 'EMPTY';
   const showPackagedActivation = workspace.runtimeShellKind === 'packaged_desktop'
     && !workspace.isSessionLive
     && !workspace.requiresPinEnrollment
@@ -39,10 +43,10 @@ export function StoreRuntimeWorkspace() {
   const isLocalAuthGateActive = workspace.runtimeShellKind === 'packaged_desktop'
     && (!workspace.hasLoadedLocalAuth || workspace.requiresPinEnrollment || workspace.requiresLocalUnlock);
   const metrics = buildMetrics({
-    branchCount: isLocalAuthGateActive ? 0 : workspace.branches.length,
+    branchCount: isLocalAuthGateActive ? 0 : branches.length,
     isSessionLive: !isLocalAuthGateActive && workspace.isSessionLive,
-    cacheStatus: isLocalAuthGateActive ? 'EMPTY' : workspace.cacheStatus,
-    stockRecords: isLocalAuthGateActive ? 0 : workspace.inventorySnapshot.length,
+    cacheStatus: isLocalAuthGateActive ? 'EMPTY' : cacheStatus,
+    stockRecords: isLocalAuthGateActive ? 0 : inventorySnapshot.length,
   });
 
   return (
@@ -208,7 +212,7 @@ export function StoreRuntimeWorkspace() {
                 { label: 'Actor', value: workspace.actor.full_name },
                 { label: 'Email', value: workspace.actor.email },
                 { label: 'Tenant', value: workspace.tenant?.name ?? 'Unbound' },
-                { label: 'Branch', value: workspace.branches[0]?.name ?? workspace.branchId ?? 'Unbound' },
+                { label: 'Branch', value: branches[0]?.name ?? workspace.branchId ?? 'Unbound' },
                 { label: 'Session expires', value: workspace.sessionExpiresAt ?? 'Unknown' },
                 { label: 'Runtime authority', value: 'Control plane only' },
               ]}
@@ -259,6 +263,7 @@ export function StoreRuntimeWorkspace() {
       {!isLocalAuthGateActive ? <StoreCustomerDisplaySection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBillingSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBarcodeLookupSection workspace={workspace} /> : null}
+      {!isLocalAuthGateActive ? <StoreRestockSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBatchExpirySection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StorePrintQueueSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreReturnsSection workspace={workspace} /> : null}

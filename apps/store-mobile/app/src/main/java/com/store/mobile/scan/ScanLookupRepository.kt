@@ -8,6 +8,8 @@ data class ScanLookupRecord(
     val sellingPrice: Double,
     val stockOnHand: Double,
     val availabilityStatus: String,
+    val reorderPoint: Double? = null,
+    val targetStock: Double? = null,
 )
 
 interface ScanLookupRepository {
@@ -24,6 +26,8 @@ class InMemoryScanLookupRepository(
             sellingPrice = 125.0,
             stockOnHand = 18.0,
             availabilityStatus = "IN_STOCK",
+            reorderPoint = 10.0,
+            targetStock = 24.0,
         ),
     ),
 ) : ScanLookupRepository {

@@ -128,15 +128,58 @@ def test_owner_adjusts_counts_and_transfers_inventory_on_control_plane():
     assert adjustment.status_code == 200
     assert adjustment.json()["resulting_stock_on_hand"] == 22.0
 
-    stock_count = client.post(
-        f"/v1/tenants/{tenant_id}/branches/{branch_one_id}/stock-counts",
+    stock_count_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_one_id}/stock-count-sessions",
         headers=owner_headers,
-        json={"product_id": product_id, "counted_quantity": 20, "note": "Cycle count before transfer"},
+        json={"product_id": product_id, "note": "Cycle count before transfer"},
     )
-    assert stock_count.status_code == 200
-    assert stock_count.json()["expected_quantity"] == 22.0
-    assert stock_count.json()["variance_quantity"] == -2.0
-    assert stock_count.json()["closing_stock"] == 20.0
+    assert stock_count_session.status_code == 200
+    stock_count_session_id = stock_count_session.json()["id"]
+    assert stock_count_session.json()["status"] == "OPEN"
+
+    stock_count_board_before = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_one_id}/stock-count-board",
+        headers=owner_headers,
+    )
+    assert stock_count_board_before.status_code == 200
+    assert stock_count_board_before.json()["open_count"] == 1
+    assert stock_count_board_before.json()["counted_count"] == 0
+
+    record_count = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_one_id}/stock-count-sessions/{stock_count_session_id}/record",
+        headers=owner_headers,
+        json={"counted_quantity": 20, "note": "Cycle count before transfer"},
+    )
+    assert record_count.status_code == 200
+    assert record_count.json()["status"] == "COUNTED"
+    assert record_count.json()["expected_quantity"] == 22.0
+    assert record_count.json()["variance_quantity"] == -2.0
+
+    snapshot_before_approval = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_one_id}/inventory-snapshot",
+        headers=owner_headers,
+    )
+    assert snapshot_before_approval.status_code == 200
+    assert snapshot_before_approval.json()["records"][0]["stock_on_hand"] == 22.0
+
+    approved_count = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_one_id}/stock-count-sessions/{stock_count_session_id}/approve",
+        headers=owner_headers,
+        json={"review_note": "Approved after blind count review"},
+    )
+    assert approved_count.status_code == 200
+    assert approved_count.json()["session"]["status"] == "APPROVED"
+    assert approved_count.json()["stock_count"]["expected_quantity"] == 22.0
+    assert approved_count.json()["stock_count"]["variance_quantity"] == -2.0
+    assert approved_count.json()["stock_count"]["closing_stock"] == 20.0
+
+    stock_count_board_after = client.get(
+        f"/v1/tenants/{tenant_id}/branches/{branch_one_id}/stock-count-board",
+        headers=owner_headers,
+    )
+    assert stock_count_board_after.status_code == 200
+    assert stock_count_board_after.json()["approved_count"] == 1
+    assert stock_count_board_after.json()["records"][0]["status"] == "APPROVED"
 
     transfer = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_one_id}/transfers",
