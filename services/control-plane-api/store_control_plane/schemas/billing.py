@@ -15,6 +15,7 @@ class SaleCreateRequest(BaseModel):
     customer_name: str
     customer_gstin: str | None = None
     payment_method: str
+    store_credit_amount: float = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
 
 
@@ -118,6 +119,7 @@ class SaleResponse(BaseModel):
     sgst_total: float
     igst_total: float
     grand_total: float
+    store_credit_amount: float = 0
     payment: PaymentResponse
     lines: list[SaleLineResponse]
     tax_lines: list[InvoiceTaxLineResponse]
@@ -132,6 +134,7 @@ class SaleRecord(BaseModel):
     irn_status: str
     payment_method: str
     grand_total: float
+    store_credit_amount: float = 0
     issued_on: date
 
 

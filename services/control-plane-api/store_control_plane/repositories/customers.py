@@ -5,7 +5,21 @@ from collections import defaultdict
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import CreditNote, CustomerExchangeSnapshot, CustomerProfile, CustomerSaleReturnSnapshot, CustomerSaleSnapshot, ExchangeOrder, Payment, Sale, SaleReturn, SalesInvoice
+from ..models import (
+    CreditNote,
+    CustomerCreditAccount,
+    CustomerCreditLedgerEntry,
+    CustomerCreditLot,
+    CustomerExchangeSnapshot,
+    CustomerProfile,
+    CustomerSaleReturnSnapshot,
+    CustomerSaleSnapshot,
+    ExchangeOrder,
+    Payment,
+    Sale,
+    SaleReturn,
+    SalesInvoice,
+)
 
 
 class CustomerProfileRepository:
@@ -91,6 +105,135 @@ class CustomerProfileRepository:
         )
         records = list((await self._session.scalars(statement)).all())
         return {record.id: record for record in records}
+
+    async def get_credit_account(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+    ) -> CustomerCreditAccount | None:
+        statement = select(CustomerCreditAccount).where(
+            CustomerCreditAccount.tenant_id == tenant_id,
+            CustomerCreditAccount.customer_profile_id == customer_profile_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def create_credit_account(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        account_id: str,
+    ) -> CustomerCreditAccount:
+        record = CustomerCreditAccount(
+            id=account_id,
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+            available_balance=0.0,
+            issued_total=0.0,
+            redeemed_total=0.0,
+            adjusted_total=0.0,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def list_active_credit_lots(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+    ) -> list[CustomerCreditLot]:
+        statement = (
+            select(CustomerCreditLot)
+            .where(
+                CustomerCreditLot.tenant_id == tenant_id,
+                CustomerCreditLot.customer_profile_id == customer_profile_id,
+                CustomerCreditLot.status == "ACTIVE",
+            )
+            .order_by(CustomerCreditLot.issued_at.asc(), CustomerCreditLot.id.asc())
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def list_credit_ledger_entries(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+    ) -> list[CustomerCreditLedgerEntry]:
+        statement = (
+            select(CustomerCreditLedgerEntry)
+            .where(
+                CustomerCreditLedgerEntry.tenant_id == tenant_id,
+                CustomerCreditLedgerEntry.customer_profile_id == customer_profile_id,
+            )
+            .order_by(CustomerCreditLedgerEntry.created_at.asc(), CustomerCreditLedgerEntry.id.asc())
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def create_credit_lot(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        account_id: str,
+        lot_id: str,
+        branch_id: str | None,
+        source_type: str,
+        source_reference_id: str | None,
+        original_amount: float,
+        remaining_amount: float,
+        status: str = "ACTIVE",
+    ) -> CustomerCreditLot:
+        record = CustomerCreditLot(
+            id=lot_id,
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+            account_id=account_id,
+            branch_id=branch_id,
+            source_type=source_type,
+            source_reference_id=source_reference_id,
+            original_amount=original_amount,
+            remaining_amount=remaining_amount,
+            status=status,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def create_credit_ledger_entry(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        account_id: str,
+        entry_id: str,
+        lot_id: str | None,
+        branch_id: str | None,
+        entry_type: str,
+        source_type: str,
+        source_reference_id: str | None,
+        amount: float,
+        running_balance: float,
+        note: str | None,
+    ) -> CustomerCreditLedgerEntry:
+        record = CustomerCreditLedgerEntry(
+            id=entry_id,
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+            account_id=account_id,
+            lot_id=lot_id,
+            branch_id=branch_id,
+            entry_type=entry_type,
+            source_type=source_type,
+            source_reference_id=source_reference_id,
+            amount=amount,
+            running_balance=running_balance,
+            note=note,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
 
 
 class CustomerReportingRepository:

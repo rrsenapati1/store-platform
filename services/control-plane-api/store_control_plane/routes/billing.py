@@ -51,6 +51,7 @@ async def create_sale(
         customer_name=payload.customer_name,
         customer_gstin=payload.customer_gstin,
         payment_method=payload.payment_method,
+        store_credit_amount=payload.store_credit_amount,
         lines=[line.model_dump() for line in payload.lines],
     )
     return SaleResponse(**sale)

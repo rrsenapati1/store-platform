@@ -41,6 +41,50 @@ class CustomerProfileListResponse(BaseModel):
     records: list[CustomerProfileResponse]
 
 
+class CustomerStoreCreditIssueRequest(BaseModel):
+    amount: float
+    note: str | None = None
+
+
+class CustomerStoreCreditAdjustmentRequest(BaseModel):
+    amount_delta: float
+    note: str | None = None
+
+
+class CustomerStoreCreditLotResponse(BaseModel):
+    id: str
+    source_type: str
+    source_reference_id: str | None = None
+    original_amount: float
+    remaining_amount: float
+    status: str
+    issued_at: datetime
+    branch_id: str | None = None
+
+
+class CustomerStoreCreditLedgerEntryResponse(BaseModel):
+    id: str
+    entry_type: str
+    source_type: str
+    source_reference_id: str | None = None
+    amount: float
+    running_balance: float
+    note: str | None = None
+    lot_id: str | None = None
+    branch_id: str | None = None
+    created_at: datetime
+
+
+class CustomerStoreCreditResponse(BaseModel):
+    customer_profile_id: str
+    available_balance: float
+    issued_total: float
+    redeemed_total: float
+    adjusted_total: float
+    lots: list[CustomerStoreCreditLotResponse]
+    ledger_entries: list[CustomerStoreCreditLedgerEntryResponse]
+
+
 class CustomerDirectoryRecord(BaseModel):
     customer_id: str
     customer_profile_id: str | None = None

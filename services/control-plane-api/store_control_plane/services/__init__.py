@@ -23,6 +23,7 @@ from .compliance_policy import build_hsn_sac_summary, ensure_gst_export_allowed,
 from .compliance_secrets import ComplianceSecretsService
 from .customer_profiles import CustomerProfileService
 from .customer_reporting import CustomerReportingService
+from .store_credit import StoreCreditService
 from .idp import build_identity_provider
 from .inventory import InventoryService
 from .onboarding import OnboardingService
@@ -54,6 +55,7 @@ __all__ = [
     "ComplianceSecretsService",
     "CustomerProfileService",
     "CustomerReportingService",
+    "StoreCreditService",
     "InventoryService",
     "OnboardingService",
     "OfflineContinuityService",

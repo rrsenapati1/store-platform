@@ -4,7 +4,15 @@ from .billing import CheckoutPaymentSession, CreditNote, CreditNoteTaxLine, Exch
 from .catalog import BranchCatalogItem, CatalogProduct
 from .compliance import BranchIrpProfile, GstExportJob, IrnAttachment
 from .commerce import BillingPlan, SubscriptionWebhookEvent, TenantBillingOverride, TenantEntitlement, TenantSubscription
-from .customers import CustomerExchangeSnapshot, CustomerProfile, CustomerSaleReturnSnapshot, CustomerSaleSnapshot
+from .customers import (
+    CustomerCreditAccount,
+    CustomerCreditLedgerEntry,
+    CustomerCreditLot,
+    CustomerExchangeSnapshot,
+    CustomerProfile,
+    CustomerSaleReturnSnapshot,
+    CustomerSaleSnapshot,
+)
 from .identity import AppSession, PlatformAdminAccount, User
 from .operations import OperationsJob
 from .inventory import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, RestockTaskSession, StockAdjustment, StockCountReviewSession, StockCountSession, TransferOrder
@@ -33,6 +41,9 @@ __all__ = [
     "CheckoutPaymentSession",
     "CreditNote",
     "CreditNoteTaxLine",
+    "CustomerCreditAccount",
+    "CustomerCreditLedgerEntry",
+    "CustomerCreditLot",
     "CustomerProfile",
     "CustomerExchangeSnapshot",
     "CustomerSaleReturnSnapshot",

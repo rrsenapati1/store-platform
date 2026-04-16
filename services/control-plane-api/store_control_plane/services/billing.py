@@ -9,6 +9,7 @@ from .billing_policy import build_sale_draft, ensure_sale_stock_available, sale_
 from .customer_profiles import CustomerProfileService
 from .exchange_policy import build_exchange_settlement
 from .returns_policy import build_sale_return_draft, credit_note_number, ensure_refund_amount_allowed
+from .store_credit import StoreCreditService
 
 
 class BillingService:
@@ -20,6 +21,7 @@ class BillingService:
         self._billing_repo = BillingRepository(session)
         self._audit_repo = AuditRepository(session)
         self._customer_profile_service = CustomerProfileService(session)
+        self._store_credit_service = StoreCreditService(session)
 
     async def create_sale(
         self,
@@ -31,6 +33,7 @@ class BillingService:
         customer_name: str,
         customer_gstin: str | None,
         payment_method: str,
+        store_credit_amount: float = 0.0,
         lines: list[dict[str, float | str]],
         auto_commit: bool = True,
     ) -> dict[str, object]:
@@ -77,6 +80,28 @@ class BillingService:
         except ValueError as error:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
+        store_credit_amount = round(float(store_credit_amount or 0.0), 2)
+        if store_credit_amount > 0:
+            if customer_profile_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Customer profile is required for store credit redemption",
+                )
+            if store_credit_amount > draft.grand_total:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Store credit redemption cannot exceed sale total",
+                )
+            credit_summary = await self._store_credit_service.get_customer_store_credit(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+            )
+            if store_credit_amount > float(credit_summary["available_balance"]):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Customer store credit balance is insufficient",
+                )
+
         for line in draft.lines:
             available_quantity = await self._inventory_repo.stock_on_hand(
                 tenant_id=tenant_id,
@@ -87,6 +112,13 @@ class BillingService:
                 ensure_sale_stock_available(requested_quantity=line.quantity, available_quantity=available_quantity)
             except ValueError as error:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+        payment_rows: list[dict[str, float | str]] | None = None
+        if store_credit_amount > 0:
+            payment_rows = [{"payment_method": "STORE_CREDIT", "amount": store_credit_amount}]
+            remaining_payment_amount = round(draft.grand_total - store_credit_amount, 2)
+            if remaining_payment_amount > 0:
+                payment_rows.append({"payment_method": payment_method, "amount": remaining_payment_amount})
 
         sequence_number = await self._billing_repo.next_branch_sale_sequence(tenant_id=tenant_id, branch_id=branch_id)
         persisted = await self._billing_repo.create_sale(
@@ -106,7 +138,7 @@ class BillingService:
             igst_total=draft.igst_total,
             grand_total=draft.grand_total,
             payment_method=payment_method,
-            payments=None,
+            payments=payment_rows,
             lines=[
                 {
                     "product_id": line.product_id,
@@ -129,6 +161,15 @@ class BillingService:
                 for line in draft.tax_lines
             ],
         )
+        if store_credit_amount > 0:
+            await self._store_credit_service.redeem_customer_store_credit(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+                amount=store_credit_amount,
+                branch_id=branch_id,
+                source_reference_id=persisted.sale.id,
+                note=f"Sale {persisted.invoice.invoice_number}",
+            )
         await self._inventory_repo.create_inventory_ledger_entries(
             entries=[
                 {
@@ -195,6 +236,10 @@ class BillingService:
                 "irn_status": sale.irn_status,
                 "payment_method": self._payment_summary(payments)["payment_method"],
                 "grand_total": sale.grand_total,
+                "store_credit_amount": round(
+                    sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
+                    2,
+                ),
                 "issued_on": invoice.issued_on,
             }
             for sale, invoice, payments in records
@@ -219,6 +264,11 @@ class BillingService:
         sale_bundle = await self._billing_repo.get_sale_bundle(tenant_id=tenant_id, branch_id=branch_id, sale_id=sale_id)
         if sale_bundle is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
+        if refund_method == "STORE_CREDIT" and sale_bundle.sale.customer_profile_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Customer profile is required for store credit refunds",
+            )
 
         products = {
             product.id: product
@@ -336,6 +386,16 @@ class BillingService:
             },
         )
         if can_approve_refund:
+            if persisted.sale_return.refund_method == "STORE_CREDIT" and persisted.sale_return.refund_amount > 0:
+                await self._store_credit_service.issue_customer_store_credit(
+                    tenant_id=tenant_id,
+                    customer_profile_id=sale_bundle.sale.customer_profile_id,
+                    amount=persisted.sale_return.refund_amount,
+                    note=f"Sale return {persisted.credit_note.credit_note_number}",
+                    branch_id=branch_id,
+                    source_type="RETURN_REFUND",
+                    source_reference_id=persisted.sale_return.id,
+                )
             await self._audit_repo.record(
                 tenant_id=tenant_id,
                 branch_id=branch_id,
@@ -684,10 +744,34 @@ class BillingService:
         )
         if sale_return is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale return not found")
+        already_approved = sale_return.status == "REFUND_APPROVED"
         sale_return.status = "REFUND_APPROVED"
         credit_note = await self._billing_repo.get_credit_note_for_sale_return(sale_return_id=sale_return.id)
         if credit_note is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credit note not found")
+        sale_bundle = await self._billing_repo.get_sale_bundle(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            sale_id=sale_return.sale_id,
+        )
+        if sale_bundle is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
+        if sale_return.refund_method == "STORE_CREDIT":
+            if sale_bundle.sale.customer_profile_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Customer profile is required for store credit refunds",
+                )
+            if not already_approved and sale_return.refund_amount > 0:
+                await self._store_credit_service.issue_customer_store_credit(
+                    tenant_id=tenant_id,
+                    customer_profile_id=sale_bundle.sale.customer_profile_id,
+                    amount=sale_return.refund_amount,
+                    note=f"Sale return {credit_note.credit_note_number}",
+                    branch_id=branch_id,
+                    source_type="RETURN_REFUND",
+                    source_reference_id=sale_return.id,
+                )
         return_lines = (await self._billing_repo.list_sale_return_lines_for_returns(sale_return_ids=[sale_return.id])).get(sale_return.id, [])
         credit_note_tax_lines = (
             await self._billing_repo.list_credit_note_tax_lines_for_credit_notes(credit_note_ids=[credit_note.id])
@@ -740,6 +824,10 @@ class BillingService:
             "sgst_total": invoice.sgst_total,
             "igst_total": invoice.igst_total,
             "grand_total": invoice.grand_total,
+            "store_credit_amount": round(
+                sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
+                2,
+            ),
             "payment": self._payment_summary(payments),
             "lines": [
                 {

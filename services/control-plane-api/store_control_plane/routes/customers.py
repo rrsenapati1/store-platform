@@ -12,8 +12,17 @@ from ..schemas import (
     CustomerProfileListResponse,
     CustomerProfileResponse,
     CustomerProfileUpdateRequest,
+    CustomerStoreCreditAdjustmentRequest,
+    CustomerStoreCreditIssueRequest,
+    CustomerStoreCreditResponse,
 )
-from ..services import ActorContext, CustomerProfileService, CustomerReportingService, assert_branch_any_capability
+from ..services import (
+    ActorContext,
+    CustomerProfileService,
+    CustomerReportingService,
+    StoreCreditService,
+    assert_branch_any_capability,
+)
 
 router = APIRouter(prefix="/v1/tenants", tags=["customers"])
 
@@ -134,6 +143,83 @@ async def reactivate_customer_profile(
     record = await service.reactivate_customer_profile(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
     await session.commit()
     return CustomerProfileResponse(**record)
+
+
+@router.get(
+    "/{tenant_id}/customer-profiles/{customer_profile_id}/store-credit",
+    response_model=CustomerStoreCreditResponse,
+)
+async def get_customer_store_credit(
+    tenant_id: str,
+    customer_profile_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerStoreCreditResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = StoreCreditService(session)
+    record = await service.get_customer_store_credit(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
+    return CustomerStoreCreditResponse(**record)
+
+
+@router.post(
+    "/{tenant_id}/customer-profiles/{customer_profile_id}/store-credit/issue",
+    response_model=CustomerStoreCreditResponse,
+)
+async def issue_customer_store_credit(
+    tenant_id: str,
+    customer_profile_id: str,
+    payload: CustomerStoreCreditIssueRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerStoreCreditResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = StoreCreditService(session)
+    record = await service.issue_customer_store_credit(
+        tenant_id=tenant_id,
+        customer_profile_id=customer_profile_id,
+        amount=payload.amount,
+        note=payload.note,
+    )
+    await session.commit()
+    return CustomerStoreCreditResponse(**record)
+
+
+@router.post(
+    "/{tenant_id}/customer-profiles/{customer_profile_id}/store-credit/adjust",
+    response_model=CustomerStoreCreditResponse,
+)
+async def adjust_customer_store_credit(
+    tenant_id: str,
+    customer_profile_id: str,
+    payload: CustomerStoreCreditAdjustmentRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerStoreCreditResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = StoreCreditService(session)
+    record = await service.adjust_customer_store_credit(
+        tenant_id=tenant_id,
+        customer_profile_id=customer_profile_id,
+        amount_delta=payload.amount_delta,
+        note=payload.note,
+    )
+    await session.commit()
+    return CustomerStoreCreditResponse(**record)
 
 
 @router.get("/{tenant_id}/customers", response_model=CustomerDirectoryResponse)
