@@ -91,156 +91,213 @@ function WorkspaceHarness() {
 describe('store runtime reviewed stock-count workspace flow', () => {
   const originalFetch = globalThis.fetch;
 
-  beforeEach(() => {
-    const responses = [
-      jsonResponse({ access_token: 'session-stock-clerk', token_type: 'Bearer' }),
-      jsonResponse({
-        user_id: 'user-stock-clerk',
-        email: 'stock@acme.local',
-        full_name: 'Stock Clerk',
-        is_platform_admin: false,
-        tenant_memberships: [],
-        branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'stock_clerk', status: 'ACTIVE' }],
-      }),
-      jsonResponse({
-        id: 'tenant-acme',
-        name: 'Acme Retail',
-        slug: 'acme-retail',
-        status: 'ACTIVE',
-        onboarding_status: 'BRANCH_READY',
-      }),
-      jsonResponse({
-        records: [{ branch_id: 'branch-1', tenant_id: 'tenant-acme', name: 'Bengaluru Flagship', code: 'blr-flagship', status: 'ACTIVE' }],
-      }),
-      jsonResponse({
-        records: [
-          {
-            id: 'catalog-item-1',
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  test('runs desktop reviewed stock-count flow end-to-end', async () => {
+    const buildInventorySnapshot = (stockOnHand: number, lastEntryType: string) => ({
+      records: [
+        {
+          product_id: 'product-1',
+          product_name: 'Classic Tea',
+          sku_code: 'tea-classic-250g',
+          stock_on_hand: stockOnHand,
+          last_entry_type: lastEntryType,
+        },
+      ],
+    });
+    const buildBoardRecord = (status: string, note: string, reviewNote: string | null) => ({
+      stock_count_session_id: status === 'CANCELED' ? 'scs-2' : 'scs-1',
+      session_number: status === 'CANCELED' ? 'SCS-BLRFLAGSHIP-0002' : 'SCS-BLRFLAGSHIP-0001',
+      product_id: 'product-1',
+      product_name: 'Classic Tea',
+      sku_code: 'tea-classic-250g',
+      status,
+      expected_quantity: status === 'OPEN' || status === 'CANCELED' ? null : 12,
+      counted_quantity: status === 'OPEN' || status === 'CANCELED' ? null : 10,
+      variance_quantity: status === 'OPEN' || status === 'CANCELED' ? null : -2,
+      note,
+      review_note: reviewNote,
+    });
+
+    let inventorySnapshot = buildInventorySnapshot(12, 'PURCHASE_RECEIPT');
+    let stockCountBoard = {
+      branch_id: 'branch-1',
+      open_count: 0,
+      counted_count: 0,
+      approved_count: 0,
+      canceled_count: 0,
+      records: [] as Array<ReturnType<typeof buildBoardRecord>>,
+    };
+    let activeSession: Record<string, unknown> | null = null;
+    let latestApprovedStockCount: Record<string, unknown> | null = null;
+
+    globalThis.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+
+      if (url.endsWith('/v1/auth/oidc/exchange') && method === 'POST') {
+        return jsonResponse({ access_token: 'session-stock-clerk', token_type: 'Bearer' }) as never;
+      }
+      if (url.endsWith('/v1/auth/me')) {
+        return jsonResponse({
+          user_id: 'user-stock-clerk',
+          email: 'stock@acme.local',
+          full_name: 'Stock Clerk',
+          is_platform_admin: false,
+          tenant_memberships: [],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'stock_clerk', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme')) {
+        return jsonResponse({
+          id: 'tenant-acme',
+          name: 'Acme Retail',
+          slug: 'acme-retail',
+          status: 'ACTIVE',
+          onboarding_status: 'BRANCH_READY',
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches')) {
+        return jsonResponse({
+          records: [{ branch_id: 'branch-1', tenant_id: 'tenant-acme', name: 'Bengaluru Flagship', code: 'blr-flagship', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/catalog-items')) {
+        return jsonResponse({
+          records: [
+            {
+              id: 'catalog-item-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              barcode: 'ACMETEACLASSIC',
+              hsn_sac_code: '0902',
+              gst_rate: 5,
+              base_selling_price: 89,
+              selling_price_override: null,
+              effective_selling_price: 89,
+              availability_status: 'ACTIVE',
+              reorder_point: 10,
+              target_stock: 24,
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/inventory-snapshot')) {
+        return jsonResponse(inventorySnapshot) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
+        return jsonResponse({
+          records: [
+            {
+              id: 'device-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              device_name: 'Counter Desktop 1',
+              device_code: 'counter-1',
+              session_surface: 'store_desktop',
+              status: 'ACTIVE',
+              assigned_staff_profile_id: null,
+              assigned_staff_full_name: null,
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/stock-count-board') && method === 'GET') {
+        return jsonResponse(stockCountBoard) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/stock-count-sessions') && method === 'POST') {
+        const payload = JSON.parse(String(init?.body ?? '{}')) as { note?: string };
+        if (payload.note === 'Aisle recount') {
+          activeSession = {
+            id: 'scs-1',
             tenant_id: 'tenant-acme',
             branch_id: 'branch-1',
             product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
-            barcode: 'ACMETEACLASSIC',
-            hsn_sac_code: '0902',
-            gst_rate: 5,
-            base_selling_price: 89,
-            selling_price_override: null,
-            effective_selling_price: 89,
-            availability_status: 'ACTIVE',
-            reorder_point: 10,
-            target_stock: 24,
-          },
-        ],
-      }),
-      jsonResponse({
-        records: [
-          {
-            product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
-            stock_on_hand: 12,
-            last_entry_type: 'PURCHASE_RECEIPT',
-          },
-        ],
-      }),
-      jsonResponse({ records: [] }),
-      jsonResponse({
-        records: [
-          {
-            id: 'device-1',
-            tenant_id: 'tenant-acme',
-            branch_id: 'branch-1',
-            device_name: 'Counter Desktop 1',
-            device_code: 'counter-1',
-            session_surface: 'store_desktop',
-            status: 'ACTIVE',
-            assigned_staff_profile_id: null,
-            assigned_staff_full_name: null,
-          },
-        ],
-      }),
-      jsonResponse({ records: [] }),
-      jsonResponse({
-        branch_id: 'branch-1',
-        open_count: 0,
-        counted_count: 0,
-        approved_count: 0,
-        canceled_count: 0,
-        records: [],
-      }),
-      jsonResponse({
-        id: 'scs-1',
-        tenant_id: 'tenant-acme',
-        branch_id: 'branch-1',
-        product_id: 'product-1',
-        session_number: 'SCS-BLRFLAGSHIP-0001',
-        status: 'OPEN',
-        expected_quantity: null,
-        counted_quantity: null,
-        variance_quantity: null,
-        note: 'Aisle recount',
-        review_note: null,
-      }),
-      jsonResponse({
-        branch_id: 'branch-1',
-        open_count: 1,
-        counted_count: 0,
-        approved_count: 0,
-        canceled_count: 0,
-        records: [
-          {
-            stock_count_session_id: 'scs-1',
             session_number: 'SCS-BLRFLAGSHIP-0001',
-            product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
             status: 'OPEN',
             expected_quantity: null,
             counted_quantity: null,
             variance_quantity: null,
             note: 'Aisle recount',
             review_note: null,
-          },
-        ],
-      }),
-      jsonResponse({
-        id: 'scs-1',
-        tenant_id: 'tenant-acme',
-        branch_id: 'branch-1',
-        product_id: 'product-1',
-        session_number: 'SCS-BLRFLAGSHIP-0001',
-        status: 'COUNTED',
-        expected_quantity: 12,
-        counted_quantity: 10,
-        variance_quantity: -2,
-        note: 'Blind count complete',
-        review_note: null,
-      }),
-      jsonResponse({
-        branch_id: 'branch-1',
-        open_count: 0,
-        counted_count: 1,
-        approved_count: 0,
-        canceled_count: 0,
-        records: [
-          {
-            stock_count_session_id: 'scs-1',
-            session_number: 'SCS-BLRFLAGSHIP-0001',
+          };
+          stockCountBoard = {
+            ...stockCountBoard,
+            open_count: 1,
+            counted_count: 0,
+            approved_count: latestApprovedStockCount ? 1 : 0,
+            canceled_count: 0,
+            records: [buildBoardRecord('OPEN', 'Aisle recount', null)],
+          };
+        } else {
+          activeSession = {
+            id: 'scs-2',
+            tenant_id: 'tenant-acme',
+            branch_id: 'branch-1',
             product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
-            status: 'COUNTED',
-            expected_quantity: 12,
-            counted_quantity: 10,
-            variance_quantity: -2,
-            note: 'Blind count complete',
+            session_number: 'SCS-BLRFLAGSHIP-0002',
+            status: 'OPEN',
+            expected_quantity: null,
+            counted_quantity: null,
+            variance_quantity: null,
+            note: 'Second recount',
             review_note: null,
-          },
-        ],
-      }),
-      jsonResponse({
-        session: {
+          };
+          stockCountBoard = {
+            ...stockCountBoard,
+            open_count: 1,
+            counted_count: 0,
+            approved_count: latestApprovedStockCount ? 1 : 0,
+            canceled_count: 0,
+            records: [
+              {
+                ...buildBoardRecord('OPEN', 'Second recount', null),
+                stock_count_session_id: 'scs-2',
+                session_number: 'SCS-BLRFLAGSHIP-0002',
+              },
+            ],
+          };
+        }
+        return jsonResponse(activeSession) as never;
+      }
+      if (url.endsWith('/stock-count-sessions/scs-1/record') && method === 'POST') {
+        activeSession = {
+          id: 'scs-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          product_id: 'product-1',
+          session_number: 'SCS-BLRFLAGSHIP-0001',
+          status: 'COUNTED',
+          expected_quantity: 12,
+          counted_quantity: 10,
+          variance_quantity: -2,
+          note: 'Blind count complete',
+          review_note: null,
+        };
+        stockCountBoard = {
+          ...stockCountBoard,
+          open_count: 0,
+          counted_count: 1,
+          approved_count: 0,
+          canceled_count: 0,
+          records: [buildBoardRecord('COUNTED', 'Blind count complete', null)],
+        };
+        return jsonResponse(activeSession) as never;
+      }
+      if (url.endsWith('/stock-count-sessions/scs-1/approve') && method === 'POST') {
+        activeSession = {
           id: 'scs-1',
           tenant_id: 'tenant-acme',
           branch_id: 'branch-1',
@@ -252,8 +309,8 @@ describe('store runtime reviewed stock-count workspace flow', () => {
           variance_quantity: -2,
           note: 'Blind count complete',
           review_note: 'Approved after review',
-        },
-        stock_count: {
+        };
+        latestApprovedStockCount = {
           id: 'count-1',
           tenant_id: 'tenant-acme',
           branch_id: 'branch-1',
@@ -263,128 +320,55 @@ describe('store runtime reviewed stock-count workspace flow', () => {
           variance_quantity: -2,
           note: 'Blind count complete',
           closing_stock: 10,
-        },
-      }),
-      jsonResponse({
-        branch_id: 'branch-1',
-        open_count: 0,
-        counted_count: 0,
-        approved_count: 1,
-        canceled_count: 0,
-        records: [
-          {
-            stock_count_session_id: 'scs-1',
-            session_number: 'SCS-BLRFLAGSHIP-0001',
-            product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
-            status: 'APPROVED',
-            expected_quantity: 12,
-            counted_quantity: 10,
-            variance_quantity: -2,
-            note: 'Blind count complete',
-            review_note: 'Approved after review',
-          },
-        ],
-      }),
-      jsonResponse({
-        records: [
-          {
-            product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
-            stock_on_hand: 10,
-            last_entry_type: 'STOCK_COUNT',
-          },
-        ],
-      }),
-      jsonResponse({
-        id: 'scs-2',
-        tenant_id: 'tenant-acme',
-        branch_id: 'branch-1',
-        product_id: 'product-1',
-        session_number: 'SCS-BLRFLAGSHIP-0002',
-        status: 'OPEN',
-        expected_quantity: null,
-        counted_quantity: null,
-        variance_quantity: null,
-        note: 'Second recount',
-        review_note: null,
-      }),
-      jsonResponse({
-        branch_id: 'branch-1',
-        open_count: 1,
-        counted_count: 0,
-        approved_count: 1,
-        canceled_count: 0,
-        records: [
-          {
-            stock_count_session_id: 'scs-2',
-            session_number: 'SCS-BLRFLAGSHIP-0002',
-            product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
-            status: 'OPEN',
-            expected_quantity: null,
-            counted_quantity: null,
-            variance_quantity: null,
-            note: 'Second recount',
-            review_note: null,
-          },
-        ],
-      }),
-      jsonResponse({
-        id: 'scs-2',
-        tenant_id: 'tenant-acme',
-        branch_id: 'branch-1',
-        product_id: 'product-1',
-        session_number: 'SCS-BLRFLAGSHIP-0002',
-        status: 'CANCELED',
-        expected_quantity: null,
-        counted_quantity: null,
-        variance_quantity: null,
-        note: 'Second recount',
-        review_note: 'Canceled after recount',
-      }),
-      jsonResponse({
-        branch_id: 'branch-1',
-        open_count: 0,
-        counted_count: 0,
-        approved_count: 1,
-        canceled_count: 1,
-        records: [
-          {
-            stock_count_session_id: 'scs-2',
-            session_number: 'SCS-BLRFLAGSHIP-0002',
-            product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
-            status: 'CANCELED',
-            expected_quantity: null,
-            counted_quantity: null,
-            variance_quantity: null,
-            note: 'Second recount',
-            review_note: 'Canceled after recount',
-          },
-        ],
-      }),
-    ];
-
-    globalThis.fetch = vi.fn(async () => {
-      const next = responses.shift();
-      if (!next) {
-        throw new Error('Unexpected fetch call');
+        };
+        inventorySnapshot = buildInventorySnapshot(10, 'STOCK_COUNT');
+        stockCountBoard = {
+          ...stockCountBoard,
+          open_count: 0,
+          counted_count: 0,
+          approved_count: 1,
+          canceled_count: 0,
+          records: [buildBoardRecord('APPROVED', 'Blind count complete', 'Approved after review')],
+        };
+        return jsonResponse({
+          session: activeSession,
+          stock_count: latestApprovedStockCount,
+        }) as never;
       }
-      return next as never;
+      if (url.endsWith('/stock-count-sessions/scs-2/cancel') && method === 'POST') {
+        activeSession = {
+          id: 'scs-2',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          product_id: 'product-1',
+          session_number: 'SCS-BLRFLAGSHIP-0002',
+          status: 'CANCELED',
+          expected_quantity: null,
+          counted_quantity: null,
+          variance_quantity: null,
+          note: 'Second recount',
+          review_note: 'Canceled after recount',
+        };
+        stockCountBoard = {
+          ...stockCountBoard,
+          open_count: 0,
+          counted_count: 0,
+          approved_count: 1,
+          canceled_count: 1,
+          records: [
+            {
+              ...buildBoardRecord('CANCELED', 'Second recount', 'Canceled after recount'),
+              stock_count_session_id: 'scs-2',
+              session_number: 'SCS-BLRFLAGSHIP-0002',
+            },
+          ],
+        };
+        return jsonResponse(activeSession) as never;
+      }
+
+      throw new Error(`Unexpected fetch call: ${method} ${url}`);
     }) as typeof fetch;
-  });
 
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-    vi.restoreAllMocks();
-  });
-
-  test('runs desktop reviewed stock-count flow end-to-end', async () => {
     render(<WorkspaceHarness />);
 
     fireEvent.change(screen.getByLabelText('Korsenex token'), {

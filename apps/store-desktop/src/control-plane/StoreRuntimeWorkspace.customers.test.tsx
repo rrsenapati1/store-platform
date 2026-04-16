@@ -22,80 +22,99 @@ describe('store runtime customer insights', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
-    const responses = [
-      jsonResponse({ access_token: 'session-cashier', token_type: 'Bearer' }),
-      jsonResponse({
-        user_id: 'user-cashier',
-        email: 'cashier@acme.local',
-        full_name: 'Counter Cashier',
-        is_platform_admin: false,
-        tenant_memberships: [],
-        branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
-      }),
-      jsonResponse({
-        id: 'tenant-acme',
-        name: 'Acme Retail',
-        slug: 'acme-retail',
-        status: 'ACTIVE',
-        onboarding_status: 'BRANCH_READY',
-      }),
-      jsonResponse({
-        records: [{ branch_id: 'branch-1', tenant_id: 'tenant-acme', name: 'Bengaluru Flagship', code: 'blr-flagship', status: 'ACTIVE' }],
-      }),
-      jsonResponse({ records: [] }),
-      jsonResponse({ records: [] }),
-      jsonResponse({ records: [] }),
-      jsonResponse({ records: [] }),
-      jsonResponse({ records: [] }),
-      jsonResponse({
-        records: [
-          {
-            customer_id: 'cust-1',
-            name: 'Acme Traders',
-            phone: null,
-            email: null,
-            gstin: '29AAEPM0111C1Z3',
-            visit_count: 2,
-            lifetime_value: 582.75,
-            last_sale_id: 'sale-2',
-            last_invoice_number: 'SINV-BLRFLAGSHIP-0002',
-            last_branch_id: 'branch-1',
-          },
-        ],
-      }),
-      jsonResponse({
-        branch_id: 'branch-1',
-        customer_count: 1,
-        repeat_customer_count: 1,
-        anonymous_sales_count: 1,
-        anonymous_sales_total: 97.12,
-        top_customers: [
-          {
-            customer_id: 'cust-1',
-            customer_name: 'Acme Traders',
-            sales_count: 2,
-            sales_total: 582.75,
-            last_invoice_number: 'SINV-BLRFLAGSHIP-0002',
-          },
-        ],
-        return_activity: [
-          {
-            customer_id: 'cust-1',
-            customer_name: 'Acme Traders',
-            return_count: 1,
-            credit_note_total: 97.12,
-            exchange_count: 1,
-          },
-        ],
-      }),
-    ];
+    globalThis.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
 
-    globalThis.fetch = vi.fn(async () => {
-      const next = responses.shift();
-      if (!next) {
-        throw new Error('Unexpected fetch call');
+      if (url.endsWith('/v1/auth/oidc/exchange') && method === 'POST') {
+        return jsonResponse({ access_token: 'session-cashier', token_type: 'Bearer' }) as never;
       }
-      return next as never;
+      if (url.endsWith('/v1/auth/me')) {
+        return jsonResponse({
+          user_id: 'user-cashier',
+          email: 'cashier@acme.local',
+          full_name: 'Counter Cashier',
+          is_platform_admin: false,
+          tenant_memberships: [],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme')) {
+        return jsonResponse({
+          id: 'tenant-acme',
+          name: 'Acme Retail',
+          slug: 'acme-retail',
+          status: 'ACTIVE',
+          onboarding_status: 'BRANCH_READY',
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches')) {
+        return jsonResponse({
+          records: [{ branch_id: 'branch-1', tenant_id: 'tenant-acme', name: 'Bengaluru Flagship', code: 'blr-flagship', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/catalog-items')) {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/inventory-snapshot')) {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/customers')) {
+        return jsonResponse({
+          records: [
+            {
+              customer_id: 'cust-1',
+              name: 'Acme Traders',
+              phone: null,
+              email: null,
+              gstin: '29AAEPM0111C1Z3',
+              visit_count: 2,
+              lifetime_value: 582.75,
+              last_sale_id: 'sale-2',
+              last_invoice_number: 'SINV-BLRFLAGSHIP-0002',
+              last_branch_id: 'branch-1',
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/customer-report')) {
+        return jsonResponse({
+          branch_id: 'branch-1',
+          customer_count: 1,
+          repeat_customer_count: 1,
+          anonymous_sales_count: 1,
+          anonymous_sales_total: 97.12,
+          top_customers: [
+            {
+              customer_id: 'cust-1',
+              customer_name: 'Acme Traders',
+              sales_count: 2,
+              sales_total: 582.75,
+              last_invoice_number: 'SINV-BLRFLAGSHIP-0002',
+            },
+          ],
+          return_activity: [
+            {
+              customer_id: 'cust-1',
+              customer_name: 'Acme Traders',
+              return_count: 1,
+              credit_note_total: 97.12,
+              exchange_count: 1,
+            },
+          ],
+        }) as never;
+      }
+
+      throw new Error(`Unexpected fetch call: ${method} ${url}`);
     }) as typeof fetch;
   });
 
