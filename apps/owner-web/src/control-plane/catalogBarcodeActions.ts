@@ -19,6 +19,8 @@ export async function runCreateCatalogProduct(params: {
   barcode: string;
   hsnSacCode: string;
   gstRate: number;
+  mrp: number;
+  categoryCode?: string | null;
   sellingPrice: number;
   setIsBusy: (value: boolean) => void;
   setErrorMessage: SetString;
@@ -34,6 +36,8 @@ export async function runCreateCatalogProduct(params: {
     barcode,
     hsnSacCode,
     gstRate,
+    mrp,
+    categoryCode,
     sellingPrice,
     setIsBusy,
     setErrorMessage,
@@ -51,6 +55,8 @@ export async function runCreateCatalogProduct(params: {
       barcode,
       hsn_sac_code: hsnSacCode,
       gst_rate: gstRate,
+      mrp,
+      category_code: categoryCode || null,
       selling_price: sellingPrice,
     });
     const productCatalog = await ownerControlPlaneClient.listCatalogProducts(accessToken, tenantId);

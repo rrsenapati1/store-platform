@@ -23,11 +23,14 @@ class CatalogService:
         barcode: str,
         hsn_sac_code: str,
         gst_rate: float,
+        mrp: float | None,
+        category_code: str | None,
         selling_price: float,
     ):
         tenant = await self._tenant_repo.get_tenant(tenant_id)
         if tenant is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+        resolved_mrp = mrp if mrp is not None else selling_price
         product = await self._catalog_repo.create_product(
             tenant_id=tenant_id,
             name=name,
@@ -35,6 +38,8 @@ class CatalogService:
             barcode=barcode,
             hsn_sac_code=hsn_sac_code,
             gst_rate=gst_rate,
+            mrp=resolved_mrp,
+            category_code=(category_code.strip().upper() if category_code and category_code.strip() else None),
             selling_price=selling_price,
         )
         await self._audit_repo.record(
@@ -63,6 +68,8 @@ class CatalogService:
                 "barcode": product.barcode,
                 "hsn_sac_code": product.hsn_sac_code,
                 "gst_rate": product.gst_rate,
+                "mrp": product.mrp,
+                "category_code": product.category_code,
                 "selling_price": product.selling_price,
                 "status": product.status,
             }
@@ -126,6 +133,8 @@ class CatalogService:
             "barcode": product.barcode,
             "hsn_sac_code": product.hsn_sac_code,
             "gst_rate": product.gst_rate,
+            "mrp": product.mrp,
+            "category_code": product.category_code,
             "base_selling_price": product.selling_price,
             "selling_price_override": item.selling_price_override,
             "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,
@@ -159,6 +168,8 @@ class CatalogService:
                     "barcode": product.barcode,
                     "hsn_sac_code": product.hsn_sac_code,
                     "gst_rate": product.gst_rate,
+                    "mrp": product.mrp,
+                    "category_code": product.category_code,
                     "base_selling_price": product.selling_price,
                     "selling_price_override": item.selling_price_override,
                     "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,

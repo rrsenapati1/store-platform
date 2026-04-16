@@ -1,5 +1,13 @@
+import type { ControlPlaneBarcodeAutomaticDiscountHint } from '@store/types';
 import { ActionButton, DetailList, FormField, SectionCard } from '@store/ui';
 import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
+
+function describeAutomaticDiscountHint(automaticDiscountHint: ControlPlaneBarcodeAutomaticDiscountHint | null | undefined) {
+  if (!automaticDiscountHint) {
+    return 'None';
+  }
+  return `${automaticDiscountHint.campaign_name} :: ${automaticDiscountHint.discount_type} ${automaticDiscountHint.discount_value}`;
+}
 
 export function StoreBarcodeLookupSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const isPackagedRuntime = workspace.runtimeShellKind === 'packaged_desktop';
@@ -135,8 +143,13 @@ export function StoreBarcodeLookupSection({ workspace }: { workspace: StoreRunti
             items={[
               { label: 'Product', value: workspace.latestScanLookup.product_name },
               { label: 'Barcode', value: workspace.latestScanLookup.barcode },
+              { label: 'MRP', value: String(workspace.latestScanLookup.mrp) },
               { label: 'Selling price', value: String(workspace.latestScanLookup.selling_price) },
               { label: 'Stock on hand', value: String(workspace.latestScanLookup.stock_on_hand) },
+              {
+                label: 'Automatic discount hint',
+                value: describeAutomaticDiscountHint(workspace.latestScanLookup.automatic_discount_hint),
+              },
             ]}
           />
         </div>

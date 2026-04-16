@@ -770,6 +770,7 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
     fireEvent.click(await screen.findByRole('button', { name: /Use customer profile Acme Traders/i }));
     expect(await screen.findByText('Available store credit')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Apply store credit amount'), { target: { value: '30' } });
     fireEvent.change(screen.getByLabelText('Redeem loyalty points'), { target: { value: '200' } });
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'CASHFREE_UPI_QR' } });
@@ -782,6 +783,7 @@ describe('store runtime checkout customer profiles', () => {
         customer_name: 'Acme Traders',
         customer_gstin: '29AAEPM0111C1Z3',
         loyalty_points_to_redeem: 200,
+        store_credit_amount: 30,
       });
     });
   });

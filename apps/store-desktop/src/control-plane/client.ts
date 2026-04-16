@@ -10,6 +10,7 @@ import type {
   ControlPlaneBranchRecord,
   ControlPlaneBranchCustomerReport,
   ControlPlaneCheckoutPaymentSession,
+  ControlPlaneCheckoutPricePreview,
   ControlPlaneCheckoutPaymentSessionListResponse,
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
@@ -514,6 +515,29 @@ export const storeControlPlaneClient = {
   listSales(accessToken: string, tenantId: string, branchId: string) {
     return request<{ records: ControlPlaneSaleRecord[] }>(`/v1/tenants/${tenantId}/branches/${branchId}/sales`, undefined, accessToken);
   },
+  getCheckoutPricePreview(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      customer_profile_id?: string | null;
+      customer_name: string;
+      customer_gstin?: string | null;
+      promotion_code?: string | null;
+      loyalty_points_to_redeem?: number;
+      store_credit_amount?: number;
+      lines: Array<{ product_id: string; quantity: number }>;
+    },
+  ) {
+    return request<ControlPlaneCheckoutPricePreview>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/checkout-price-preview`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
   listCustomers(accessToken: string, tenantId: string, query?: string) {
     const queryParam = query ? `?query=${encodeURIComponent(query)}` : '';
     return request<{ records: ControlPlaneCustomerDirectoryRecord[] }>(
@@ -693,6 +717,7 @@ export const storeControlPlaneClient = {
       customer_gstin?: string | null;
       promotion_code?: string | null;
       loyalty_points_to_redeem?: number;
+      store_credit_amount?: number;
       lines: Array<{ product_id: string; quantity: number }>;
     },
   ) {

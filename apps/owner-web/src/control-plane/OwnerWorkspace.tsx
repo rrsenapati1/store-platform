@@ -201,6 +201,8 @@ export function OwnerWorkspace() {
         <FormField id="product-barcode" label="Barcode" value={workspace.productBarcode} onChange={workspace.setProductBarcode} />
         <FormField id="product-hsn-sac-code" label="HSN or SAC code" value={workspace.productHsnSacCode} onChange={workspace.setProductHsnSacCode} />
         <FormField id="product-gst-rate" label="GST rate" value={workspace.productGstRate} onChange={workspace.setProductGstRate} />
+        <FormField id="product-mrp" label="MRP" value={workspace.productMrp} onChange={workspace.setProductMrp} />
+        <FormField id="product-category-code" label="Category code" value={workspace.productCategoryCode} onChange={workspace.setProductCategoryCode} />
         <FormField id="product-selling-price" label="Selling price" value={workspace.productSellingPrice} onChange={workspace.setProductSellingPrice} />
         <ActionButton
           onClick={() => void workspace.createCatalogProduct()}
@@ -211,6 +213,7 @@ export function OwnerWorkspace() {
             !workspace.productSkuCode ||
             !workspace.productBarcode ||
             !workspace.productHsnSacCode ||
+            !workspace.productMrp ||
             !workspace.productSellingPrice
           }
         >
@@ -224,6 +227,8 @@ export function OwnerWorkspace() {
               items={[
                 { label: 'Name', value: workspace.latestCatalogProduct.name },
                 { label: 'SKU', value: workspace.latestCatalogProduct.sku_code },
+                { label: 'MRP', value: String(workspace.latestCatalogProduct.mrp) },
+                { label: 'Category', value: workspace.latestCatalogProduct.category_code ?? 'Unspecified' },
                 { label: 'Status', value: <StatusBadge label={workspace.latestCatalogProduct.status} tone="success" /> },
               ]}
             />
@@ -233,7 +238,7 @@ export function OwnerWorkspace() {
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
           {workspace.catalogProducts.map((product) => (
             <li key={product.product_id}>
-              {product.name} ({product.sku_code})
+              {product.name} ({product.sku_code}) :: MRP {product.mrp} :: {product.category_code ?? 'NO_CATEGORY'}
             </li>
           ))}
         </ul>
@@ -260,6 +265,8 @@ export function OwnerWorkspace() {
             <DetailList
               items={[
                 { label: 'Product', value: workspace.latestBranchCatalogItem.product_name },
+                { label: 'MRP', value: String(workspace.latestBranchCatalogItem.mrp) },
+                { label: 'Category', value: workspace.latestBranchCatalogItem.category_code ?? 'Unspecified' },
                 { label: 'Effective price', value: String(workspace.latestBranchCatalogItem.effective_selling_price) },
                 { label: 'Status', value: <StatusBadge label={workspace.latestBranchCatalogItem.availability_status} tone="success" /> },
               ]}
@@ -270,7 +277,7 @@ export function OwnerWorkspace() {
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
           {workspace.branchCatalogItems.map((item) => (
             <li key={item.id}>
-              {item.product_name} {'->'} {item.effective_selling_price}
+              {item.product_name} {'->'} {item.effective_selling_price} :: MRP {item.mrp}
             </li>
           ))}
         </ul>

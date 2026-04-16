@@ -31,7 +31,72 @@ class CheckoutPaymentSessionCreateRequest(BaseModel):
     customer_gstin: str | None = None
     promotion_code: str | None = None
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
+    store_credit_amount: float = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
+
+
+class CheckoutPricePreviewRequest(BaseModel):
+    customer_profile_id: str | None = None
+    customer_name: str
+    customer_gstin: str | None = None
+    promotion_code: str | None = None
+    loyalty_points_to_redeem: int = Field(default=0, ge=0)
+    store_credit_amount: float = Field(default=0, ge=0)
+    lines: list[SaleLineCreateRequest]
+
+
+class CheckoutPricePreviewCampaignResponse(BaseModel):
+    id: str
+    name: str
+    trigger_mode: str
+    scope: str
+    discount_type: str
+    discount_value: float
+
+
+class CheckoutPricePreviewCodeCampaignResponse(CheckoutPricePreviewCampaignResponse):
+    code_id: str
+    code: str
+
+
+class CheckoutPricePreviewSummaryResponse(BaseModel):
+    mrp_total: float
+    selling_price_subtotal: float
+    automatic_discount_total: float = 0
+    promotion_code_discount_total: float = 0
+    loyalty_discount_total: float = 0
+    total_discount: float = 0
+    tax_total: float
+    invoice_total: float
+    grand_total: float
+    store_credit_amount: float = 0
+    final_payable_amount: float
+
+
+class CheckoutPricePreviewLineResponse(BaseModel):
+    product_id: str
+    product_name: str
+    sku_code: str
+    quantity: float
+    mrp: float
+    unit_selling_price: float
+    automatic_discount_amount: float = 0
+    promotion_code_discount_amount: float = 0
+    promotion_discount_source: str | None = None
+    taxable_amount: float
+    tax_amount: float
+    line_total: float
+
+
+class CheckoutPricePreviewResponse(BaseModel):
+    customer_profile_id: str | None = None
+    customer_name: str
+    customer_gstin: str | None = None
+    automatic_campaign: CheckoutPricePreviewCampaignResponse | None = None
+    promotion_code_campaign: CheckoutPricePreviewCodeCampaignResponse | None = None
+    summary: CheckoutPricePreviewSummaryResponse
+    lines: list[CheckoutPricePreviewLineResponse]
+    tax_lines: list["InvoiceTaxLineResponse"]
 
 
 class CheckoutPaymentActionPayloadResponse(BaseModel):
@@ -62,8 +127,12 @@ class CheckoutPaymentSessionResponse(BaseModel):
     provider_status: str
     order_amount: float
     currency_code: str
+    automatic_campaign_name: str | None = None
+    automatic_discount_total: float = 0
     promotion_code: str | None = None
     promotion_discount_amount: float = 0
+    promotion_code_discount_total: float = 0
+    store_credit_amount: float = 0
     action_payload: CheckoutPaymentActionPayloadResponse
     action_expires_at: datetime | None = None
     qr_payload: CheckoutPaymentQrPayloadResponse | None = None
@@ -95,8 +164,15 @@ class SaleLineResponse(BaseModel):
     sku_code: str
     hsn_sac_code: str
     quantity: float
+    mrp: float = 0
+    unit_selling_price: float = 0
     unit_price: float
     gst_rate: float
+    automatic_discount_amount: float = 0
+    promotion_code_discount_amount: float = 0
+    promotion_discount_source: str | None = None
+    taxable_amount: float = 0
+    tax_amount: float = 0
     line_subtotal: float
     tax_total: float
     line_total: float
@@ -120,10 +196,17 @@ class SaleResponse(BaseModel):
     irn_status: str
     invoice_number: str
     issued_on: date
+    mrp_total: float = 0
+    selling_price_subtotal: float = 0
     subtotal: float
     cgst_total: float
     sgst_total: float
     igst_total: float
+    automatic_campaign_name: str | None = None
+    automatic_discount_total: float = 0
+    promotion_code_discount_total: float = 0
+    total_discount: float = 0
+    invoice_total: float = 0
     grand_total: float
     promotion_campaign_id: str | None = None
     promotion_code_id: str | None = None
@@ -146,6 +229,11 @@ class SaleRecord(BaseModel):
     invoice_kind: str
     irn_status: str
     payment_method: str
+    automatic_campaign_name: str | None = None
+    automatic_discount_total: float = 0
+    promotion_code_discount_total: float = 0
+    total_discount: float = 0
+    invoice_total: float = 0
     grand_total: float
     promotion_campaign_id: str | None = None
     promotion_code_id: str | None = None
@@ -239,3 +327,4 @@ class SaleReturnListResponse(BaseModel):
 
 
 CheckoutPaymentSessionResponse.model_rebuild()
+CheckoutPricePreviewResponse.model_rebuild()

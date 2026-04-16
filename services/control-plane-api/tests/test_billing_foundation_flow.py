@@ -1356,7 +1356,7 @@ def test_sale_applies_promotion_code_before_loyalty_and_store_credit() -> None:
     assert sale.json()["promotion_discount_amount"] == 20.0
     assert sale.json()["loyalty_discount_amount"] == 20.0
     assert sale.json()["store_credit_amount"] == 10.0
-    assert sale.json()["grand_total"] == 57.12
+    assert sale.json()["grand_total"] == 56.12
 
 
 def test_sale_rejects_unknown_promotion_code() -> None:
@@ -1713,12 +1713,15 @@ def test_sale_snapshots_automatic_discounts_before_code_loyalty_and_store_credit
             "quantity": 1.0,
             "mrp": 120.0,
             "unit_selling_price": 92.5,
+            "unit_price": 92.5,
             "gst_rate": 5.0,
             "automatic_discount_amount": 9.25,
             "promotion_code_discount_amount": 20.0,
             "promotion_discount_source": "AUTOMATIC_ITEM_CATEGORY+CODE",
             "taxable_amount": 63.25,
             "tax_amount": 3.16,
+            "line_subtotal": 92.5,
+            "tax_total": 3.16,
             "line_total": 66.41,
         }
     ]

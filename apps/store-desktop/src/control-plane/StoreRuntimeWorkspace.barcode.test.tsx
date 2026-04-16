@@ -66,9 +66,17 @@ describe('store runtime barcode lookup flow', () => {
         product_name: 'Classic Tea',
         sku_code: 'tea-classic-250g',
         barcode: 'ACMETEACLASSIC',
+        mrp: 120,
         selling_price: 89,
         stock_on_hand: 24,
         availability_status: 'ACTIVE',
+        automatic_discount_hint: {
+          campaign_id: 'campaign-auto-1',
+          campaign_name: 'Tea Auto',
+          discount_type: 'PERCENTAGE',
+          discount_value: 10,
+          scope: 'ITEM_CATEGORY',
+        },
       }),
     ];
 
@@ -105,7 +113,9 @@ describe('store runtime barcode lookup flow', () => {
     await waitFor(() => {
       expect(screen.getByText('Latest scan lookup')).toBeInTheDocument();
       expect(screen.getAllByText('Classic Tea').length).toBeGreaterThan(0);
+      expect(screen.getByText('120')).toBeInTheDocument();
       expect(screen.getAllByText('24').length).toBeGreaterThan(0);
+      expect(screen.getByText('Tea Auto :: PERCENTAGE 10')).toBeInTheDocument();
     });
   });
 });

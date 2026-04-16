@@ -77,6 +77,8 @@ describe('owner catalog foundation flow', () => {
         barcode: '8901234567890',
         hsn_sac_code: '0902',
         gst_rate: 5,
+        mrp: 120,
+        category_code: 'TEA',
         selling_price: 92.5,
         status: 'ACTIVE',
       }),
@@ -90,6 +92,8 @@ describe('owner catalog foundation flow', () => {
             barcode: '8901234567890',
             hsn_sac_code: '0902',
             gst_rate: 5,
+            mrp: 120,
+            category_code: 'TEA',
             selling_price: 92.5,
             status: 'ACTIVE',
           },
@@ -105,6 +109,8 @@ describe('owner catalog foundation flow', () => {
         barcode: '8901234567890',
         hsn_sac_code: '0902',
         gst_rate: 5,
+        mrp: 120,
+        category_code: 'TEA',
         base_selling_price: 92.5,
         selling_price_override: 89,
         effective_selling_price: 89,
@@ -122,6 +128,8 @@ describe('owner catalog foundation flow', () => {
             barcode: '8901234567890',
             hsn_sac_code: '0902',
             gst_rate: 5,
+            mrp: 120,
+            category_code: 'TEA',
             base_selling_price: 92.5,
             selling_price_override: 89,
             effective_selling_price: 89,
@@ -161,12 +169,15 @@ describe('owner catalog foundation flow', () => {
     fireEvent.change(screen.getByLabelText('Barcode'), { target: { value: '8901234567890' } });
     fireEvent.change(screen.getByLabelText('HSN or SAC code'), { target: { value: '0902' } });
     fireEvent.change(screen.getByLabelText('GST rate'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('MRP'), { target: { value: '120' } });
+    fireEvent.change(screen.getByLabelText('Category code'), { target: { value: 'TEA' } });
     fireEvent.change(screen.getByLabelText('Selling price'), { target: { value: '92.5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create catalog product' }));
 
     await waitFor(() => {
       expect(screen.getByText('Latest catalog product')).toBeInTheDocument();
       expect(screen.getAllByText('Classic Tea').length).toBeGreaterThan(0);
+      expect(screen.getByText('120')).toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByLabelText('Branch selling price override'), { target: { value: '89' } });
@@ -174,7 +185,7 @@ describe('owner catalog foundation flow', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Latest branch catalog item')).toBeInTheDocument();
-      expect(screen.getByText('Classic Tea -> 89')).toBeInTheDocument();
+      expect(screen.getByText('Classic Tea -> 89 :: MRP 120')).toBeInTheDocument();
     });
   });
 });

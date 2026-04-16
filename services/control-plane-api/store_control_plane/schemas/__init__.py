@@ -2,7 +2,7 @@ from .audit import AuditListResponse, AuditRecord
 from .auth import ActorBranchMembership, ActorResponse, ActorTenantMembership, OIDCExchangeRequest, RuntimeActivationRedeemRequest, RuntimeActivationRedeemResponse, SessionTokenResponse, SignOutResponse
 from .batches import BatchExpiryBoardRecord, BatchExpiryBoardResponse, BatchExpiryReportRecord, BatchExpiryReportResponse, BatchExpiryReviewApprovalResponse, BatchExpiryReviewSessionApproveRequest, BatchExpiryReviewSessionCancelRequest, BatchExpiryReviewSessionCreateRequest, BatchExpiryReviewSessionRecordRequest, BatchExpiryReviewSessionResponse, BatchExpiryWriteOffCreateRequest, BatchExpiryWriteOffResponse, BatchLotResponse, GoodsReceiptBatchLotCreateRequest, GoodsReceiptBatchLotResponse
 from .barcode import BarcodeAllocationRequest, BarcodeAllocationResponse, BarcodeLabelPreviewResponse, BarcodeScanLookupResponse
-from .billing import CheckoutPaymentQrPayloadResponse, CheckoutPaymentSessionCreateRequest, CheckoutPaymentSessionListResponse, CheckoutPaymentSessionResponse, CheckoutPaymentWebhookResponse, CreditNoteResponse, CreditNoteTaxLineResponse, InvoiceTaxLineResponse, PaymentResponse, RefundApprovalRequest, SaleCreateRequest, SaleLineCreateRequest, SaleLineResponse, SaleListResponse, SaleRecord, SaleResponse, SaleReturnCreateRequest, SaleReturnLineCreateRequest, SaleReturnLineResponse, SaleReturnListResponse, SaleReturnRecord, SaleReturnResponse
+from .billing import CheckoutPaymentQrPayloadResponse, CheckoutPaymentSessionCreateRequest, CheckoutPaymentSessionListResponse, CheckoutPaymentSessionResponse, CheckoutPaymentWebhookResponse, CheckoutPricePreviewCampaignResponse, CheckoutPricePreviewCodeCampaignResponse, CheckoutPricePreviewLineResponse, CheckoutPricePreviewRequest, CheckoutPricePreviewResponse, CheckoutPricePreviewSummaryResponse, CreditNoteResponse, CreditNoteTaxLineResponse, InvoiceTaxLineResponse, PaymentResponse, RefundApprovalRequest, SaleCreateRequest, SaleLineCreateRequest, SaleLineResponse, SaleListResponse, SaleRecord, SaleResponse, SaleReturnCreateRequest, SaleReturnLineCreateRequest, SaleReturnLineResponse, SaleReturnListResponse, SaleReturnRecord, SaleReturnResponse
 from .exchanges import ExchangeCreateRequest, ExchangePaymentAllocationResponse, ExchangeResponse
 from .catalog import BranchCatalogItemListResponse, BranchCatalogItemRecord, BranchCatalogItemResponse, BranchCatalogItemUpsertRequest, CatalogProductCreateRequest, CatalogProductListResponse, CatalogProductRecord, CatalogProductResponse
 from .compliance import AttachIrnRequest, BranchIrpProfileResponse, BranchIrpProfileUpsertRequest, GstExportCreateRequest, GstExportJobListResponse, GstExportJobResponse
@@ -135,6 +135,12 @@ __all__ = [
     "CheckoutPaymentSessionListResponse",
     "CheckoutPaymentSessionResponse",
     "CheckoutPaymentWebhookResponse",
+    "CheckoutPricePreviewCampaignResponse",
+    "CheckoutPricePreviewCodeCampaignResponse",
+    "CheckoutPricePreviewLineResponse",
+    "CheckoutPricePreviewRequest",
+    "CheckoutPricePreviewResponse",
+    "CheckoutPricePreviewSummaryResponse",
     "CreditNoteResponse",
     "CreditNoteTaxLineResponse",
     "CustomerDirectoryRecord",

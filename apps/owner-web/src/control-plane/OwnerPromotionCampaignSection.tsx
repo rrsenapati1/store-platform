@@ -11,22 +11,30 @@ type OwnerPromotionCampaignSectionProps = {
 type PromotionCampaignDraft = {
   name: string;
   status: string;
+  triggerMode: string;
+  scope: string;
   discountType: string;
   discountValue: string;
   minimumOrderAmount: string;
   maximumDiscountAmount: string;
   redemptionLimitTotal: string;
+  targetProductIds: string;
+  targetCategoryCodes: string;
 };
 
 function defaultCampaignDraft(): PromotionCampaignDraft {
   return {
     name: '',
     status: 'ACTIVE',
+    triggerMode: 'CODE',
+    scope: 'CART',
     discountType: 'FLAT_AMOUNT',
     discountValue: '0',
     minimumOrderAmount: '',
     maximumDiscountAmount: '',
     redemptionLimitTotal: '',
+    targetProductIds: '',
+    targetCategoryCodes: '',
   };
 }
 
@@ -34,11 +42,15 @@ function buildCampaignDraft(campaign: ControlPlanePromotionCampaign): PromotionC
   return {
     name: campaign.name,
     status: campaign.status,
+    triggerMode: campaign.trigger_mode ?? 'CODE',
+    scope: campaign.scope ?? 'CART',
     discountType: campaign.discount_type,
     discountValue: String(campaign.discount_value),
     minimumOrderAmount: campaign.minimum_order_amount == null ? '' : String(campaign.minimum_order_amount),
     maximumDiscountAmount: campaign.maximum_discount_amount == null ? '' : String(campaign.maximum_discount_amount),
     redemptionLimitTotal: campaign.redemption_limit_total == null ? '' : String(campaign.redemption_limit_total),
+    targetProductIds: Array.isArray(campaign.target_product_ids) ? campaign.target_product_ids.join(', ') : '',
+    targetCategoryCodes: Array.isArray(campaign.target_category_codes) ? campaign.target_category_codes.join(', ') : '',
   };
 }
 
@@ -48,6 +60,14 @@ function parseOptionalNumber(value: string): number | null {
     return null;
   }
   return Number(trimmed);
+}
+
+function parseCsvValues(value: string): string[] | null {
+  const records = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return records.length ? records : null;
 }
 
 export function OwnerPromotionCampaignSection({
@@ -64,6 +84,9 @@ export function OwnerPromotionCampaignSection({
   const [isBusy, setIsBusy] = useState(false);
 
   const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId) ?? null;
+  const isAutomaticDraft = campaignDraft.triggerMode === 'AUTOMATIC';
+  const isAutomaticItemCategoryDraft = isAutomaticDraft && campaignDraft.scope === 'ITEM_CATEGORY';
+  const selectedCampaignSupportsSharedCodes = selectedCampaign?.trigger_mode !== 'AUTOMATIC';
 
   function applySelectedCampaign(campaign: ControlPlanePromotionCampaign | null) {
     setSelectedCampaignId(campaign?.id ?? '');
@@ -110,11 +133,15 @@ export function OwnerPromotionCampaignSection({
       const created = await ownerControlPlaneClient.createPromotionCampaign(accessToken, tenantId, {
         name: campaignDraft.name.trim(),
         status: campaignDraft.status,
+        trigger_mode: campaignDraft.triggerMode,
+        scope: campaignDraft.scope,
         discount_type: campaignDraft.discountType,
         discount_value: Number(campaignDraft.discountValue || 0),
         minimum_order_amount: parseOptionalNumber(campaignDraft.minimumOrderAmount),
         maximum_discount_amount: parseOptionalNumber(campaignDraft.maximumDiscountAmount),
         redemption_limit_total: parseOptionalNumber(campaignDraft.redemptionLimitTotal),
+        target_product_ids: parseCsvValues(campaignDraft.targetProductIds),
+        target_category_codes: parseCsvValues(campaignDraft.targetCategoryCodes),
       });
       await loadCampaigns(created.id);
     } catch (error) {
@@ -134,11 +161,15 @@ export function OwnerPromotionCampaignSection({
       const updated = await ownerControlPlaneClient.updatePromotionCampaign(accessToken, tenantId, selectedCampaign.id, {
         name: campaignDraft.name.trim(),
         status: campaignDraft.status,
+        trigger_mode: campaignDraft.triggerMode,
+        scope: campaignDraft.scope,
         discount_type: campaignDraft.discountType,
         discount_value: Number(campaignDraft.discountValue || 0),
         minimum_order_amount: parseOptionalNumber(campaignDraft.minimumOrderAmount),
         maximum_discount_amount: parseOptionalNumber(campaignDraft.maximumDiscountAmount),
         redemption_limit_total: parseOptionalNumber(campaignDraft.redemptionLimitTotal),
+        target_product_ids: parseCsvValues(campaignDraft.targetProductIds),
+        target_category_codes: parseCsvValues(campaignDraft.targetCategoryCodes),
       });
       await loadCampaigns(updated.id);
     } catch (error) {
@@ -191,11 +222,19 @@ export function OwnerPromotionCampaignSection({
       <div style={{ display: 'grid', gap: '12px' }}>
         <FormField id="promotion-campaign-name" label="Campaign name" value={campaignDraft.name} onChange={(value) => setCampaignDraft((current) => ({ ...current, name: value }))} />
         <FormField id="promotion-campaign-status" label="Campaign status" value={campaignDraft.status} onChange={(value) => setCampaignDraft((current) => ({ ...current, status: value }))} />
+        <FormField id="promotion-campaign-trigger-mode" label="Trigger mode" value={campaignDraft.triggerMode} onChange={(value) => setCampaignDraft((current) => ({ ...current, triggerMode: value }))} />
+        <FormField id="promotion-campaign-scope" label="Scope" value={campaignDraft.scope} onChange={(value) => setCampaignDraft((current) => ({ ...current, scope: value }))} />
         <FormField id="promotion-campaign-discount-type" label="Discount type" value={campaignDraft.discountType} onChange={(value) => setCampaignDraft((current) => ({ ...current, discountType: value }))} />
         <FormField id="promotion-campaign-discount-value" label="Discount value" value={campaignDraft.discountValue} onChange={(value) => setCampaignDraft((current) => ({ ...current, discountValue: value }))} />
         <FormField id="promotion-campaign-minimum-order" label="Minimum order amount" value={campaignDraft.minimumOrderAmount} onChange={(value) => setCampaignDraft((current) => ({ ...current, minimumOrderAmount: value }))} />
         <FormField id="promotion-campaign-maximum-discount" label="Maximum discount amount" value={campaignDraft.maximumDiscountAmount} onChange={(value) => setCampaignDraft((current) => ({ ...current, maximumDiscountAmount: value }))} />
         <FormField id="promotion-campaign-redemption-limit" label="Total redemption limit" value={campaignDraft.redemptionLimitTotal} onChange={(value) => setCampaignDraft((current) => ({ ...current, redemptionLimitTotal: value }))} />
+        {isAutomaticItemCategoryDraft ? (
+          <>
+            <FormField id="promotion-campaign-target-product-ids" label="Target product ids" value={campaignDraft.targetProductIds} onChange={(value) => setCampaignDraft((current) => ({ ...current, targetProductIds: value }))} />
+            <FormField id="promotion-campaign-target-category-codes" label="Target category codes" value={campaignDraft.targetCategoryCodes} onChange={(value) => setCampaignDraft((current) => ({ ...current, targetCategoryCodes: value }))} />
+          </>
+        ) : null}
       </div>
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px' }}>
         <ActionButton onClick={() => void loadCampaigns()} disabled={isBusy}>
@@ -234,34 +273,54 @@ export function OwnerPromotionCampaignSection({
             items={[
               { label: 'Selected campaign', value: selectedCampaign.name },
               { label: 'Status', value: <StatusBadge label={selectedCampaign.status} tone={selectedCampaign.status === 'ACTIVE' ? 'success' : 'warning'} /> },
+              { label: 'Trigger', value: selectedCampaign.trigger_mode ?? 'CODE' },
+              { label: 'Scope', value: selectedCampaign.scope ?? 'CART' },
               { label: 'Discount rule', value: `${selectedCampaign.discount_type} ${selectedCampaign.discount_value}` },
               { label: 'Minimum order', value: selectedCampaign.minimum_order_amount == null ? 'None' : String(selectedCampaign.minimum_order_amount) },
               { label: 'Maximum discount', value: selectedCampaign.maximum_discount_amount == null ? 'None' : String(selectedCampaign.maximum_discount_amount) },
+              {
+                label: 'Target products',
+                value: Array.isArray(selectedCampaign.target_product_ids) && selectedCampaign.target_product_ids.length
+                  ? selectedCampaign.target_product_ids.join(', ')
+                  : 'None',
+              },
+              {
+                label: 'Target categories',
+                value: Array.isArray(selectedCampaign.target_category_codes) && selectedCampaign.target_category_codes.length
+                  ? selectedCampaign.target_category_codes.join(', ')
+                  : 'None',
+              },
               { label: 'Total redemption count', value: String(selectedCampaign.redemption_count) },
             ]}
           />
 
-          <div style={{ marginTop: '16px', display: 'grid', gap: '12px' }}>
-            <FormField id="promotion-shared-code" label="Shared promotion code" value={sharedCodeDraft} onChange={setSharedCodeDraft} />
-            <FormField id="promotion-shared-code-status" label="Shared code status" value={sharedCodeStatus} onChange={setSharedCodeStatus} />
-            <FormField id="promotion-shared-code-limit" label="Per-code redemption limit" value={sharedCodeLimit} onChange={setSharedCodeLimit} />
-          </div>
-          <div style={{ marginTop: '14px' }}>
-            <ActionButton onClick={() => void createSharedCode()} disabled={isBusy || !sharedCodeDraft.trim()}>
-              Create shared code
-            </ActionButton>
-          </div>
+          {selectedCampaignSupportsSharedCodes ? (
+            <>
+              <div style={{ marginTop: '16px', display: 'grid', gap: '12px' }}>
+                <FormField id="promotion-shared-code" label="Shared promotion code" value={sharedCodeDraft} onChange={setSharedCodeDraft} />
+                <FormField id="promotion-shared-code-status" label="Shared code status" value={sharedCodeStatus} onChange={setSharedCodeStatus} />
+                <FormField id="promotion-shared-code-limit" label="Per-code redemption limit" value={sharedCodeLimit} onChange={setSharedCodeLimit} />
+              </div>
+              <div style={{ marginTop: '14px' }}>
+                <ActionButton onClick={() => void createSharedCode()} disabled={isBusy || !sharedCodeDraft.trim()}>
+                  Create shared code
+                </ActionButton>
+              </div>
 
-          {selectedCampaign.codes.length ? (
-            <ul style={{ marginTop: '16px', marginBottom: 0, color: '#4e5871', lineHeight: 1.7, paddingLeft: '20px' }}>
-              {selectedCampaign.codes.map((code) => (
-                <li key={code.id}>
-                  {code.code} - {code.status} - redeemed {code.redemption_count}
-                </li>
-              ))}
-            </ul>
+              {selectedCampaign.codes.length ? (
+                <ul style={{ marginTop: '16px', marginBottom: 0, color: '#4e5871', lineHeight: 1.7, paddingLeft: '20px' }}>
+                  {selectedCampaign.codes.map((code) => (
+                    <li key={code.id}>
+                      {code.code} - {code.status} - redeemed {code.redemption_count}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ color: '#4e5871' }}>No shared codes created for this campaign yet.</p>
+              )}
+            </>
           ) : (
-            <p style={{ color: '#4e5871' }}>No shared codes created for this campaign yet.</p>
+            <p style={{ color: '#4e5871' }}>Automatic campaigns apply without cashier-entered shared codes.</p>
           )}
         </>
       ) : null}

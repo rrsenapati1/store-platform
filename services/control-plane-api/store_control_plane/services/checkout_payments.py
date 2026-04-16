@@ -10,7 +10,7 @@ from ..config import Settings
 from ..repositories import AuditRepository, BillingRepository, CatalogRepository, InventoryRepository, TenantRepository
 from ..utils import new_id, utc_now
 from .billing import BillingService
-from .billing_policy import build_sale_draft, ensure_sale_stock_available
+from .checkout_pricing import CheckoutPricingService
 from .checkout_payment_providers import build_checkout_payment_provider
 from .customer_profiles import CustomerProfileService
 from .loyalty import LoyaltyService
@@ -27,6 +27,7 @@ class CheckoutPaymentsService:
         self._billing_repo = BillingRepository(session)
         self._audit_repo = AuditRepository(session)
         self._billing_service = BillingService(session)
+        self._checkout_pricing_service = CheckoutPricingService(session)
         self._customer_profile_service = CustomerProfileService(session)
         self._loyalty_service = LoyaltyService(session)
         self._promotion_service = PromotionService(session)
@@ -46,6 +47,7 @@ class CheckoutPaymentsService:
         customer_gstin: str | None,
         promotion_code: str | None,
         loyalty_points_to_redeem: int,
+        store_credit_amount: float,
         lines: list[dict[str, object]],
     ) -> dict[str, object]:
         (
@@ -56,7 +58,7 @@ class CheckoutPaymentsService:
             handoff_surface=handoff_surface,
             provider_payment_mode=provider_payment_mode,
         )
-        draft, cart_snapshot = await self._build_checkout_sale_draft(
+        pricing_preview = await self._build_checkout_pricing_preview(
             tenant_id=tenant_id,
             branch_id=branch_id,
             customer_profile_id=customer_profile_id,
@@ -64,6 +66,7 @@ class CheckoutPaymentsService:
             customer_gstin=customer_gstin,
             promotion_code=promotion_code,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
+            store_credit_amount=store_credit_amount,
             lines=lines,
         )
         record = await self._create_payment_session_record(
@@ -75,11 +78,10 @@ class CheckoutPaymentsService:
             payment_method=payment_method,
             handoff_surface=resolved_handoff_surface,
             provider_payment_mode=resolved_provider_payment_mode,
-            customer_name=draft.customer_name,
-            customer_gstin=draft.customer_gstin,
+            customer_name=str(pricing_preview["customer_name"]),
+            customer_gstin=pricing_preview.get("customer_gstin"),
             lines=lines,
-            draft=draft,
-            cart_snapshot=cart_snapshot,
+            pricing_preview=pricing_preview,
         )
         await self._audit_repo.record(
             tenant_id=tenant_id,
@@ -94,6 +96,8 @@ class CheckoutPaymentsService:
                 "handoff_surface": resolved_handoff_surface,
                 "provider_payment_mode": resolved_provider_payment_mode,
                 "order_amount": record.order_amount,
+                "automatic_discount_total": pricing_preview["summary"]["automatic_discount_total"],
+                "promotion_code_discount_total": pricing_preview["summary"]["promotion_code_discount_total"],
             },
         )
         await self._session.commit()
@@ -217,7 +221,7 @@ class CheckoutPaymentsService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Only failed, expired, or canceled checkout payment sessions can be retried",
             )
-        lines = list(record.cart_snapshot.get("lines", []))
+        lines = list(record.cart_snapshot.get("requested_lines", []))
         next_session = await self.create_checkout_payment_session(
             tenant_id=tenant_id,
             branch_id=branch_id,
@@ -231,6 +235,7 @@ class CheckoutPaymentsService:
             customer_gstin=record.customer_gstin,
             promotion_code=record.cart_snapshot.get("promotion_code"),
             loyalty_points_to_redeem=int(record.cart_snapshot.get("loyalty_points_to_redeem", 0)),
+            store_credit_amount=float(record.cart_snapshot.get("summary", {}).get("store_credit_amount", 0.0)),
             lines=lines,
         )
         await self._audit_repo.record(
@@ -307,7 +312,7 @@ class CheckoutPaymentsService:
         await self._session.commit()
         return {"status": "ok", "checkout_payment_session_id": record.id, "lifecycle_status": record.lifecycle_status}
 
-    async def _build_checkout_sale_draft(
+    async def _build_checkout_pricing_preview(
         self,
         *,
         tenant_id: str,
@@ -317,120 +322,25 @@ class CheckoutPaymentsService:
         customer_gstin: str | None,
         promotion_code: str | None,
         loyalty_points_to_redeem: int,
+        store_credit_amount: float,
         lines: list[dict[str, object]],
-    ):
-        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
-        if branch is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
-        if branch.gstin is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Branch GSTIN is required for billing")
-
-        resolved_customer_name = customer_name
-        resolved_customer_gstin = customer_gstin
-        if customer_profile_id is not None:
-            profile = await self._customer_profile_service.require_active_profile(
-                tenant_id=tenant_id,
-                customer_profile_id=customer_profile_id,
-            )
-            resolved_customer_name = profile.full_name
-            resolved_customer_gstin = profile.gstin
-
-        products = {product.id: product for product in await self._catalog_repo.list_products(tenant_id=tenant_id)}
-        branch_catalog_items = await self._catalog_repo.list_branch_catalog_items(tenant_id=tenant_id, branch_id=branch_id)
-        branch_catalog_by_product_id: dict[str, dict[str, object]] = {}
-        for item in branch_catalog_items:
-            product = products.get(item.product_id)
-            if product is None:
-                continue
-            branch_catalog_by_product_id[item.product_id] = {
-                "availability_status": item.availability_status,
-                "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,
-            }
-
-        try:
-            draft = build_sale_draft(
-                line_inputs=lines,
-                branch_gstin=branch.gstin,
-                customer_name=resolved_customer_name,
-                customer_gstin=resolved_customer_gstin,
-                products_by_id=products,
-                branch_catalog_items_by_product_id=branch_catalog_by_product_id,
-            )
-        except ValueError as error:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
-
-        promotion_snapshot = {
-            "promotion_campaign_id": None,
-            "promotion_code_id": None,
-            "promotion_code": None,
-            "promotion_discount_amount": 0.0,
-        }
-        if promotion_code:
-            validated = await self._promotion_service.validate_promotion_code(
-                tenant_id=tenant_id,
-                promotion_code=promotion_code,
-                sale_total=draft.grand_total,
-            )
-            promotion_snapshot = {
-                "promotion_campaign_id": validated["campaign"].id,
-                "promotion_code_id": validated["code"].id,
-                "promotion_code": validated["code"].code,
-                "promotion_discount_amount": round(float(validated["discount_amount"]), 2),
-            }
-
-        for line in draft.lines:
-            available_quantity = await self._inventory_repo.stock_on_hand(
-                tenant_id=tenant_id,
-                branch_id=branch_id,
-                product_id=line.product_id,
-            )
-            try:
-                ensure_sale_stock_available(requested_quantity=line.quantity, available_quantity=available_quantity)
-            except ValueError as error:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
-
-        loyalty_redemption = {
-            "points_to_redeem": 0,
-            "discount_amount": 0.0,
-        }
-        discounted_order_amount = round(
-            draft.grand_total - float(promotion_snapshot["promotion_discount_amount"]),
-            2,
+    ) -> dict[str, object]:
+        preview = await self._checkout_pricing_service.build_preview(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            customer_profile_id=customer_profile_id,
+            customer_name=customer_name,
+            customer_gstin=customer_gstin,
+            promotion_code=promotion_code,
+            loyalty_points_to_redeem=loyalty_points_to_redeem,
+            store_credit_amount=store_credit_amount,
+            lines=lines,
+            validate_stock=True,
         )
-        if loyalty_points_to_redeem > 0:
-            if customer_profile_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Customer profile is required for loyalty redemption",
-                )
-            loyalty_redemption = await self._loyalty_service.calculate_sale_redemption(
-                tenant_id=tenant_id,
-                customer_profile_id=customer_profile_id,
-                points_to_redeem=loyalty_points_to_redeem,
-                sale_total=discounted_order_amount,
-            )
-
-        net_order_amount = round(discounted_order_amount - float(loyalty_redemption["discount_amount"]), 2)
-        cart_snapshot = {
-            "customer_profile_id": customer_profile_id,
-            "customer_name": draft.customer_name,
-            "customer_gstin": draft.customer_gstin,
-            "promotion_code": promotion_snapshot["promotion_code"],
-            "promotion_discount_amount": float(promotion_snapshot["promotion_discount_amount"]),
-            "promotion": promotion_snapshot,
-            "loyalty_points_to_redeem": int(loyalty_redemption["points_to_redeem"]),
-            "loyalty_discount_amount": float(loyalty_redemption["discount_amount"]),
-            "net_order_amount": net_order_amount,
-            "lines": [{"product_id": line.product_id, "quantity": line.quantity} for line in draft.lines],
-            "totals": {
-                "subtotal": draft.subtotal,
-                "cgst_total": draft.cgst_total,
-                "sgst_total": draft.sgst_total,
-                "igst_total": draft.igst_total,
-                "grand_total": draft.grand_total,
-            },
+        return {
+            **preview,
+            "requested_lines": [{"product_id": str(line["product_id"]), "quantity": float(line["quantity"])} for line in lines],
         }
-        return draft, cart_snapshot
 
     async def _create_payment_session_record(
         self,
@@ -446,17 +356,16 @@ class CheckoutPaymentsService:
         customer_name: str,
         customer_gstin: str | None,
         lines: list[dict[str, object]],
-        draft,
-        cart_snapshot: dict[str, object],
+        pricing_preview: dict[str, object],
     ):
-        cart_summary_hash = hashlib.sha256(json.dumps(cart_snapshot, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        cart_summary_hash = hashlib.sha256(json.dumps(pricing_preview, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
         checkout_payment_session_id = new_id()
         provider = build_checkout_payment_provider(provider_name, self._settings)
         provider_result = await provider.create_checkout_payment(
             checkout_payment_session_id=checkout_payment_session_id,
             handoff_surface=handoff_surface,
             provider_payment_mode=provider_payment_mode,
-            order_amount=float(cart_snapshot.get("net_order_amount", draft.grand_total)),
+            order_amount=float(pricing_preview["summary"]["final_payable_amount"]),
             currency_code="INR",
             customer_name=customer_name,
             customer_gstin=customer_gstin,
@@ -475,10 +384,10 @@ class CheckoutPaymentsService:
             provider_payment_mode=provider_payment_mode,
             lifecycle_status="ACTION_READY",
             provider_status=provider_result.provider_status,
-            order_amount=float(cart_snapshot.get("net_order_amount", draft.grand_total)),
+            order_amount=float(pricing_preview["summary"]["final_payable_amount"]),
             currency_code="INR",
             cart_summary_hash=cart_summary_hash,
-            cart_snapshot=cart_snapshot,
+            cart_snapshot=pricing_preview,
             customer_name=customer_name,
             customer_gstin=customer_gstin,
             action_payload=provider_result.action_payload,
@@ -534,9 +443,10 @@ class CheckoutPaymentsService:
                 customer_name=record.customer_name,
                 customer_gstin=record.customer_gstin,
                 payment_method=record.payment_method,
-                promotion_snapshot=record.cart_snapshot.get("promotion"),
+                pricing_snapshot=dict(record.cart_snapshot),
+                store_credit_amount=float(record.cart_snapshot.get("summary", {}).get("store_credit_amount", 0.0)),
                 loyalty_points_to_redeem=int(record.cart_snapshot.get("loyalty_points_to_redeem", 0)),
-                lines=list(record.cart_snapshot.get("lines", [])),
+                lines=list(record.cart_snapshot.get("requested_lines", [])),
                 auto_commit=False,
             )
         except HTTPException as error:
@@ -628,8 +538,14 @@ class CheckoutPaymentsService:
             "provider_status": record.provider_status,
             "order_amount": record.order_amount,
             "currency_code": record.currency_code,
+            "automatic_campaign_name": record.cart_snapshot.get("automatic_campaign", {}).get("name")
+            if record.cart_snapshot.get("automatic_campaign")
+            else None,
+            "automatic_discount_total": float(record.cart_snapshot.get("summary", {}).get("automatic_discount_total", 0.0)),
             "promotion_code": record.cart_snapshot.get("promotion_code"),
-            "promotion_discount_amount": float(record.cart_snapshot.get("promotion_discount_amount", 0.0)),
+            "promotion_discount_amount": float(record.cart_snapshot.get("summary", {}).get("promotion_code_discount_total", 0.0)),
+            "promotion_code_discount_total": float(record.cart_snapshot.get("summary", {}).get("promotion_code_discount_total", 0.0)),
+            "store_credit_amount": float(record.cart_snapshot.get("summary", {}).get("store_credit_amount", 0.0)),
             "action_payload": record.action_payload,
             "action_expires_at": record.action_expires_at,
             "qr_payload": qr_payload,

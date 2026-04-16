@@ -77,6 +77,8 @@ describe('owner replenishment workflow', () => {
         barcode: '8901234567890',
         hsn_sac_code: '0902',
         gst_rate: 5,
+        mrp: 120,
+        category_code: 'TEA',
         selling_price: 92.5,
         status: 'ACTIVE',
       }),
@@ -90,6 +92,8 @@ describe('owner replenishment workflow', () => {
             barcode: '8901234567890',
             hsn_sac_code: '0902',
             gst_rate: 5,
+            mrp: 120,
+            category_code: 'TEA',
             selling_price: 92.5,
             status: 'ACTIVE',
           },
@@ -105,6 +109,8 @@ describe('owner replenishment workflow', () => {
         barcode: '8901234567890',
         hsn_sac_code: '0902',
         gst_rate: 5,
+        mrp: 120,
+        category_code: 'TEA',
         base_selling_price: 92.5,
         selling_price_override: 89,
         effective_selling_price: 89,
@@ -124,6 +130,8 @@ describe('owner replenishment workflow', () => {
             barcode: '8901234567890',
             hsn_sac_code: '0902',
             gst_rate: 5,
+            mrp: 120,
+            category_code: 'TEA',
             base_selling_price: 92.5,
             selling_price_override: 89,
             effective_selling_price: 89,
@@ -143,6 +151,8 @@ describe('owner replenishment workflow', () => {
         barcode: '8901234567890',
         hsn_sac_code: '0902',
         gst_rate: 5,
+        mrp: 120,
+        category_code: 'TEA',
         base_selling_price: 92.5,
         selling_price_override: 89,
         effective_selling_price: 89,
@@ -199,6 +209,8 @@ describe('owner replenishment workflow', () => {
     fireEvent.change(screen.getByLabelText('Barcode'), { target: { value: '8901234567890' } });
     fireEvent.change(screen.getByLabelText('HSN or SAC code'), { target: { value: '0902' } });
     fireEvent.change(screen.getByLabelText('GST rate'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('MRP'), { target: { value: '120' } });
+    fireEvent.change(screen.getByLabelText('Category code'), { target: { value: 'TEA' } });
     fireEvent.change(screen.getByLabelText('Selling price'), { target: { value: '92.5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create catalog product' }));
 

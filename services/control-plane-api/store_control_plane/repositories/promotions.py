@@ -32,23 +32,31 @@ class PromotionRepository:
         campaign_id: str,
         name: str,
         status: str,
+        trigger_mode: str,
+        scope: str,
         discount_type: str,
         discount_value: float,
         minimum_order_amount: float | None,
         maximum_discount_amount: float | None,
         redemption_limit_total: int | None,
+        target_product_ids: list[str] | None,
+        target_category_codes: list[str] | None,
     ) -> PromotionCampaign:
         record = PromotionCampaign(
             id=campaign_id,
             tenant_id=tenant_id,
             name=name,
             status=status,
+            trigger_mode=trigger_mode,
+            scope=scope,
             discount_type=discount_type,
             discount_value=discount_value,
             minimum_order_amount=minimum_order_amount,
             maximum_discount_amount=maximum_discount_amount,
             redemption_limit_total=redemption_limit_total,
             redemption_count=0,
+            target_product_ids=target_product_ids,
+            target_category_codes=target_category_codes,
         )
         self._session.add(record)
         await self._session.flush()

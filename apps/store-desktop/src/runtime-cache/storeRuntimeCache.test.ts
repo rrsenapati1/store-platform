@@ -72,6 +72,8 @@ function buildSnapshot(): StoreRuntimeCacheSnapshot {
       barcode: '8901234567890',
       hsn_sac_code: '0902',
       gst_rate: 5,
+      mrp: 120,
+      category_code: 'TEA',
       base_selling_price: 92.5,
       selling_price_override: null,
       effective_selling_price: 92.5,

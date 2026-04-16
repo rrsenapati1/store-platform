@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_actor, get_session
 from ..schemas import (
+    CheckoutPricePreviewRequest,
+    CheckoutPricePreviewResponse,
     CheckoutPaymentSessionCreateRequest,
     CheckoutPaymentSessionListResponse,
     CheckoutPaymentSessionResponse,
@@ -23,6 +25,7 @@ from ..services import (
     ActorContext,
     BillingService,
     CheckoutPaymentsService,
+    CheckoutPricingService,
     assert_branch_any_capability,
     assert_branch_capability,
     branch_has_capability,
@@ -59,6 +62,31 @@ async def create_sale(
     return SaleResponse(**sale)
 
 
+@branch_router.post("/{tenant_id}/branches/{branch_id}/checkout-price-preview", response_model=CheckoutPricePreviewResponse)
+async def checkout_price_preview(
+    tenant_id: str,
+    branch_id: str,
+    payload: CheckoutPricePreviewRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CheckoutPricePreviewResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("sales.bill", "catalog.manage"))
+    service = CheckoutPricingService(session)
+    preview = await service.build_preview(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        customer_profile_id=payload.customer_profile_id,
+        customer_name=payload.customer_name,
+        customer_gstin=payload.customer_gstin,
+        promotion_code=payload.promotion_code,
+        loyalty_points_to_redeem=payload.loyalty_points_to_redeem,
+        store_credit_amount=payload.store_credit_amount,
+        lines=[line.model_dump() for line in payload.lines],
+        validate_stock=False,
+    )
+    return CheckoutPricePreviewResponse(**preview)
+
+
 @branch_router.post("/{tenant_id}/branches/{branch_id}/checkout-payment-sessions", response_model=CheckoutPaymentSessionResponse)
 async def create_checkout_payment_session(
     tenant_id: str,
@@ -83,6 +111,7 @@ async def create_checkout_payment_session(
         customer_gstin=payload.customer_gstin,
         promotion_code=payload.promotion_code,
         loyalty_points_to_redeem=payload.loyalty_points_to_redeem,
+        store_credit_amount=payload.store_credit_amount,
         lines=[line.model_dump() for line in payload.lines],
     )
     return CheckoutPaymentSessionResponse(**checkout_payment_session)

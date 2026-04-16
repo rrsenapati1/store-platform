@@ -66,7 +66,23 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     assignRuntimePreferredScale: vi.fn(async () => {}),
     readRuntimeScaleWeight: vi.fn(async () => {}),
     assignRuntimePreferredScanner: vi.fn(async () => {}),
-    latestScanLookup: null,
+    latestScanLookup: {
+      product_id: 'product-1',
+      product_name: 'Classic Tea',
+      sku_code: 'tea-classic-250g',
+      barcode: 'ACMETEA',
+      mrp: 120,
+      selling_price: 92.5,
+      stock_on_hand: 24,
+      availability_status: 'ACTIVE',
+      automatic_discount_hint: {
+        campaign_id: 'campaign-auto-1',
+        campaign_name: 'Tea Auto',
+        discount_type: 'PERCENTAGE',
+        discount_value: 10,
+        scope: 'ITEM_CATEGORY',
+      },
+    },
     ...overrides,
   } as unknown as StoreRuntimeWorkspaceState;
 }
@@ -81,7 +97,7 @@ describe('store barcode lookup section', () => {
     expect(screen.getByRole('button', { name: 'Read current weight' })).toBeInTheDocument();
     expect(screen.getByText('Scanner diagnostics')).toBeInTheDocument();
     expect(screen.getByText('keyboard_wedge')).toBeInTheDocument();
-    expect(screen.getByText('ACMETEA')).toBeInTheDocument();
+    expect(screen.getAllByText('ACMETEA').length).toBeGreaterThan(0);
     expect(screen.getByText('Ready for external scanner input')).toBeInTheDocument();
     expect(screen.getByText('Discovered local scales')).toBeInTheDocument();
     expect(screen.getAllByText('Serial scale (COM3)').length).toBeGreaterThan(0);
@@ -93,5 +109,10 @@ describe('store barcode lookup section', () => {
     expect(screen.getByText('Socket Mobile S740')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Use as preferred scanner' })).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Clear preferred scanner' })).toBeInTheDocument();
+    expect(screen.getByText('Latest scan lookup')).toBeInTheDocument();
+    expect(screen.getByText('MRP')).toBeInTheDocument();
+    expect(screen.getByText('120')).toBeInTheDocument();
+    expect(screen.getByText('Automatic discount hint')).toBeInTheDocument();
+    expect(screen.getByText('Tea Auto :: PERCENTAGE 10')).toBeInTheDocument();
   });
 });

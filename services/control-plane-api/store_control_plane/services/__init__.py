@@ -16,6 +16,7 @@ from .barcode_policy import allocate_barcode, build_barcode_label_preview, norma
 from .billing import BillingService
 from .commerce import CommerceService
 from .checkout_payments import CheckoutPaymentsService
+from .checkout_pricing import CheckoutPricingService
 from .offline_continuity import OfflineContinuityService
 from .catalog import CatalogService
 from .compliance import ComplianceService
@@ -52,6 +53,7 @@ __all__ = [
     "BillingService",
     "CatalogService",
     "CheckoutPaymentsService",
+    "CheckoutPricingService",
     "CommerceService",
     "ComplianceService",
     "ComplianceSecretsService",

@@ -27,6 +27,8 @@ async def create_catalog_product(
         barcode=payload.barcode,
         hsn_sac_code=payload.hsn_sac_code,
         gst_rate=payload.gst_rate,
+        mrp=payload.mrp,
+        category_code=payload.category_code,
         selling_price=payload.selling_price,
     )
     return CatalogProductResponse.model_validate(product, from_attributes=True)

@@ -1,5 +1,22 @@
 # Store Worklog
 
+## 2026-04-17
+
+- Expanded `V2-005` with automatic discount foundation and authoritative checkout pricing preview:
+  - extended control-plane catalog and promotion authority with `mrp`, optional `category_code`, automatic campaign trigger modes and scopes, item/category targeting, and a dedicated checkout-pricing engine that computes line-level and header-level pricing posture for preview, direct sales, and provider-backed checkout sessions
+  - persisted commercial sale snapshots for MRP, selling subtotal, automatic discounts, promotion-code discounts, tax, invoice totals, and per-line discount sources so finalized invoices preserve the exact pricing truth used at checkout
+  - upgraded owner-web catalog and promotion management to capture MRP/category data and automatic campaign configuration inside the existing commercial surfaces instead of creating a second pricing subsystem
+  - extended Store Desktop scan and checkout flows so barcode lookup shows live MRP posture, checkout can refresh authoritative pricing preview, and provider-backed payment sessions stay aligned with store credit, promotion, and automatic-discount-adjusted totals
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_promotions_flow.py services/control-plane-api/tests/test_checkout_price_preview_flow.py services/control-plane-api/tests/test_barcode_foundation_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 ## 2026-04-16
 
 - Started `V2-005` loyalty foundation on top of customer profiles and store credit:

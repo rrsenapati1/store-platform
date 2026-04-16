@@ -18,11 +18,13 @@ class BarcodeScanLookupResponse(BaseModel):
     product_name: str
     sku_code: str
     barcode: str
+    mrp: float
     selling_price: float
     stock_on_hand: float
     availability_status: str
     reorder_point: float | None = None
     target_stock: float | None = None
+    automatic_discount_hint: dict[str, object] | None = None
 
 
 class BarcodeLabelPreviewResponse(BaseModel):

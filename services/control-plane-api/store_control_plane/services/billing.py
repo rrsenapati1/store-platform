@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..repositories import AuditRepository, BillingRepository, CatalogRepository, InventoryRepository, TenantRepository
 from ..utils import utc_now
 from .billing_policy import build_sale_draft, ensure_sale_stock_available, sale_invoice_number
+from .checkout_pricing import CheckoutPricingService
 from .customer_profiles import CustomerProfileService
 from .exchange_policy import build_exchange_settlement
 from .loyalty import LoyaltyService
@@ -22,6 +23,7 @@ class BillingService:
         self._inventory_repo = InventoryRepository(session)
         self._billing_repo = BillingRepository(session)
         self._audit_repo = AuditRepository(session)
+        self._checkout_pricing_service = CheckoutPricingService(session)
         self._customer_profile_service = CustomerProfileService(session)
         self._loyalty_service = LoyaltyService(session)
         self._promotion_service = PromotionService(session)
@@ -38,7 +40,7 @@ class BillingService:
         customer_gstin: str | None,
         payment_method: str,
         promotion_code: str | None = None,
-        promotion_snapshot: dict[str, object] | None = None,
+        pricing_snapshot: dict[str, object] | None = None,
         store_credit_amount: float = 0.0,
         loyalty_points_to_redeem: int = 0,
         lines: list[dict[str, float | str]],
@@ -47,107 +49,32 @@ class BillingService:
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
         if branch is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
-        if branch.gstin is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Branch GSTIN is required for billing")
 
-        resolved_customer_name = customer_name
-        resolved_customer_gstin = customer_gstin
-        if customer_profile_id is not None:
-            profile = await self._customer_profile_service.require_active_profile(
-                tenant_id=tenant_id,
-                customer_profile_id=customer_profile_id,
-            )
-            resolved_customer_name = profile.full_name
-            resolved_customer_gstin = profile.gstin
-
-        products = {
-            product.id: product
-            for product in await self._catalog_repo.list_products(tenant_id=tenant_id)
-        }
-        branch_catalog_items = await self._catalog_repo.list_branch_catalog_items(tenant_id=tenant_id, branch_id=branch_id)
-        branch_catalog_by_product_id: dict[str, dict[str, object]] = {}
-        for item in branch_catalog_items:
-            product = products.get(item.product_id)
-            if product is None:
-                continue
-            branch_catalog_by_product_id[item.product_id] = {
-                "availability_status": item.availability_status,
-                "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,
-            }
-
-        try:
-            draft = build_sale_draft(
-                line_inputs=lines,
-                branch_gstin=branch.gstin,
-                customer_name=resolved_customer_name,
-                customer_gstin=resolved_customer_gstin,
-                products_by_id=products,
-                branch_catalog_items_by_product_id=branch_catalog_by_product_id,
-            )
-        except ValueError as error:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
-
-        promotion_application = await self._resolve_promotion_application(
-            tenant_id=tenant_id,
-            sale_total=draft.grand_total,
-            promotion_code=promotion_code,
-            promotion_snapshot=promotion_snapshot,
-        )
-        promotion_discount_amount = round(float(promotion_application["promotion_discount_amount"]), 2)
-        discounted_sale_total = round(draft.grand_total - promotion_discount_amount, 2)
-
-        loyalty_points_to_redeem = int(loyalty_points_to_redeem or 0)
-        loyalty_points_redeemed = 0
-        loyalty_discount_amount = 0.0
-        if loyalty_points_to_redeem > 0:
-            if customer_profile_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Customer profile is required for loyalty redemption",
-                )
-            loyalty_redemption = await self._loyalty_service.calculate_sale_redemption(
-                tenant_id=tenant_id,
-                customer_profile_id=customer_profile_id,
-                points_to_redeem=loyalty_points_to_redeem,
-                sale_total=discounted_sale_total,
-            )
-            loyalty_points_redeemed = int(loyalty_redemption["points_to_redeem"])
-            loyalty_discount_amount = round(float(loyalty_redemption["discount_amount"]), 2)
-
-        net_sale_total = round(discounted_sale_total - loyalty_discount_amount, 2)
-        store_credit_amount = round(float(store_credit_amount or 0.0), 2)
-        if store_credit_amount > 0:
-            if customer_profile_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Customer profile is required for store credit redemption",
-                )
-            if store_credit_amount > net_sale_total:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Store credit redemption cannot exceed sale total",
-                )
-            credit_summary = await self._store_credit_service.get_customer_store_credit(
-                tenant_id=tenant_id,
-                customer_profile_id=customer_profile_id,
-            )
-            if store_credit_amount > float(credit_summary["available_balance"]):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Customer store credit balance is insufficient",
-                )
-
-        for line in draft.lines:
-            available_quantity = await self._inventory_repo.stock_on_hand(
+        preview = pricing_snapshot
+        if preview is None:
+            preview = await self._checkout_pricing_service.build_preview(
                 tenant_id=tenant_id,
                 branch_id=branch_id,
-                product_id=line.product_id,
+                customer_profile_id=customer_profile_id,
+                customer_name=customer_name,
+                customer_gstin=customer_gstin,
+                promotion_code=promotion_code,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                store_credit_amount=store_credit_amount,
+                lines=lines,
+                validate_stock=True,
             )
-            try:
-                ensure_sale_stock_available(requested_quantity=line.quantity, available_quantity=available_quantity)
-            except ValueError as error:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
+        preview_summary = dict(preview["summary"])
+        preview_lines = list(preview["lines"])
+        preview_tax_lines = list(preview["tax_lines"])
+        automatic_campaign = preview.get("automatic_campaign")
+        promotion_code_campaign = preview.get("promotion_code_campaign")
+        loyalty_points_redeemed = int(preview.get("loyalty_points_to_redeem", 0))
+        loyalty_points_earned = int(preview.get("loyalty_points_earned", 0))
+        loyalty_discount_amount = round(float(preview_summary.get("loyalty_discount_total", 0.0)), 2)
+        store_credit_amount = round(float(preview_summary.get("store_credit_amount", 0.0)), 2)
+        net_sale_total = round(float(preview_summary.get("grand_total", 0.0)), 2)
         payment_rows: list[dict[str, float | str]] | None = None
         if store_credit_amount > 0:
             payment_rows = [{"payment_method": "STORE_CREDIT", "amount": store_credit_amount}]
@@ -155,65 +82,55 @@ class BillingService:
             if remaining_payment_amount > 0:
                 payment_rows.append({"payment_method": payment_method, "amount": remaining_payment_amount})
 
-        loyalty_points_earned = 0
-        if customer_profile_id is not None:
-            loyalty_points_earned = await self._loyalty_service.calculate_sale_earn_points(
-                tenant_id=tenant_id,
-                eligible_sale_amount=net_sale_total,
-            )
-
         sequence_number = await self._billing_repo.next_branch_sale_sequence(tenant_id=tenant_id, branch_id=branch_id)
         persisted = await self._billing_repo.create_sale(
             tenant_id=tenant_id,
             branch_id=branch_id,
             customer_profile_id=customer_profile_id,
-            customer_name=draft.customer_name,
-            customer_gstin=draft.customer_gstin,
-            promotion_campaign_id=promotion_application["promotion_campaign_id"],
-            promotion_code_id=promotion_application["promotion_code_id"],
-            promotion_code=promotion_application["promotion_code"],
-            promotion_discount_amount=promotion_discount_amount,
-            invoice_kind=draft.invoice_kind,
-            irn_status=draft.irn_status,
+            customer_name=str(preview["customer_name"]),
+            customer_gstin=preview.get("customer_gstin"),
+            automatic_campaign_name=automatic_campaign["name"] if automatic_campaign is not None else None,
+            automatic_discount_total=round(float(preview_summary.get("automatic_discount_total", 0.0)), 2),
+            promotion_campaign_id=promotion_code_campaign["id"] if promotion_code_campaign is not None else None,
+            promotion_code_id=promotion_code_campaign["code_id"] if promotion_code_campaign is not None else None,
+            promotion_code=promotion_code_campaign["code"] if promotion_code_campaign is not None else None,
+            promotion_discount_amount=round(float(preview_summary.get("promotion_code_discount_total", 0.0)), 2),
+            promotion_code_discount_total=round(float(preview_summary.get("promotion_code_discount_total", 0.0)), 2),
+            invoice_kind=str(preview["invoice_kind"]),
+            irn_status=str(preview["irn_status"]),
             issued_on=utc_now().date(),
+            mrp_total=round(float(preview_summary.get("mrp_total", 0.0)), 2),
+            selling_price_subtotal=round(float(preview_summary.get("selling_price_subtotal", 0.0)), 2),
+            total_discount=round(float(preview_summary.get("total_discount", 0.0)), 2),
+            invoice_total=round(float(preview_summary.get("invoice_total", 0.0)), 2),
             invoice_number=sale_invoice_number(branch_code=branch.code, sequence_number=sequence_number),
-            subtotal=draft.subtotal,
-            tax_total=draft.tax_total,
-            cgst_total=draft.cgst_total,
-            sgst_total=draft.sgst_total,
-            igst_total=draft.igst_total,
+            subtotal=round(float(preview_summary.get("selling_price_subtotal", 0.0)), 2),
+            tax_total=round(float(preview_summary.get("tax_total", 0.0)), 2),
+            cgst_total=round(
+                sum(float(line["tax_amount"]) for line in preview_tax_lines if line["tax_type"] == "CGST"),
+                2,
+            ),
+            sgst_total=round(
+                sum(float(line["tax_amount"]) for line in preview_tax_lines if line["tax_type"] == "SGST"),
+                2,
+            ),
+            igst_total=round(
+                sum(float(line["tax_amount"]) for line in preview_tax_lines if line["tax_type"] == "IGST"),
+                2,
+            ),
             grand_total=net_sale_total,
             loyalty_points_redeemed=loyalty_points_redeemed,
             loyalty_discount_amount=loyalty_discount_amount,
             loyalty_points_earned=loyalty_points_earned,
             payment_method=payment_method,
             payments=payment_rows,
-            lines=[
-                {
-                    "product_id": line.product_id,
-                    "quantity": line.quantity,
-                    "unit_price": line.unit_price,
-                    "gst_rate": line.gst_rate,
-                    "line_subtotal": line.line_subtotal,
-                    "tax_total": line.tax_total,
-                    "line_total": line.line_total,
-                }
-                for line in draft.lines
-            ],
-            tax_lines=[
-                {
-                    "tax_type": line.tax_type,
-                    "tax_rate": line.tax_rate,
-                    "taxable_amount": line.taxable_amount,
-                    "tax_amount": line.tax_amount,
-                }
-                for line in draft.tax_lines
-            ],
+            lines=preview_lines,
+            tax_lines=preview_tax_lines,
         )
-        if promotion_application["promotion_code_id"] is not None:
+        if promotion_code_campaign is not None:
             await self._promotion_service.mark_code_redeemed(
                 tenant_id=tenant_id,
-                promotion_code_id=str(promotion_application["promotion_code_id"]),
+                promotion_code_id=str(promotion_code_campaign["code_id"]),
             )
         if store_credit_amount > 0:
             await self._store_credit_service.redeem_customer_store_credit(
@@ -247,13 +164,13 @@ class BillingService:
                 {
                     "tenant_id": tenant_id,
                     "branch_id": branch_id,
-                    "product_id": line.product_id,
+                    "product_id": str(line["product_id"]),
                     "entry_type": "SALE",
-                    "quantity": -abs(line.quantity),
+                    "quantity": -abs(float(line["quantity"])),
                     "reference_type": "sale",
                     "reference_id": persisted.sale.id,
                 }
-                for line in draft.lines
+                for line in preview_lines
             ]
         )
         await self._audit_repo.record(
@@ -267,6 +184,10 @@ class BillingService:
         )
         if auto_commit:
             await self._session.commit()
+        products = {
+            product.id: product
+            for product in await self._catalog_repo.list_products(tenant_id=tenant_id)
+        }
         return self._serialize_sale_bundle(
             sale=persisted.sale,
             invoice=persisted.invoice,
@@ -307,6 +228,11 @@ class BillingService:
                 "invoice_kind": sale.invoice_kind,
                 "irn_status": sale.irn_status,
                 "payment_method": self._payment_summary(payments)["payment_method"],
+                "automatic_campaign_name": sale.automatic_campaign_name,
+                "automatic_discount_total": sale.automatic_discount_total,
+                "promotion_code_discount_total": sale.promotion_code_discount_total,
+                "total_discount": sale.total_discount,
+                "invoice_total": sale.invoice_total,
                 "grand_total": sale.grand_total,
                 "promotion_campaign_id": sale.promotion_campaign_id,
                 "promotion_code_id": sale.promotion_code_id,
@@ -905,11 +831,18 @@ class BillingService:
             "irn_status": sale.irn_status,
             "invoice_number": invoice.invoice_number,
             "issued_on": invoice.issued_on,
+            "mrp_total": sale.mrp_total,
+            "selling_price_subtotal": sale.selling_price_subtotal,
             "subtotal": sale.subtotal,
             "cgst_total": invoice.cgst_total,
             "sgst_total": invoice.sgst_total,
             "igst_total": invoice.igst_total,
-            "grand_total": invoice.grand_total,
+            "automatic_campaign_name": sale.automatic_campaign_name,
+            "automatic_discount_total": sale.automatic_discount_total,
+            "promotion_code_discount_total": sale.promotion_code_discount_total,
+            "total_discount": sale.total_discount,
+            "invoice_total": sale.invoice_total,
+            "grand_total": sale.grand_total,
             "promotion_campaign_id": sale.promotion_campaign_id,
             "promotion_code_id": sale.promotion_code_id,
             "promotion_code": sale.promotion_code,
@@ -929,8 +862,15 @@ class BillingService:
                     "sku_code": products_by_id[line.product_id].sku_code,
                     "hsn_sac_code": products_by_id[line.product_id].hsn_sac_code,
                     "quantity": line.quantity,
+                    "mrp": line.mrp,
+                    "unit_selling_price": line.unit_selling_price,
                     "unit_price": line.unit_price,
                     "gst_rate": line.gst_rate,
+                    "automatic_discount_amount": line.automatic_discount_amount,
+                    "promotion_code_discount_amount": line.promotion_code_discount_amount,
+                    "promotion_discount_source": line.promotion_discount_source,
+                    "taxable_amount": line.taxable_amount,
+                    "tax_amount": line.tax_amount,
                     "line_subtotal": line.line_subtotal,
                     "tax_total": line.tax_total,
                     "line_total": line.line_total,

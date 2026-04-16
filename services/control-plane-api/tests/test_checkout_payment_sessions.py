@@ -551,7 +551,7 @@ def test_checkout_payment_session_applies_promotion_code_to_order_amount(monkeyp
         ),
     )
     assert create_response.status_code == 200
-    assert create_response.json()["order_amount"] == 368.5
+    assert create_response.json()["order_amount"] == 367.5
 
 
 def test_checkout_payment_session_rejects_invalid_promotion_code(monkeypatch) -> None:
@@ -674,7 +674,7 @@ def test_checkout_payment_session_amount_matches_price_preview_with_automatic_di
     assert preview.json()["summary"]["automatic_discount_total"] == 37.0
     assert preview.json()["summary"]["promotion_code_discount_total"] == 20.0
     assert preview.json()["summary"]["store_credit_amount"] == 10.0
-    assert preview.json()["summary"]["final_payable_amount"] == 325.65
+    assert preview.json()["summary"]["final_payable_amount"] == 318.65
 
     create_response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",

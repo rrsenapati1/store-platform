@@ -155,6 +155,7 @@ def test_owner_allocates_barcode_and_runtime_scans_branch_catalog_item():
         "availability_status": "ACTIVE",
         "reorder_point": 10.0,
         "target_stock": 24.0,
+        "automatic_discount_hint": None,
     }
 
     preview = client.get(
@@ -262,6 +263,7 @@ def test_runtime_scan_lookup_returns_null_policy_when_branch_policy_is_missing()
         "availability_status": "ACTIVE",
         "reorder_point": None,
         "target_stock": None,
+        "automatic_discount_hint": None,
     }
 
 

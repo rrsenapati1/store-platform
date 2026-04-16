@@ -20,6 +20,8 @@ class CatalogProduct(Base, TimestampMixin):
     barcode: Mapped[str] = mapped_column(String(64))
     hsn_sac_code: Mapped[str] = mapped_column(String(32))
     gst_rate: Mapped[float] = mapped_column(default=0.0)
+    mrp: Mapped[float] = mapped_column(Float(), default=0.0)
+    category_code: Mapped[str | None] = mapped_column(String(64), default=None)
     selling_price: Mapped[float] = mapped_column(default=0.0)
     status: Mapped[str] = mapped_column(String(32), default="ACTIVE")
 

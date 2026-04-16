@@ -94,6 +94,8 @@ export function useOwnerWorkspace() {
   const [barcodeManualValue, setBarcodeManualValue] = useState('');
   const [productHsnSacCode, setProductHsnSacCode] = useState('');
   const [productGstRate, setProductGstRate] = useState('5');
+  const [productMrp, setProductMrp] = useState('');
+  const [productCategoryCode, setProductCategoryCode] = useState('');
   const [productSellingPrice, setProductSellingPrice] = useState('');
   const [branchCatalogPriceOverride, setBranchCatalogPriceOverride] = useState('');
   const [supplierName, setSupplierName] = useState('');
@@ -353,6 +355,8 @@ export function useOwnerWorkspace() {
       barcode: productBarcode,
       hsnSacCode: productHsnSacCode,
       gstRate: Number(productGstRate),
+      mrp: Number(productMrp),
+      categoryCode: productCategoryCode.trim() || null,
       sellingPrice: Number(productSellingPrice),
       setIsBusy,
       setErrorMessage,
@@ -364,6 +368,8 @@ export function useOwnerWorkspace() {
         setProductBarcode('');
         setProductHsnSacCode('');
         setProductGstRate('5');
+        setProductMrp('');
+        setProductCategoryCode('');
         setProductSellingPrice('');
       },
     });
@@ -1159,6 +1165,8 @@ export function useOwnerWorkspace() {
     setProductBarcode,
     setProductGstRate,
     setProductHsnSacCode,
+    setProductMrp,
+    setProductCategoryCode,
     setProductName,
     setProductSellingPrice,
     setProductSkuCode,
@@ -1206,6 +1214,8 @@ export function useOwnerWorkspace() {
     productBarcode,
     productGstRate,
     productHsnSacCode,
+    productMrp,
+    productCategoryCode,
     productName,
     productSellingPrice,
     productSkuCode,

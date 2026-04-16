@@ -9,6 +9,8 @@ class CatalogProductCreateRequest(BaseModel):
     barcode: str
     hsn_sac_code: str
     gst_rate: float = Field(ge=0)
+    mrp: float | None = Field(default=None, gt=0)
+    category_code: str | None = None
     selling_price: float = Field(gt=0)
 
 
@@ -20,6 +22,8 @@ class CatalogProductResponse(BaseModel):
     barcode: str
     hsn_sac_code: str
     gst_rate: float
+    mrp: float
+    category_code: str | None = None
     selling_price: float
     status: str
 
@@ -32,6 +36,8 @@ class CatalogProductRecord(BaseModel):
     barcode: str
     hsn_sac_code: str
     gst_rate: float
+    mrp: float
+    category_code: str | None = None
     selling_price: float
     status: str
 
@@ -58,6 +64,8 @@ class BranchCatalogItemResponse(BaseModel):
     barcode: str
     hsn_sac_code: str
     gst_rate: float
+    mrp: float
+    category_code: str | None = None
     base_selling_price: float
     selling_price_override: float | None
     effective_selling_price: float

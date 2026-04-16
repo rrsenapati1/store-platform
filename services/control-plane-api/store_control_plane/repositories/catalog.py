@@ -20,6 +20,8 @@ class CatalogRepository:
         barcode: str,
         hsn_sac_code: str,
         gst_rate: float,
+        mrp: float,
+        category_code: str | None,
         selling_price: float,
     ) -> CatalogProduct:
         product = CatalogProduct(
@@ -30,6 +32,8 @@ class CatalogRepository:
             barcode=barcode,
             hsn_sac_code=hsn_sac_code,
             gst_rate=gst_rate,
+            mrp=mrp,
+            category_code=category_code,
             selling_price=selling_price,
             status="ACTIVE",
         )

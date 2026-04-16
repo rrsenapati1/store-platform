@@ -1,4 +1,8 @@
-import type { ControlPlaneCheckoutPaymentSession } from '@store/types';
+import type {
+  ControlPlaneCheckoutPaymentSession,
+  ControlPlaneCheckoutPricePreview,
+  ControlPlaneCheckoutPricePreviewLine,
+} from '@store/types';
 import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@store/ui';
 import { PaymentQrCode, usePaymentQrExpiry } from '../customer-display/paymentQr';
 import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
@@ -102,6 +106,28 @@ function CheckoutPaymentActionCard({ checkoutPaymentSession }: { checkoutPayment
       ) : null}
     </div>
   );
+}
+
+function describePreviewLineDiscountSource(
+  preview: ControlPlaneCheckoutPricePreview,
+  line: ControlPlaneCheckoutPricePreviewLine,
+) {
+  if (!line.promotion_discount_source) {
+    return 'None';
+  }
+  return line.promotion_discount_source
+    .split('+')
+    .map((segment) => {
+      const trimmedSegment = segment.trim();
+      if (trimmedSegment === 'CODE') {
+        return preview.promotion_code_campaign?.code ?? trimmedSegment;
+      }
+      if (trimmedSegment === 'AUTOMATIC_CART' || trimmedSegment === 'AUTOMATIC_ITEM_CATEGORY') {
+        return preview.automatic_campaign?.name ?? trimmedSegment;
+      }
+      return trimmedSegment;
+    })
+    .join(' + ');
 }
 
 export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
@@ -258,6 +284,24 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
             </ActionButton>
           ))}
         </div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+          <ActionButton
+            onClick={() => void workspace.refreshCheckoutPricePreview()}
+            disabled={
+              workspace.isBusy
+              || !workspace.isSessionLive
+              || !workspace.actor
+              || !selectedItem
+              || !workspace.customerName
+              || !workspace.saleQuantity
+            }
+          >
+            Refresh checkout pricing
+          </ActionButton>
+        </div>
+        {workspace.checkoutPricePreviewError ? (
+          <p style={{ color: '#9d2b19' }}>{workspace.checkoutPricePreviewError}</p>
+        ) : null}
         <ActionButton
           onClick={() => void workspace.createSalesInvoice()}
           disabled={isCheckoutActionDisabled}
@@ -268,6 +312,84 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
           {paymentMethodDescription.helpText}
         </p>
       </SectionCard>
+
+      {workspace.checkoutPricePreview ? (() => {
+        const checkoutPricePreview = workspace.checkoutPricePreview;
+        return (
+          <SectionCard eyebrow="Commercial pricing" title="Checkout pricing">
+            <DetailList
+              items={[
+                {
+                  label: 'Automatic campaign',
+                  value: checkoutPricePreview.automatic_campaign?.name ?? 'None',
+                },
+                {
+                  label: 'Promotion code',
+                  value: checkoutPricePreview.promotion_code_campaign?.code ?? 'None',
+                },
+                { label: 'MRP total', value: String(checkoutPricePreview.summary.mrp_total) },
+                {
+                  label: 'Selling subtotal',
+                  value: String(checkoutPricePreview.summary.selling_price_subtotal),
+                },
+                {
+                  label: 'Automatic discount',
+                  value: String(checkoutPricePreview.summary.automatic_discount_total),
+                },
+                {
+                  label: 'Code discount',
+                  value: String(checkoutPricePreview.summary.promotion_code_discount_total),
+                },
+                {
+                  label: 'Loyalty discount',
+                  value: checkoutPricePreview.summary.loyalty_discount_total.toFixed(2),
+                },
+                { label: 'Tax total', value: String(checkoutPricePreview.summary.tax_total) },
+                {
+                  label: 'Invoice total',
+                  value: String(checkoutPricePreview.summary.invoice_total),
+                },
+                {
+                  label: 'Store credit used',
+                  value: String(checkoutPricePreview.summary.store_credit_amount),
+                },
+                {
+                  label: 'Remaining payable',
+                  value: String(checkoutPricePreview.summary.final_payable_amount),
+                },
+              ]}
+            />
+            <div style={{ marginTop: '16px', display: 'grid', gap: '16px' }}>
+              {checkoutPricePreview.lines.map((line) => (
+                <div
+                  key={`${line.product_id}-${line.sku_code ?? 'line'}`}
+                  style={{
+                    borderRadius: '14px',
+                    border: '1px solid rgba(23, 32, 51, 0.12)',
+                    padding: '14px 16px',
+                    background: 'rgba(248, 250, 255, 0.92)',
+                    display: 'grid',
+                    gap: '8px',
+                  }}
+                >
+                  <strong>{`${line.product_name} x ${line.quantity}`}</strong>
+                  <DetailList
+                    items={[
+                      { label: 'MRP posture', value: `Rs. ${line.mrp.toFixed(2)}` },
+                      { label: 'Selling posture', value: `Rs. ${line.unit_selling_price.toFixed(2)}` },
+                      {
+                        label: 'Discount source',
+                        value: describePreviewLineDiscountSource(checkoutPricePreview, line),
+                      },
+                      { label: 'Line total', value: `Rs. ${line.line_total.toFixed(2)}` },
+                    ]}
+                  />
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        );
+      })() : null}
 
       {isDigitalCheckout || checkoutPaymentSession ? (
         <SectionCard eyebrow="Digital payment" title={digitalPaymentTitle}>

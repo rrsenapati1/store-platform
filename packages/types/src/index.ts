@@ -583,6 +583,8 @@ export interface ControlPlaneCatalogProduct {
   barcode: string;
   hsn_sac_code: string;
   gst_rate: number;
+  mrp: number;
+  category_code?: string | null;
   selling_price: number;
   status: string;
 }
@@ -595,6 +597,8 @@ export interface ControlPlaneCatalogProductRecord {
   barcode: string;
   hsn_sac_code: string;
   gst_rate: number;
+  mrp: number;
+  category_code?: string | null;
   selling_price: number;
   status: string;
 }
@@ -605,14 +609,25 @@ export interface ControlPlaneBarcodeAllocation {
   source: string;
 }
 
+export interface ControlPlaneBarcodeAutomaticDiscountHint {
+  campaign_name: string;
+  discount_type: string;
+  discount_value: number;
+  scope: string;
+}
+
 export interface ControlPlaneBarcodeScanLookup {
   product_id: string;
   product_name: string;
   sku_code: string;
   barcode: string;
+  mrp: number;
   selling_price: number;
   stock_on_hand: number;
   availability_status: string;
+  reorder_point?: number | null;
+  target_stock?: number | null;
+  automatic_discount_hint?: ControlPlaneBarcodeAutomaticDiscountHint | null;
 }
 
 export interface ControlPlaneBarcodeLabelPreview {
@@ -633,6 +648,8 @@ export interface ControlPlaneBranchCatalogItem {
   barcode: string;
   hsn_sac_code: string;
   gst_rate: number;
+  mrp: number;
+  category_code?: string | null;
   base_selling_price: number;
   selling_price_override?: number | null;
   effective_selling_price: number;
@@ -1411,8 +1428,15 @@ export interface ControlPlaneSaleLine {
   sku_code: string;
   hsn_sac_code: string;
   quantity: number;
+  mrp?: number;
+  unit_selling_price?: number;
   unit_price: number;
   gst_rate: number;
+  automatic_discount_amount?: number;
+  promotion_code_discount_amount?: number;
+  promotion_discount_source?: string | null;
+  taxable_amount?: number;
+  tax_amount?: number;
   line_subtotal: number;
   tax_total: number;
   line_total: number;
@@ -1436,10 +1460,17 @@ export interface ControlPlaneSale {
   irn_status: string;
   invoice_number: string;
   issued_on: string;
+  mrp_total?: number;
+  selling_price_subtotal?: number;
   subtotal: number;
   cgst_total: number;
   sgst_total: number;
   igst_total: number;
+  automatic_campaign_name?: string | null;
+  automatic_discount_total?: number;
+  promotion_code_discount_total?: number;
+  total_discount?: number;
+  invoice_total?: number;
   grand_total: number;
   promotion_campaign_id?: string | null;
   promotion_code_id?: string | null;
@@ -1462,6 +1493,11 @@ export interface ControlPlaneSaleRecord {
   invoice_kind: string;
   irn_status: string;
   payment_method: string;
+  automatic_campaign_name?: string | null;
+  automatic_discount_total?: number;
+  promotion_code_discount_total?: number;
+  total_discount?: number;
+  invoice_total?: number;
   grand_total: number;
   promotion_campaign_id?: string | null;
   promotion_code_id?: string | null;
@@ -1490,8 +1526,12 @@ export interface ControlPlaneCheckoutPaymentSession {
   provider_status: string;
   order_amount: number;
   currency_code: string;
+  automatic_campaign_name?: string | null;
+  automatic_discount_total?: number;
   promotion_code?: string | null;
   promotion_discount_amount: number;
+  promotion_code_discount_total?: number;
+  store_credit_amount?: number;
   action_payload: ControlPlaneCheckoutPaymentActionPayload;
   action_expires_at?: string | null;
   qr_payload?: ControlPlaneCheckoutPaymentQrPayload | null;
@@ -1523,12 +1563,16 @@ export interface ControlPlanePromotionCampaign {
   tenant_id: string;
   name: string;
   status: string;
+  trigger_mode: string;
+  scope: string;
   discount_type: string;
   discount_value: number;
   minimum_order_amount?: number | null;
   maximum_discount_amount?: number | null;
   redemption_limit_total?: number | null;
   redemption_count: number;
+  target_product_ids: string[];
+  target_category_codes: string[];
   created_at: string;
   updated_at: string;
   codes: ControlPlanePromotionCode[];
@@ -1536,6 +1580,60 @@ export interface ControlPlanePromotionCampaign {
 
 export interface ControlPlanePromotionCampaignListResponse {
   records: ControlPlanePromotionCampaign[];
+}
+
+export interface ControlPlaneCheckoutPricePreviewCampaign {
+  id: string;
+  name: string;
+  trigger_mode: string;
+  scope: string;
+  discount_type: string;
+  discount_value: number;
+}
+
+export interface ControlPlaneCheckoutPricePreviewCodeCampaign extends ControlPlaneCheckoutPricePreviewCampaign {
+  code_id: string;
+  code: string;
+}
+
+export interface ControlPlaneCheckoutPricePreviewSummary {
+  mrp_total: number;
+  selling_price_subtotal: number;
+  automatic_discount_total: number;
+  promotion_code_discount_total: number;
+  loyalty_discount_total: number;
+  total_discount: number;
+  tax_total: number;
+  invoice_total: number;
+  grand_total: number;
+  store_credit_amount: number;
+  final_payable_amount: number;
+}
+
+export interface ControlPlaneCheckoutPricePreviewLine {
+  product_id: string;
+  product_name: string;
+  sku_code: string;
+  quantity: number;
+  mrp: number;
+  unit_selling_price: number;
+  automatic_discount_amount: number;
+  promotion_code_discount_amount: number;
+  promotion_discount_source?: string | null;
+  taxable_amount: number;
+  tax_amount: number;
+  line_total: number;
+}
+
+export interface ControlPlaneCheckoutPricePreview {
+  customer_profile_id?: string | null;
+  customer_name: string;
+  customer_gstin?: string | null;
+  automatic_campaign?: ControlPlaneCheckoutPricePreviewCampaign | null;
+  promotion_code_campaign?: ControlPlaneCheckoutPricePreviewCodeCampaign | null;
+  summary: ControlPlaneCheckoutPricePreviewSummary;
+  lines: ControlPlaneCheckoutPricePreviewLine[];
+  tax_lines: ControlPlaneInvoiceTaxLine[];
 }
 
 export interface ControlPlaneCustomerProfile {

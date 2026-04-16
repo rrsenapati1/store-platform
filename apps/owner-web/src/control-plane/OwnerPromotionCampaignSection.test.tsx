@@ -25,12 +25,16 @@ describe('owner promotion campaign section', () => {
     tenant_id: string;
     name: string;
     status: string;
+    trigger_mode: string;
+    scope: string;
     discount_type: string;
     discount_value: number;
     minimum_order_amount: number | null;
     maximum_discount_amount: number | null;
     redemption_limit_total: number | null;
     redemption_count: number;
+    target_product_ids: string[];
+    target_category_codes: string[];
     created_at: string;
     updated_at: string;
     codes: Array<{
@@ -53,12 +57,16 @@ describe('owner promotion campaign section', () => {
         tenant_id: 'tenant-acme',
         name: 'Weekend Savings',
         status: 'ACTIVE',
+        trigger_mode: 'CODE',
+        scope: 'CART',
         discount_type: 'PERCENTAGE',
         discount_value: 10,
         minimum_order_amount: 200,
         maximum_discount_amount: 40,
         redemption_limit_total: 500,
         redemption_count: 2,
+        target_product_ids: [],
+        target_category_codes: [],
         created_at: '2026-04-17T09:00:00Z',
         updated_at: '2026-04-17T09:00:00Z',
         codes: [],
@@ -79,12 +87,16 @@ describe('owner promotion campaign section', () => {
           tenant_id: 'tenant-acme',
           name: payload.name,
           status: payload.status,
+          trigger_mode: payload.trigger_mode,
+          scope: payload.scope,
           discount_type: payload.discount_type,
           discount_value: Number(payload.discount_value),
           minimum_order_amount: payload.minimum_order_amount,
           maximum_discount_amount: payload.maximum_discount_amount,
           redemption_limit_total: payload.redemption_limit_total,
           redemption_count: 0,
+          target_product_ids: payload.target_product_ids ?? [],
+          target_category_codes: payload.target_category_codes ?? [],
           created_at: '2026-04-17T09:30:00Z',
           updated_at: '2026-04-17T09:30:00Z',
           codes: [],
@@ -178,6 +190,45 @@ describe('owner promotion campaign section', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reactivate selected campaign' }));
     await waitFor(() => {
       expect(screen.getByText('ACTIVE')).toBeInTheDocument();
+    });
+  });
+
+  test('creates an automatic item/category campaign with explicit targets', async () => {
+    render(<OwnerPromotionCampaignSection accessToken="access-token" tenantId="tenant-acme" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh promotion campaigns' }));
+    await screen.findByText('Weekend Savings');
+
+    fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Tea Auto' } });
+    fireEvent.change(screen.getByLabelText('Trigger mode'), { target: { value: 'AUTOMATIC' } });
+    fireEvent.change(screen.getByLabelText('Scope'), { target: { value: 'ITEM_CATEGORY' } });
+    fireEvent.change(screen.getByLabelText('Discount type'), { target: { value: 'PERCENTAGE' } });
+    fireEvent.change(screen.getByLabelText('Discount value'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('Target product ids'), { target: { value: 'product-1, product-2' } });
+    fireEvent.change(screen.getByLabelText('Target category codes'), { target: { value: 'TEA, SNACKS' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create promotion campaign' }));
+
+    expect(await screen.findByText('Tea Auto')).toBeInTheDocument();
+    expect(screen.getByText('AUTOMATIC')).toBeInTheDocument();
+    expect(screen.getByText('ITEM_CATEGORY')).toBeInTheDocument();
+    expect(screen.getByText('product-1, product-2')).toBeInTheDocument();
+    expect(screen.getByText('TEA, SNACKS')).toBeInTheDocument();
+    expect(screen.getByText('Automatic campaigns apply without cashier-entered shared codes.')).toBeInTheDocument();
+
+    await waitFor(() => {
+      const createCampaignCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) =>
+          String(url).endsWith('/promotion-campaigns')
+          && init?.method === 'POST'
+          && JSON.parse(String(init?.body ?? '{}')).name === 'Tea Auto',
+      );
+      expect(createCampaignCall).toBeDefined();
+      expect(JSON.parse(String(createCampaignCall?.[1]?.body ?? '{}'))).toMatchObject({
+        trigger_mode: 'AUTOMATIC',
+        scope: 'ITEM_CATEGORY',
+        target_product_ids: ['product-1', 'product-2'],
+        target_category_codes: ['TEA', 'SNACKS'],
+      });
     });
   });
 });

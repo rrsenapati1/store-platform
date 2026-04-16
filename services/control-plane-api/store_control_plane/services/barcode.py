@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import AuditRepository, BarcodeRepository, InventoryRepository, TenantRepository
+from .checkout_pricing import CheckoutPricingService
 from .barcode_policy import allocate_barcode, build_barcode_label_preview, normalize_barcode
 
 
@@ -14,6 +15,7 @@ class BarcodeService:
         self._barcode_repo = BarcodeRepository(session)
         self._inventory_repo = InventoryRepository(session)
         self._audit_repo = AuditRepository(session)
+        self._checkout_pricing_service = CheckoutPricingService(session)
 
     async def allocate_product_barcode(
         self,
@@ -84,16 +86,24 @@ class BarcodeService:
             product_id=product.id,
         )
         effective_selling_price = item.selling_price_override if item.selling_price_override is not None else product.selling_price
+        automatic_discount_hint = await self._checkout_pricing_service.describe_scan_automatic_discount_hint(
+            tenant_id=tenant_id,
+            product_id=product.id,
+            category_code=product.category_code,
+            unit_selling_price=effective_selling_price,
+        )
         return {
             "product_id": product.id,
             "product_name": product.name,
             "sku_code": product.sku_code,
             "barcode": normalized_barcode,
+            "mrp": product.mrp,
             "selling_price": effective_selling_price,
             "stock_on_hand": stock_on_hand,
             "availability_status": item.availability_status,
             "reorder_point": item.reorder_point,
             "target_stock": item.target_stock,
+            "automatic_discount_hint": automatic_discount_hint,
         }
 
     async def preview_branch_barcode_label(

@@ -210,7 +210,16 @@ export const ownerControlPlaneClient = {
   createCatalogProduct(
     accessToken: string,
     tenantId: string,
-    payload: { name: string; sku_code: string; barcode: string; hsn_sac_code: string; gst_rate: number; selling_price: number },
+    payload: {
+      name: string;
+      sku_code: string;
+      barcode: string;
+      hsn_sac_code: string;
+      gst_rate: number;
+      mrp: number;
+      category_code?: string | null;
+      selling_price: number;
+    },
   ) {
     return request<ControlPlaneCatalogProduct>(
       `/v1/tenants/${tenantId}/catalog/products`,
@@ -812,11 +821,15 @@ export const ownerControlPlaneClient = {
     payload: {
       name: string;
       status: string;
+      trigger_mode?: string;
+      scope?: string;
       discount_type: string;
       discount_value: number;
       minimum_order_amount?: number | null;
       maximum_discount_amount?: number | null;
       redemption_limit_total?: number | null;
+      target_product_ids?: string[] | null;
+      target_category_codes?: string[] | null;
     },
   ) {
     return request<ControlPlanePromotionCampaign>(
@@ -835,11 +848,15 @@ export const ownerControlPlaneClient = {
     payload: {
       name?: string | null;
       status?: string | null;
+      trigger_mode?: string | null;
+      scope?: string | null;
       discount_type?: string | null;
       discount_value?: number | null;
       minimum_order_amount?: number | null;
       maximum_discount_amount?: number | null;
       redemption_limit_total?: number | null;
+      target_product_ids?: string[] | null;
+      target_category_codes?: string[] | null;
     },
   ) {
     return request<ControlPlanePromotionCampaign>(

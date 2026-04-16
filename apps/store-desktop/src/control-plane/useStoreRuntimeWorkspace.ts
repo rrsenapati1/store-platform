@@ -16,6 +16,7 @@ import type {
   ControlPlaneGoodsReceipt,
   ControlPlaneGoodsReceiptRecord,
   ControlPlaneInventorySnapshotRecord,
+  ControlPlaneCheckoutPricePreview,
   ControlPlanePrintJob,
   ControlPlanePurchaseOrder,
   ControlPlaneReplenishmentBoard,
@@ -70,6 +71,7 @@ import {
 import { runLoadCustomerStoreCredit } from './storeCreditActions';
 import { runLoadCustomerLoyalty, runLoadLoyaltyProgram } from './storeLoyaltyActions';
 import { normalizePromotionCodeInput, resolvePromotionCodePayload } from './storePromotionActions';
+import { runLoadCheckoutPricePreview } from './storePricingPreviewActions';
 import {
   runApproveStockCountSession,
   runCancelStockCountSession,
@@ -183,6 +185,8 @@ export function useStoreRuntimeWorkspace() {
   const [selectedCustomerStoreCredit, setSelectedCustomerStoreCredit] = useState<ControlPlaneCustomerStoreCredit | null>(null);
   const [selectedCustomerLoyalty, setSelectedCustomerLoyalty] = useState<ControlPlaneCustomerLoyalty | null>(null);
   const [loyaltyProgram, setLoyaltyProgram] = useState<ControlPlaneLoyaltyProgram | null>(null);
+  const [checkoutPricePreview, setCheckoutPricePreview] = useState<ControlPlaneCheckoutPricePreview | null>(null);
+  const [checkoutPricePreviewError, setCheckoutPricePreviewError] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
   const [promotionCode, setPromotionCodeState] = useState('');
@@ -231,6 +235,7 @@ export function useStoreRuntimeWorkspace() {
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? actor?.branch_memberships[0]?.tenant_id ?? '';
   const branchId = actor?.branch_memberships[0]?.branch_id ?? branches[0]?.branch_id ?? '';
   const selectedCatalogItem = branchCatalogItems[0] ?? null;
+  const parsedStoreCreditAmount = selectedCustomerProfile ? Number(storeCreditAmount || 0) : 0;
   const parsedLoyaltyPointsToRedeem = selectedCustomerProfile ? Number(loyaltyPointsToRedeem || 0) : 0;
   const runtimeHardware = useStoreRuntimeHardwareIntegration({
     runtimeShellKind: runtimeShellStatus?.runtime_kind ?? null,
@@ -306,6 +311,7 @@ export function useStoreRuntimeWorkspace() {
     customerGstin,
     promotionCode,
     loyaltyPointsToRedeem: parsedLoyaltyPointsToRedeem,
+    storeCreditAmount: parsedStoreCreditAmount,
     saleQuantity,
     paymentMethod,
     isSessionLive,
@@ -358,6 +364,23 @@ export function useStoreRuntimeWorkspace() {
     setPromotionCodeState('');
   }
 
+  useEffect(() => {
+    setCheckoutPricePreview(null);
+    setCheckoutPricePreviewError('');
+  }, [
+    accessToken,
+    branchId,
+    customerGstin,
+    customerName,
+    loyaltyPointsToRedeem,
+    promotionCode,
+    saleQuantity,
+    selectedCatalogItem?.product_id,
+    selectedCustomerProfile?.id,
+    storeCreditAmount,
+    tenantId,
+  ]);
+
   function resetRuntimeWorkspaceState() {
     sessionRecordRef.current = null;
     applyStateTransition(() => {
@@ -407,6 +430,8 @@ export function useStoreRuntimeWorkspace() {
       setSelectedCustomerStoreCredit(null);
       setSelectedCustomerLoyalty(null);
       setLoyaltyProgram(null);
+      setCheckoutPricePreview(null);
+      setCheckoutPricePreviewError('');
       setCustomerName('');
       setCustomerGstin('');
       setPromotionCodeState('');
@@ -1256,7 +1281,6 @@ export function useStoreRuntimeWorkspace() {
   async function createSalesInvoice() {
     const catalogItem = selectedCatalogItem;
     const parsedPromotionCode = resolvePromotionCodePayload(promotionCode);
-    const parsedStoreCreditAmount = selectedCustomerProfile ? Number(storeCreditAmount || 0) : 0;
     const parsedLoyaltyRedemption = selectedCustomerProfile ? Number(loyaltyPointsToRedeem || 0) : 0;
     if (!catalogItem || !actor) {
       return;
@@ -1443,6 +1467,47 @@ export function useStoreRuntimeWorkspace() {
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to look up scanned barcode');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function refreshCheckoutPricePreview() {
+    if (!accessToken || !tenantId || !branchId) {
+      applyStateTransition(() => {
+        setCheckoutPricePreview(null);
+        setCheckoutPricePreviewError('Checkout pricing preview requires a live online runtime session.');
+        setErrorMessage('Checkout pricing preview requires a live online runtime session.');
+      });
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    setCheckoutPricePreviewError('');
+    try {
+      const preview = await runLoadCheckoutPricePreview({
+        accessToken,
+        tenantId,
+        branchId,
+        selectedCatalogItem,
+        customerProfileId: selectedCustomerProfile?.id ?? null,
+        customerName,
+        customerGstin,
+        promotionCode,
+        loyaltyPointsToRedeem: parsedLoyaltyPointsToRedeem,
+        storeCreditAmount: parsedStoreCreditAmount,
+        saleQuantity,
+      });
+      applyStateTransition(() => {
+        setCheckoutPricePreview(preview);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to refresh checkout pricing.';
+      applyStateTransition(() => {
+        setCheckoutPricePreview(null);
+        setCheckoutPricePreviewError(message);
+        setErrorMessage(message);
+      });
     } finally {
       setIsBusy(false);
     }
@@ -2151,6 +2216,8 @@ export function useStoreRuntimeWorkspace() {
     cancelCheckoutPaymentSession,
     checkoutPaymentSession: runtimeCheckoutPayment.checkoutPaymentSession,
     checkoutPaymentHistory: runtimeCheckoutPayment.checkoutPaymentHistory,
+    checkoutPricePreview,
+    checkoutPricePreviewError,
     clearSelectedCustomerProfile,
     createCustomerProfileFromCheckout,
     customerGstin,
@@ -2281,6 +2348,7 @@ export function useStoreRuntimeWorkspace() {
     replacementQuantity,
     refundAmount,
     refundMethod,
+    refreshCheckoutPricePreview,
     refreshRuntimeSession,
     refreshCheckoutPaymentSession,
     retryCheckoutPaymentSession,

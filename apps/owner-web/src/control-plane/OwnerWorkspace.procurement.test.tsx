@@ -75,6 +75,8 @@ describe('owner procurement foundation flow', () => {
             barcode: '8901234567890',
             hsn_sac_code: '0902',
             gst_rate: 5,
+            mrp: 120,
+            category_code: 'TEA',
             selling_price: 92.5,
             status: 'ACTIVE',
           },
@@ -297,7 +299,7 @@ describe('owner procurement foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
     expect(await screen.findByText('Acme Owner')).toBeInTheDocument();
-    expect(await screen.findByText('Classic Tea (tea-classic-250g)')).toBeInTheDocument();
+    expect(await screen.findByText('Classic Tea (tea-classic-250g) :: MRP 120 :: TEA')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Supplier name'), { target: { value: 'Acme Tea Traders' } });
     fireEvent.change(screen.getByLabelText('Supplier GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
