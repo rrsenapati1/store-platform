@@ -15,6 +15,7 @@ interface UseStoreRuntimeCheckoutPaymentArgs {
   tenantId: string;
   branchId: string;
   selectedCatalogItem: ControlPlaneBranchCatalogItem | null;
+  customerProfileId: string | null;
   customerName: string;
   customerGstin: string;
   saleQuantity: string;
@@ -73,6 +74,7 @@ export function useStoreRuntimeCheckoutPayment({
   tenantId,
   branchId,
   selectedCatalogItem,
+  customerProfileId,
   customerName,
   customerGstin,
   saleQuantity,
@@ -162,6 +164,7 @@ export function useStoreRuntimeCheckoutPayment({
         payment_method: paymentMethod,
         handoff_surface: methodConfiguration.handoffSurface,
         provider_payment_mode: methodConfiguration.providerPaymentMode,
+        customer_profile_id: customerProfileId,
         customer_name: customerName,
         customer_gstin: customerGstin || null,
         lines: [{ product_id: selectedCatalogItem.product_id, quantity }],

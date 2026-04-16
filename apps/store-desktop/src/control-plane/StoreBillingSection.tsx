@@ -106,6 +106,7 @@ function CheckoutPaymentActionCard({ checkoutPaymentSession }: { checkoutPayment
 
 export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const selectedItem = workspace.branchCatalogItems[0];
+  const hasSelectedCustomerProfile = workspace.selectedCustomerProfile !== null;
   const paymentMethodDescription = describePaymentMethod(workspace.paymentMethod);
   const isDigitalCheckout = isProviderBackedPaymentMethod(workspace.paymentMethod);
   const checkoutPaymentSession = workspace.checkoutPaymentSession;
@@ -131,8 +132,58 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
   return (
     <>
       <SectionCard eyebrow="Billing foundation" title="Counter checkout">
-        <FormField id="runtime-customer-name" label="Customer name" value={workspace.customerName} onChange={workspace.setCustomerName} />
-        <FormField id="runtime-customer-gstin" label="Customer GSTIN" value={workspace.customerGstin} onChange={workspace.setCustomerGstin} />
+        <FormField
+          id="runtime-customer-profile-search"
+          label="Customer profile search"
+          value={workspace.customerProfileSearchQuery}
+          onChange={workspace.setCustomerProfileSearchQuery}
+        />
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+          <ActionButton onClick={() => void workspace.loadCustomerProfiles()} disabled={workspace.isBusy || !workspace.isSessionLive}>
+            Find customer profiles
+          </ActionButton>
+          <ActionButton
+            onClick={() => void workspace.createCustomerProfileFromCheckout()}
+            disabled={workspace.isBusy || !workspace.isSessionLive || !workspace.customerName.trim()}
+          >
+            Create customer profile from checkout
+          </ActionButton>
+          {hasSelectedCustomerProfile ? (
+            <ActionButton onClick={() => void workspace.clearSelectedCustomerProfile()} disabled={workspace.isBusy}>
+              Use manual customer details
+            </ActionButton>
+          ) : null}
+        </div>
+        {workspace.customerProfiles.length ? (
+          <ul style={{ marginTop: 0, marginBottom: '16px', color: '#4e5871', lineHeight: 1.7, paddingLeft: '20px' }}>
+            {workspace.customerProfiles.map((profile) => (
+              <li key={profile.id}>
+                <ActionButton onClick={() => workspace.selectCustomerProfile(profile.id)} disabled={workspace.isBusy}>
+                  {`Use customer profile ${profile.full_name}`}
+                </ActionButton>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {hasSelectedCustomerProfile ? (
+          <p style={{ marginTop: 0, marginBottom: '14px', color: '#4e5871' }}>
+            Linked customer profile: <strong>{workspace.selectedCustomerProfile?.full_name}</strong>
+          </p>
+        ) : null}
+        <FormField
+          id="runtime-customer-name"
+          label="Customer name"
+          value={workspace.customerName}
+          onChange={workspace.setCustomerName}
+          disabled={hasSelectedCustomerProfile}
+        />
+        <FormField
+          id="runtime-customer-gstin"
+          label="Customer GSTIN"
+          value={workspace.customerGstin}
+          onChange={workspace.setCustomerGstin}
+          disabled={hasSelectedCustomerProfile}
+        />
         <FormField id="runtime-sale-quantity" label="Sale quantity" value={workspace.saleQuantity} onChange={workspace.setSaleQuantity} />
         <FormField id="runtime-payment-method" label="Payment method" value={workspace.paymentMethod} onChange={workspace.setPaymentMethod} />
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>

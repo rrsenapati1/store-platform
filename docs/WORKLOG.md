@@ -2,6 +2,21 @@
 
 ## 2026-04-16
 
+- Started `V2-005` with first-class customer profile foundation:
+  - added control-plane-owned customer profiles with tenant-scoped create/search/update/archive/reactivate routes, linked sales and checkout payment sessions to optional `customer_profile_id`, and kept invoice-facing customer snapshots intact for anonymous and historical compatibility
+  - upgraded owner-web customer insights from read-only reporting into profile-aware customer management so operators can search, inspect history, edit core fields, and archive or reactivate customer profiles inside the existing customer surface
+  - extended Store Desktop checkout with customer-profile search, inline customer creation from current checkout fields, profile selection and clearing, and payment/sale payload linkage so cashier flows can use real customer identity without making profiles mandatory
+  - hardened Store Desktop test verification by resetting browser runtime storage between tests and raising app-level Vitest timeouts to match the expanded full-suite integration load
+- Verified:
+  - `C:\Users\Nebula\AppData\Local\Python\bin\python.exe -m pytest services/control-plane-api/tests/test_customer_profile_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_customer_reporting_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 - Expanded `V2-004` on Store Desktop with replenishment-board visibility inside assisted restock:
   - extended the desktop control-plane client with the existing `replenishment-board` route so the runtime can read low-stock posture without adding a new backend contract
   - updated the extracted restock-board loader and `useStoreRuntimeWorkspace.ts` so desktop now tracks both restock tasks and replenishment suggestions, supports selecting a low-stock product into the current restock draft, and keeps scan-first restock intact

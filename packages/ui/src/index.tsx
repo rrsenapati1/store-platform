@@ -86,6 +86,7 @@ export function FormField(
     placeholder?: string;
     onChange: (value: string) => void;
     multiline?: boolean;
+    disabled?: boolean;
   }>,
 ) {
   const inputStyle: React.CSSProperties = {
@@ -108,6 +109,7 @@ export function FormField(
           value={props.value}
           placeholder={props.placeholder}
           rows={4}
+          disabled={props.disabled}
           onChange={(event) => props.onChange(event.target.value)}
           style={{ ...inputStyle, resize: 'vertical' }}
         />
@@ -116,6 +118,7 @@ export function FormField(
           id={props.id}
           value={props.value}
           placeholder={props.placeholder}
+          disabled={props.disabled}
           onChange={(event) => props.onChange(event.target.value)}
           style={inputStyle}
         />

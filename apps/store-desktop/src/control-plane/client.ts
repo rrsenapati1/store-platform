@@ -13,6 +13,7 @@ import type {
   ControlPlaneCheckoutPaymentSessionListResponse,
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
+  ControlPlaneCustomerProfile,
   ControlPlaneDeviceRecord,
   ControlPlaneExchange,
   ControlPlaneGoodsReceipt,
@@ -518,6 +519,35 @@ export const storeControlPlaneClient = {
       accessToken,
     );
   },
+  listCustomerProfiles(accessToken: string, tenantId: string, query?: string) {
+    const queryParam = query ? `?query=${encodeURIComponent(query)}` : '';
+    return request<{ records: ControlPlaneCustomerProfile[] }>(
+      `/v1/tenants/${tenantId}/customer-profiles${queryParam}`,
+      undefined,
+      accessToken,
+    );
+  },
+  createCustomerProfile(
+    accessToken: string,
+    tenantId: string,
+    payload: {
+      full_name: string;
+      phone?: string | null;
+      email?: string | null;
+      gstin?: string | null;
+      default_note?: string | null;
+      tags?: string[];
+    },
+  ) {
+    return request<ControlPlaneCustomerProfile>(
+      `/v1/tenants/${tenantId}/customer-profiles`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
   getCustomerHistory(accessToken: string, tenantId: string, customerId: string) {
     return request<ControlPlaneCustomerHistoryResponse>(
       `/v1/tenants/${tenantId}/customers/${customerId}/history`,
@@ -606,6 +636,7 @@ export const storeControlPlaneClient = {
     tenantId: string,
     branchId: string,
     payload: {
+      customer_profile_id?: string | null;
       customer_name: string;
       customer_gstin?: string | null;
       payment_method: string;
@@ -630,6 +661,7 @@ export const storeControlPlaneClient = {
       payment_method: string;
       handoff_surface?: string | null;
       provider_payment_mode?: string | null;
+      customer_profile_id?: string | null;
       customer_name: string;
       customer_gstin?: string | null;
       lines: Array<{ product_id: string; quantity: number }>;
