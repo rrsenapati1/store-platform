@@ -10,6 +10,7 @@ import { StoreRuntimeCacheSection } from './StoreRuntimeCacheSection';
 import { StoreRuntimeOutboxSection } from './StoreRuntimeOutboxSection';
 import { StoreExchangeSection } from './StoreExchangeSection';
 import { StorePrintQueueSection } from './StorePrintQueueSection';
+import { StoreReceivingSection } from './StoreReceivingSection';
 import { StoreRestockSection } from './StoreRestockSection';
 import { StoreRuntimeReleaseSection } from './StoreRuntimeReleaseSection';
 import { StoreReturnsSection } from './StoreReturnsSection';
@@ -264,6 +265,7 @@ export function StoreRuntimeWorkspace() {
       {!isLocalAuthGateActive ? <StoreCustomerDisplaySection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBillingSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBarcodeLookupSection workspace={workspace} /> : null}
+      {!isLocalAuthGateActive ? <StoreReceivingSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreRestockSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreStockCountSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBatchExpirySection workspace={workspace} /> : null}

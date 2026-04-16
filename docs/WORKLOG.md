@@ -2,6 +2,13 @@
 
 ## 2026-04-16
 
+- Expanded `V2-004` on Store Desktop with reviewed receiving workflow:
+  - added desktop client routes for receiving-board, purchase-order detail, goods-receipt creation, and goods-receipt history so the runtime can execute reviewed receiving against the existing control-plane authority model
+  - extracted receiving mutations into `storeReceivingActions.ts` and extended `useStoreRuntimeWorkspace.ts` with a board-driven reviewed-receiving flow that loads approved POs, builds line drafts from PO detail, validates quantities, creates the GRN, and refreshes board, receipts, and inventory snapshot
+  - introduced `StoreReceivingSection.tsx` so desktop operators can select an approved PO from the receiving board, review per-line quantities and discrepancy notes, add a receipt note, and inspect the latest posted goods receipt
+- Verified:
+  - `npm run test --workspace @store/store-desktop -- client.receiving.test.ts StoreRuntimeWorkspace.receiving.test.tsx StoreReceivingSection.test.tsx`
+
 - Expanded `V2-004` on Store Mobile and Inventory Tablet with the fifth real control-plane-backed branch workflow:
   - extended the control-plane barcode scan response so branch scan lookup now carries `reorder_point` and `target_stock` alongside price, stock, and availability, keeping branch scan semantics in one backend read model
   - added `lookupCatalogScan` to the Android control-plane client plus a new `RemoteScanLookupRepository`, so paired runtimes now resolve scanned products against live branch data instead of the in-memory demo scan repository

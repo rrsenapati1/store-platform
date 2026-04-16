@@ -10,8 +10,12 @@ import type {
   ControlPlaneExchange,
   ControlPlaneBranchRecord,
   ControlPlaneDeviceRecord,
+  ControlPlaneGoodsReceipt,
+  ControlPlaneGoodsReceiptRecord,
   ControlPlaneInventorySnapshotRecord,
   ControlPlanePrintJob,
+  ControlPlanePurchaseOrder,
+  ControlPlaneReceivingBoard,
   ControlPlaneRestockBoard,
   ControlPlaneRestockTask,
   ControlPlaneRuntimeDeviceClaimResolution,
@@ -61,6 +65,12 @@ import {
   runLoadStockCountBoard,
   runRecordStockCountSession,
 } from './storeStockCountActions';
+import {
+  runCreateGoodsReceipt,
+  runLoadReceivingBoard,
+  runSelectReceivingPurchaseOrder,
+  type StoreReceivingLineDraft,
+} from './storeReceivingActions';
 import {
   clearStoreRuntimeLocalAuth,
   isStoreRuntimeLocalAuthOfflineExpired,
@@ -128,6 +138,12 @@ export function useStoreRuntimeWorkspace() {
   const [activeBatchExpirySession, setActiveBatchExpirySession] = useState<ControlPlaneBatchExpiryReviewSession | null>(null);
   const [latestBatchWriteOff, setLatestBatchWriteOff] = useState<ControlPlaneBatchExpiryWriteOff | null>(null);
   const [latestScanLookup, setLatestScanLookup] = useState<ControlPlaneBarcodeScanLookup | null>(null);
+  const [receivingBoard, setReceivingBoard] = useState<ControlPlaneReceivingBoard | null>(null);
+  const [goodsReceipts, setGoodsReceipts] = useState<ControlPlaneGoodsReceiptRecord[]>([]);
+  const [latestGoodsReceipt, setLatestGoodsReceipt] = useState<ControlPlaneGoodsReceipt | null>(null);
+  const [selectedReceivingPurchaseOrderId, setSelectedReceivingPurchaseOrderId] = useState('');
+  const [selectedReceivingPurchaseOrder, setSelectedReceivingPurchaseOrder] = useState<ControlPlanePurchaseOrder | null>(null);
+  const [receivingLineDrafts, setReceivingLineDrafts] = useState<StoreReceivingLineDraft[]>([]);
   const [restockBoard, setRestockBoard] = useState<ControlPlaneRestockBoard | null>(null);
   const [latestRestockTask, setLatestRestockTask] = useState<ControlPlaneRestockTask | null>(null);
   const [stockCountBoard, setStockCountBoard] = useState<ControlPlaneStockCountBoard | null>(null);
@@ -157,6 +173,7 @@ export function useStoreRuntimeWorkspace() {
   const [restockSourcePosture, setRestockSourcePosture] = useState('BACKROOM_AVAILABLE');
   const [restockNote, setRestockNote] = useState('');
   const [restockCompletionNote, setRestockCompletionNote] = useState('');
+  const [goodsReceiptNote, setGoodsReceiptNote] = useState('');
   const [selectedStockCountProductId, setSelectedStockCountProductId] = useState('');
   const [stockCountNote, setStockCountNote] = useState('');
   const [blindCountedQuantity, setBlindCountedQuantity] = useState('');
@@ -327,6 +344,12 @@ export function useStoreRuntimeWorkspace() {
       setActiveBatchExpirySession(null);
       setLatestBatchWriteOff(null);
       setLatestScanLookup(null);
+      setReceivingBoard(null);
+      setGoodsReceipts([]);
+      setLatestGoodsReceipt(null);
+      setSelectedReceivingPurchaseOrderId('');
+      setSelectedReceivingPurchaseOrder(null);
+      setReceivingLineDrafts([]);
       setRestockBoard(null);
       setLatestRestockTask(null);
       setLatestSale(null);
@@ -341,6 +364,7 @@ export function useStoreRuntimeWorkspace() {
       setRestockSourcePosture('BACKROOM_AVAILABLE');
       setRestockNote('');
       setRestockCompletionNote('');
+      setGoodsReceiptNote('');
       setExpirySessionNote('');
       setExpiryWriteOffQuantity('1');
       setExpiryWriteOffReason('');
@@ -356,6 +380,35 @@ export function useStoreRuntimeWorkspace() {
       setRestockSourcePosture('BACKROOM_AVAILABLE');
       setRestockNote('');
       setRestockCompletionNote('');
+    });
+  }
+
+  function resetReceivingDraft() {
+    applyStateTransition(() => {
+      setSelectedReceivingPurchaseOrderId('');
+      setSelectedReceivingPurchaseOrder(null);
+      setReceivingLineDrafts([]);
+      setGoodsReceiptNote('');
+    });
+  }
+
+  function setReceivingLineQuantity(productId: string, value: string) {
+    applyStateTransition(() => {
+      setReceivingLineDrafts((current) => current.map((line) => (
+        line.product_id === productId
+          ? { ...line, received_quantity: value }
+          : line
+      )));
+    });
+  }
+
+  function setReceivingLineDiscrepancyNote(productId: string, value: string) {
+    applyStateTransition(() => {
+      setReceivingLineDrafts((current) => current.map((line) => (
+        line.product_id === productId
+          ? { ...line, discrepancy_note: value }
+          : line
+      )));
     });
   }
 
@@ -1247,6 +1300,61 @@ export function useStoreRuntimeWorkspace() {
     });
   }
 
+  async function loadReceivingBoard() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    await runLoadReceivingBoard({
+      accessToken,
+      tenantId,
+      branchId,
+      setIsBusy,
+      setErrorMessage,
+      setReceivingBoard,
+      setGoodsReceipts,
+      setLatestGoodsReceipt,
+    });
+  }
+
+  async function selectReceivingPurchaseOrder(purchaseOrderId: string) {
+    if (!accessToken || !tenantId || !branchId || !purchaseOrderId) {
+      return;
+    }
+    await runSelectReceivingPurchaseOrder({
+      accessToken,
+      tenantId,
+      branchId,
+      purchaseOrderId,
+      setIsBusy,
+      setErrorMessage,
+      setSelectedReceivingPurchaseOrderId,
+      setSelectedReceivingPurchaseOrder,
+      setReceivingLineDrafts,
+      setGoodsReceiptNote,
+    });
+  }
+
+  async function createGoodsReceipt() {
+    if (!accessToken || !tenantId || !branchId || !selectedReceivingPurchaseOrderId) {
+      return;
+    }
+    await runCreateGoodsReceipt({
+      accessToken,
+      tenantId,
+      branchId,
+      purchaseOrderId: selectedReceivingPurchaseOrderId,
+      goodsReceiptNote,
+      receivingLineDrafts,
+      setIsBusy,
+      setErrorMessage,
+      setLatestGoodsReceipt,
+      setReceivingBoard,
+      setGoodsReceipts,
+      setInventorySnapshot,
+      resetReceivingDraft,
+    });
+  }
+
   async function loadStockCountBoard() {
     if (!accessToken || !tenantId || !branchId) {
       return;
@@ -1834,6 +1942,7 @@ export function useStoreRuntimeWorkspace() {
     printJobs,
     loadBatchExpiryBoard,
     loadBatchExpiryReport,
+    loadReceivingBoard,
     loadRestockBoard,
     loadStockCountBoard,
     queueLatestCreditNotePrint,
@@ -1918,6 +2027,15 @@ export function useStoreRuntimeWorkspace() {
     retryCheckoutPaymentSession,
     finalizeCheckoutPaymentSession,
     listCheckoutPaymentHistory: runtimeCheckoutPayment.listCheckoutPaymentHistory,
+    receivingBoard,
+    goodsReceipts,
+    latestGoodsReceipt,
+    selectedReceivingPurchaseOrderId,
+    selectedReceivingPurchaseOrder,
+    receivingLineDrafts,
+    goodsReceiptNote,
+    selectReceivingPurchaseOrder,
+    createGoodsReceipt,
     restockBoard,
     restockRequestedQuantity,
     restockPickedQuantity,
@@ -1962,6 +2080,9 @@ export function useStoreRuntimeWorkspace() {
     setRefundMethod,
     setReturnQuantity,
     setSaleQuantity,
+    setReceivingLineQuantity,
+    setReceivingLineDiscrepancyNote,
+    setGoodsReceiptNote,
     setStockCountNote,
     setStockCountReviewNote,
     setUnlockPin,

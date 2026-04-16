@@ -15,10 +15,14 @@ import type {
   ControlPlaneCustomerHistoryResponse,
   ControlPlaneDeviceRecord,
   ControlPlaneExchange,
+  ControlPlaneGoodsReceipt,
+  ControlPlaneGoodsReceiptRecord,
   ControlPlaneInventorySnapshotRecord,
   ControlPlaneOfflineSaleReplayRequest,
   ControlPlaneOfflineSaleReplayResponse,
   ControlPlanePrintJob,
+  ControlPlanePurchaseOrder,
+  ControlPlaneReceivingBoard,
   ControlPlaneRestockBoard,
   ControlPlaneRestockTask,
   ControlPlaneRuntimeDeviceClaimResolution,
@@ -199,6 +203,46 @@ export const storeControlPlaneClient = {
   listInventorySnapshot(accessToken: string, tenantId: string, branchId: string) {
     return request<{ records: ControlPlaneInventorySnapshotRecord[] }>(
       `/v1/tenants/${tenantId}/branches/${branchId}/inventory-snapshot`,
+      undefined,
+      accessToken,
+    );
+  },
+  getPurchaseOrder(accessToken: string, tenantId: string, branchId: string, purchaseOrderId: string) {
+    return request<ControlPlanePurchaseOrder>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/purchase-orders/${purchaseOrderId}`,
+      undefined,
+      accessToken,
+    );
+  },
+  getReceivingBoard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneReceivingBoard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/receiving-board`,
+      undefined,
+      accessToken,
+    );
+  },
+  createGoodsReceipt(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      purchase_order_id: string;
+      note?: string | null;
+      lines?: Array<{ product_id: string; received_quantity: number; discrepancy_note?: string | null }>;
+    },
+  ) {
+    return request<ControlPlaneGoodsReceipt>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/goods-receipts`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  listGoodsReceipts(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneGoodsReceiptRecord[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/goods-receipts`,
       undefined,
       accessToken,
     );
