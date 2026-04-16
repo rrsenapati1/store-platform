@@ -12,6 +12,7 @@ from ..utils import new_id, utc_now
 from .billing import BillingService
 from .billing_policy import build_sale_draft, ensure_sale_stock_available
 from .checkout_payment_providers import build_checkout_payment_provider
+from .customer_profiles import CustomerProfileService
 
 
 class CheckoutPaymentsService:
@@ -24,6 +25,7 @@ class CheckoutPaymentsService:
         self._billing_repo = BillingRepository(session)
         self._audit_repo = AuditRepository(session)
         self._billing_service = BillingService(session)
+        self._customer_profile_service = CustomerProfileService(session)
 
     async def create_checkout_payment_session(
         self,
@@ -35,6 +37,7 @@ class CheckoutPaymentsService:
         payment_method: str,
         handoff_surface: str | None,
         provider_payment_mode: str | None,
+        customer_profile_id: str | None,
         customer_name: str,
         customer_gstin: str | None,
         lines: list[dict[str, object]],
@@ -50,6 +53,7 @@ class CheckoutPaymentsService:
         draft, cart_snapshot = await self._build_checkout_sale_draft(
             tenant_id=tenant_id,
             branch_id=branch_id,
+            customer_profile_id=customer_profile_id,
             customer_name=customer_name,
             customer_gstin=customer_gstin,
             lines=lines,
@@ -58,12 +62,13 @@ class CheckoutPaymentsService:
             tenant_id=tenant_id,
             branch_id=branch_id,
             actor_user_id=actor_user_id,
+            customer_profile_id=customer_profile_id,
             provider_name=provider_name,
             payment_method=payment_method,
             handoff_surface=resolved_handoff_surface,
             provider_payment_mode=resolved_provider_payment_mode,
-            customer_name=customer_name,
-            customer_gstin=customer_gstin,
+            customer_name=draft.customer_name,
+            customer_gstin=draft.customer_gstin,
             lines=lines,
             draft=draft,
             cart_snapshot=cart_snapshot,
@@ -213,6 +218,7 @@ class CheckoutPaymentsService:
             payment_method=record.payment_method,
             handoff_surface=record.handoff_surface,
             provider_payment_mode=record.provider_payment_mode,
+            customer_profile_id=record.customer_profile_id,
             customer_name=record.customer_name,
             customer_gstin=record.customer_gstin,
             lines=lines,
@@ -296,6 +302,7 @@ class CheckoutPaymentsService:
         *,
         tenant_id: str,
         branch_id: str,
+        customer_profile_id: str | None,
         customer_name: str,
         customer_gstin: str | None,
         lines: list[dict[str, object]],
@@ -305,6 +312,16 @@ class CheckoutPaymentsService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
         if branch.gstin is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Branch GSTIN is required for billing")
+
+        resolved_customer_name = customer_name
+        resolved_customer_gstin = customer_gstin
+        if customer_profile_id is not None:
+            profile = await self._customer_profile_service.require_active_profile(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+            )
+            resolved_customer_name = profile.full_name
+            resolved_customer_gstin = profile.gstin
 
         products = {product.id: product for product in await self._catalog_repo.list_products(tenant_id=tenant_id)}
         branch_catalog_items = await self._catalog_repo.list_branch_catalog_items(tenant_id=tenant_id, branch_id=branch_id)
@@ -322,8 +339,8 @@ class CheckoutPaymentsService:
             draft = build_sale_draft(
                 line_inputs=lines,
                 branch_gstin=branch.gstin,
-                customer_name=customer_name,
-                customer_gstin=customer_gstin,
+                customer_name=resolved_customer_name,
+                customer_gstin=resolved_customer_gstin,
                 products_by_id=products,
                 branch_catalog_items_by_product_id=branch_catalog_by_product_id,
             )
@@ -342,6 +359,7 @@ class CheckoutPaymentsService:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
         cart_snapshot = {
+            "customer_profile_id": customer_profile_id,
             "customer_name": draft.customer_name,
             "customer_gstin": draft.customer_gstin,
             "lines": [{"product_id": line.product_id, "quantity": line.quantity} for line in draft.lines],
@@ -361,6 +379,7 @@ class CheckoutPaymentsService:
         tenant_id: str,
         branch_id: str,
         actor_user_id: str,
+        customer_profile_id: str | None,
         provider_name: str,
         payment_method: str,
         handoff_surface: str,
@@ -388,6 +407,7 @@ class CheckoutPaymentsService:
             tenant_id=tenant_id,
             branch_id=branch_id,
             actor_user_id=actor_user_id,
+            customer_profile_id=customer_profile_id,
             provider_name=provider_name,
             provider_order_id=provider_result.provider_order_id,
             provider_payment_session_id=provider_result.provider_payment_session_id,
@@ -451,6 +471,7 @@ class CheckoutPaymentsService:
                 tenant_id=record.tenant_id,
                 branch_id=record.branch_id,
                 actor_user_id=record.actor_user_id,
+                customer_profile_id=record.customer_profile_id,
                 customer_name=record.customer_name,
                 customer_gstin=record.customer_gstin,
                 payment_method=record.payment_method,
@@ -534,6 +555,7 @@ class CheckoutPaymentsService:
             "id": record.id,
             "tenant_id": record.tenant_id,
             "branch_id": record.branch_id,
+            "customer_profile_id": record.customer_profile_id,
             "provider_name": record.provider_name,
             "provider_order_id": record.provider_order_id,
             "provider_payment_session_id": record.provider_payment_session_id,

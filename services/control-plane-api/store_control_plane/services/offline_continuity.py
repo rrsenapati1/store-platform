@@ -160,6 +160,7 @@ class OfflineContinuityService:
         persisted = await self._billing_repo.create_sale(
             tenant_id=device.tenant_id,
             branch_id=device.branch_id,
+            customer_profile_id=None,
             customer_name=draft.customer_name,
             customer_gstin=draft.customer_gstin,
             invoice_kind=draft.invoice_kind,

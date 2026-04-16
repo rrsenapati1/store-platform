@@ -11,6 +11,7 @@ class SaleLineCreateRequest(BaseModel):
 
 
 class SaleCreateRequest(BaseModel):
+    customer_profile_id: str | None = None
     customer_name: str
     customer_gstin: str | None = None
     payment_method: str
@@ -22,6 +23,7 @@ class CheckoutPaymentSessionCreateRequest(BaseModel):
     payment_method: str
     handoff_surface: str | None = None
     provider_payment_mode: str | None = None
+    customer_profile_id: str | None = None
     customer_name: str
     customer_gstin: str | None = None
     lines: list[SaleLineCreateRequest]
@@ -43,6 +45,7 @@ class CheckoutPaymentSessionResponse(BaseModel):
     id: str
     tenant_id: str
     branch_id: str
+    customer_profile_id: str | None = None
     provider_name: str
     provider_order_id: str
     provider_payment_session_id: str | None = None
@@ -103,6 +106,7 @@ class SaleResponse(BaseModel):
     id: str
     tenant_id: str
     branch_id: str
+    customer_profile_id: str | None = None
     customer_name: str
     customer_gstin: str | None = None
     invoice_kind: str
@@ -121,6 +125,7 @@ class SaleResponse(BaseModel):
 
 class SaleRecord(BaseModel):
     sale_id: str
+    customer_profile_id: str | None = None
     invoice_number: str
     customer_name: str
     invoice_kind: str

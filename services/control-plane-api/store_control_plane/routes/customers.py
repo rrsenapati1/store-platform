@@ -4,10 +4,136 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_actor, get_session
-from ..schemas import BranchCustomerReportResponse, CustomerDirectoryResponse, CustomerHistoryResponse
-from ..services import ActorContext, CustomerReportingService, assert_branch_any_capability
+from ..schemas import (
+    BranchCustomerReportResponse,
+    CustomerDirectoryResponse,
+    CustomerHistoryResponse,
+    CustomerProfileCreateRequest,
+    CustomerProfileListResponse,
+    CustomerProfileResponse,
+    CustomerProfileUpdateRequest,
+)
+from ..services import ActorContext, CustomerProfileService, CustomerReportingService, assert_branch_any_capability
 
 router = APIRouter(prefix="/v1/tenants", tags=["customers"])
+
+
+@router.get("/{tenant_id}/customer-profiles", response_model=CustomerProfileListResponse)
+async def list_customer_profiles(
+    tenant_id: str,
+    query: str | None = None,
+    status: str | None = None,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerProfileListResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = CustomerProfileService(session)
+    report = await service.list_customer_profiles(tenant_id=tenant_id, query=query, status_filter=status)
+    return CustomerProfileListResponse(**report)
+
+
+@router.post("/{tenant_id}/customer-profiles", response_model=CustomerProfileResponse)
+async def create_customer_profile(
+    tenant_id: str,
+    payload: CustomerProfileCreateRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerProfileResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = CustomerProfileService(session)
+    record = await service.create_customer_profile(tenant_id=tenant_id, **payload.model_dump())
+    await session.commit()
+    return CustomerProfileResponse(**record)
+
+
+@router.get("/{tenant_id}/customer-profiles/{customer_profile_id}", response_model=CustomerProfileResponse)
+async def get_customer_profile(
+    tenant_id: str,
+    customer_profile_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerProfileResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = CustomerProfileService(session)
+    record = await service.get_customer_profile(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
+    return CustomerProfileResponse(**record)
+
+
+@router.patch("/{tenant_id}/customer-profiles/{customer_profile_id}", response_model=CustomerProfileResponse)
+async def update_customer_profile(
+    tenant_id: str,
+    customer_profile_id: str,
+    payload: CustomerProfileUpdateRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerProfileResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = CustomerProfileService(session)
+    record = await service.update_customer_profile(
+        tenant_id=tenant_id,
+        customer_profile_id=customer_profile_id,
+        updates=payload.model_dump(exclude_unset=True),
+    )
+    await session.commit()
+    return CustomerProfileResponse(**record)
+
+
+@router.post("/{tenant_id}/customer-profiles/{customer_profile_id}/archive", response_model=CustomerProfileResponse)
+async def archive_customer_profile(
+    tenant_id: str,
+    customer_profile_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerProfileResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = CustomerProfileService(session)
+    record = await service.archive_customer_profile(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
+    await session.commit()
+    return CustomerProfileResponse(**record)
+
+
+@router.post("/{tenant_id}/customer-profiles/{customer_profile_id}/reactivate", response_model=CustomerProfileResponse)
+async def reactivate_customer_profile(
+    tenant_id: str,
+    customer_profile_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerProfileResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("reports.view", "sales.bill", "sales.return"),
+    )
+    service = CustomerProfileService(session)
+    record = await service.reactivate_customer_profile(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
+    await session.commit()
+    return CustomerProfileResponse(**record)
 
 
 @router.get("/{tenant_id}/customers", response_model=CustomerDirectoryResponse)

@@ -5,7 +5,7 @@ from .billing import BillingRepository
 from .catalog import CatalogRepository
 from .compliance import ComplianceRepository
 from .commerce import CommerceRepository
-from .customers import CustomerReportingRepository
+from .customers import CustomerProfileRepository, CustomerReportingRepository
 from .identity import IdentityRepository
 from .inventory import InventoryRepository
 from .memberships import MembershipRepository
@@ -26,6 +26,7 @@ __all__ = [
     "CatalogRepository",
     "ComplianceRepository",
     "CommerceRepository",
+    "CustomerProfileRepository",
     "CustomerReportingRepository",
     "IdentityRepository",
     "InventoryRepository",

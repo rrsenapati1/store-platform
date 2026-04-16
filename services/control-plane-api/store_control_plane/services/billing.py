@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..repositories import AuditRepository, BillingRepository, CatalogRepository, InventoryRepository, TenantRepository
 from ..utils import utc_now
 from .billing_policy import build_sale_draft, ensure_sale_stock_available, sale_invoice_number
+from .customer_profiles import CustomerProfileService
 from .exchange_policy import build_exchange_settlement
 from .returns_policy import build_sale_return_draft, credit_note_number, ensure_refund_amount_allowed
 
@@ -18,6 +19,7 @@ class BillingService:
         self._inventory_repo = InventoryRepository(session)
         self._billing_repo = BillingRepository(session)
         self._audit_repo = AuditRepository(session)
+        self._customer_profile_service = CustomerProfileService(session)
 
     async def create_sale(
         self,
@@ -25,6 +27,7 @@ class BillingService:
         tenant_id: str,
         branch_id: str,
         actor_user_id: str | None,
+        customer_profile_id: str | None,
         customer_name: str,
         customer_gstin: str | None,
         payment_method: str,
@@ -36,6 +39,16 @@ class BillingService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
         if branch.gstin is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Branch GSTIN is required for billing")
+
+        resolved_customer_name = customer_name
+        resolved_customer_gstin = customer_gstin
+        if customer_profile_id is not None:
+            profile = await self._customer_profile_service.require_active_profile(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+            )
+            resolved_customer_name = profile.full_name
+            resolved_customer_gstin = profile.gstin
 
         products = {
             product.id: product
@@ -56,8 +69,8 @@ class BillingService:
             draft = build_sale_draft(
                 line_inputs=lines,
                 branch_gstin=branch.gstin,
-                customer_name=customer_name,
-                customer_gstin=customer_gstin,
+                customer_name=resolved_customer_name,
+                customer_gstin=resolved_customer_gstin,
                 products_by_id=products,
                 branch_catalog_items_by_product_id=branch_catalog_by_product_id,
             )
@@ -79,6 +92,7 @@ class BillingService:
         persisted = await self._billing_repo.create_sale(
             tenant_id=tenant_id,
             branch_id=branch_id,
+            customer_profile_id=customer_profile_id,
             customer_name=draft.customer_name,
             customer_gstin=draft.customer_gstin,
             invoice_kind=draft.invoice_kind,
@@ -174,6 +188,7 @@ class BillingService:
         return [
             {
                 "sale_id": sale.id,
+                "customer_profile_id": sale.customer_profile_id,
                 "invoice_number": invoice.invoice_number,
                 "customer_name": sale.customer_name,
                 "invoice_kind": sale.invoice_kind,
@@ -509,6 +524,7 @@ class BillingService:
         persisted_sale = await self._billing_repo.create_sale(
             tenant_id=tenant_id,
             branch_id=branch_id,
+            customer_profile_id=sale_bundle.sale.customer_profile_id,
             customer_name=replacement_draft.customer_name,
             customer_gstin=replacement_draft.customer_gstin,
             invoice_kind=replacement_draft.invoice_kind,
@@ -712,6 +728,7 @@ class BillingService:
             "id": sale.id,
             "tenant_id": sale.tenant_id,
             "branch_id": sale.branch_id,
+            "customer_profile_id": sale.customer_profile_id,
             "customer_name": sale.customer_name,
             "customer_gstin": sale.customer_gstin,
             "invoice_kind": sale.invoice_kind,

@@ -1,10 +1,49 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+
+class CustomerProfileCreateRequest(BaseModel):
+    full_name: str
+    phone: str | None = None
+    email: str | None = None
+    gstin: str | None = None
+    default_note: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class CustomerProfileUpdateRequest(BaseModel):
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    gstin: str | None = None
+    default_note: str | None = None
+    tags: list[str] | None = None
+
+
+class CustomerProfileResponse(BaseModel):
+    id: str
+    tenant_id: str
+    full_name: str
+    phone: str | None = None
+    email: str | None = None
+    gstin: str | None = None
+    default_note: str | None = None
+    tags: list[str]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CustomerProfileListResponse(BaseModel):
+    records: list[CustomerProfileResponse]
 
 
 class CustomerDirectoryRecord(BaseModel):
     customer_id: str
+    customer_profile_id: str | None = None
     name: str
     phone: str | None
     email: str | None
@@ -22,6 +61,7 @@ class CustomerDirectoryResponse(BaseModel):
 
 class CustomerHistoryCustomer(BaseModel):
     customer_id: str
+    customer_profile_id: str | None = None
     name: str
     phone: str | None
     email: str | None
@@ -79,6 +119,7 @@ class CustomerHistoryResponse(BaseModel):
 
 class BranchCustomerTopRecord(BaseModel):
     customer_id: str
+    customer_profile_id: str | None = None
     customer_name: str
     sales_count: int
     sales_total: float
@@ -87,6 +128,7 @@ class BranchCustomerTopRecord(BaseModel):
 
 class BranchCustomerReturnRecord(BaseModel):
     customer_id: str
+    customer_profile_id: str | None = None
     customer_name: str
     return_count: int
     credit_note_total: float

@@ -2,10 +2,95 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import CreditNote, CustomerExchangeSnapshot, CustomerSaleReturnSnapshot, CustomerSaleSnapshot, ExchangeOrder, Payment, Sale, SaleReturn, SalesInvoice
+from ..models import CreditNote, CustomerExchangeSnapshot, CustomerProfile, CustomerSaleReturnSnapshot, CustomerSaleSnapshot, ExchangeOrder, Payment, Sale, SaleReturn, SalesInvoice
+
+
+class CustomerProfileRepository:
+    def __init__(self, session: AsyncSession):
+        self._session = session
+
+    async def list_profiles(
+        self,
+        *,
+        tenant_id: str,
+        query: str | None = None,
+        status: str | None = None,
+    ) -> list[CustomerProfile]:
+        statement = select(CustomerProfile).where(CustomerProfile.tenant_id == tenant_id)
+        if status is not None:
+            statement = statement.where(CustomerProfile.status == status)
+        if query:
+            pattern = f"%{query.lower()}%"
+            statement = statement.where(
+                or_(
+                    CustomerProfile.full_name.ilike(pattern),
+                    CustomerProfile.phone.ilike(pattern),
+                    CustomerProfile.email.ilike(pattern),
+                    CustomerProfile.gstin.ilike(pattern),
+                )
+            )
+        statement = statement.order_by(CustomerProfile.full_name.asc(), CustomerProfile.id.asc())
+        return list((await self._session.scalars(statement)).all())
+
+    async def get_profile(self, *, tenant_id: str, customer_profile_id: str) -> CustomerProfile | None:
+        statement = select(CustomerProfile).where(
+            CustomerProfile.tenant_id == tenant_id,
+            CustomerProfile.id == customer_profile_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def get_profile_by_gstin(self, *, tenant_id: str, gstin: str) -> CustomerProfile | None:
+        statement = select(CustomerProfile).where(
+            CustomerProfile.tenant_id == tenant_id,
+            CustomerProfile.gstin == gstin,
+        )
+        return await self._session.scalar(statement)
+
+    async def create_profile(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        full_name: str,
+        phone: str | None,
+        email: str | None,
+        gstin: str | None,
+        default_note: str | None,
+        tags: list[str],
+        status: str = "ACTIVE",
+    ) -> CustomerProfile:
+        record = CustomerProfile(
+            id=customer_profile_id,
+            tenant_id=tenant_id,
+            full_name=full_name,
+            phone=phone,
+            email=email,
+            gstin=gstin,
+            default_note=default_note,
+            tags=tags,
+            status=status,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def list_profiles_by_ids(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_ids: list[str],
+    ) -> dict[str, CustomerProfile]:
+        if not customer_profile_ids:
+            return {}
+        statement = select(CustomerProfile).where(
+            CustomerProfile.tenant_id == tenant_id,
+            CustomerProfile.id.in_(customer_profile_ids),
+        )
+        records = list((await self._session.scalars(statement)).all())
+        return {record.id: record for record in records}
 
 
 class CustomerReportingRepository:

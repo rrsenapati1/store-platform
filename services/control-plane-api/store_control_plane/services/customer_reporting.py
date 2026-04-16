@@ -5,7 +5,7 @@ import hashlib
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..repositories import CustomerReportingRepository, TenantRepository
+from ..repositories import CustomerProfileRepository, CustomerReportingRepository, TenantRepository
 
 
 _ANONYMOUS_ALIASES = {
@@ -41,11 +41,37 @@ def _customer_id(*, tenant_id: str, customer_key: str) -> str:
     return digest[:32]
 
 
+def _customer_identity(*, tenant_id: str, sale, customer_profiles_by_id: dict[str, object]) -> dict[str, object] | None:
+    if sale.customer_profile_id:
+        profile = customer_profiles_by_id.get(sale.customer_profile_id)
+        if profile is not None:
+            return {
+                "customer_id": profile.id,
+                "customer_profile_id": profile.id,
+                "name": profile.full_name,
+                "phone": profile.phone,
+                "email": profile.email,
+                "gstin": profile.gstin,
+            }
+    customer_key = _customer_key(customer_name=sale.customer_name, customer_gstin=sale.customer_gstin)
+    if customer_key is None:
+        return None
+    return {
+        "customer_id": _customer_id(tenant_id=tenant_id, customer_key=customer_key),
+        "customer_profile_id": None,
+        "name": sale.customer_name,
+        "phone": None,
+        "email": None,
+        "gstin": sale.customer_gstin,
+    }
+
+
 class CustomerReportingService:
     def __init__(self, session: AsyncSession):
         self._session = session
         self._tenant_repo = TenantRepository(session)
         self._reporting_repo = CustomerReportingRepository(session)
+        self._customer_profile_repo = CustomerProfileRepository(session)
 
     async def list_customer_directory(self, *, tenant_id: str, query: str | None) -> dict[str, object]:
         tenant = await self._tenant_repo.get_tenant(tenant_id)
@@ -53,16 +79,25 @@ class CustomerReportingService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
 
         sales = await self._reporting_repo.list_sales(tenant_id=tenant_id)
-        customer_index = self._build_customer_index(tenant_id=tenant_id, sales=sales)
+        customer_profiles_by_id = await self._customer_profile_repo.list_profiles_by_ids(
+            tenant_id=tenant_id,
+            customer_profile_ids=[sale.sale.customer_profile_id for sale in sales if sale.sale.customer_profile_id],
+        )
+        customer_index = self._build_customer_index(
+            tenant_id=tenant_id,
+            sales=sales,
+            customer_profiles_by_id=customer_profiles_by_id,
+        )
         records = []
         query_value = _normalized(query)
         for record in customer_index.values():
-            searchable_fields = (record["name"], record["gstin"])
+            searchable_fields = (record["name"], record["phone"], record["email"], record["gstin"])
             if query_value and not any(query_value in _normalized(field) for field in searchable_fields):
                 continue
             records.append(
                 {
                     "customer_id": record["customer_id"],
+                    "customer_profile_id": record["customer_profile_id"],
                     "name": record["name"],
                     "phone": record["phone"],
                     "email": record["email"],
@@ -83,7 +118,15 @@ class CustomerReportingService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
 
         sales = await self._reporting_repo.list_sales(tenant_id=tenant_id)
-        customer_index = self._build_customer_index(tenant_id=tenant_id, sales=sales)
+        customer_profiles_by_id = await self._customer_profile_repo.list_profiles_by_ids(
+            tenant_id=tenant_id,
+            customer_profile_ids=[sale.sale.customer_profile_id for sale in sales if sale.sale.customer_profile_id],
+        )
+        customer_index = self._build_customer_index(
+            tenant_id=tenant_id,
+            sales=sales,
+            customer_profiles_by_id=customer_profiles_by_id,
+        )
         customer = customer_index.get(customer_id)
         if customer is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
@@ -148,9 +191,10 @@ class CustomerReportingService:
         return {
             "customer": {
                 "customer_id": customer_id,
+                "customer_profile_id": customer["customer_profile_id"],
                 "name": customer["name"],
-                "phone": None,
-                "email": None,
+                "phone": customer["phone"],
+                "email": customer["email"],
                 "gstin": customer["gstin"],
                 "visit_count": customer["visit_count"],
                 "lifetime_value": customer["lifetime_value"],
@@ -176,6 +220,10 @@ class CustomerReportingService:
         sales = await self._reporting_repo.list_sales(tenant_id=tenant_id, branch_id=branch_id)
         sale_returns = await self._reporting_repo.list_sale_returns(tenant_id=tenant_id, branch_id=branch_id)
         exchanges = await self._reporting_repo.list_exchange_orders(tenant_id=tenant_id, branch_id=branch_id)
+        customer_profiles_by_id = await self._customer_profile_repo.list_profiles_by_ids(
+            tenant_id=tenant_id,
+            customer_profile_ids=[sale.sale.customer_profile_id for sale in sales if sale.sale.customer_profile_id],
+        )
 
         customer_records: dict[str, dict[str, object]] = {}
         anonymous_sales_count = 0
@@ -183,17 +231,21 @@ class CustomerReportingService:
         sales_by_id = {sale.sale.id: sale for sale in sales}
 
         for sale in sales:
-            customer_key = _customer_key(customer_name=sale.sale.customer_name, customer_gstin=sale.sale.customer_gstin)
-            if customer_key is None:
+            identity = _customer_identity(
+                tenant_id=tenant_id,
+                sale=sale.sale,
+                customer_profiles_by_id=customer_profiles_by_id,
+            )
+            if identity is None:
                 anonymous_sales_count += 1
                 anonymous_sales_total += sale.invoice.grand_total
                 continue
-            customer_id = _customer_id(tenant_id=tenant_id, customer_key=customer_key)
             record = customer_records.setdefault(
-                customer_id,
+                str(identity["customer_id"]),
                 {
-                    "customer_id": customer_id,
-                    "customer_name": sale.sale.customer_name,
+                    "customer_id": identity["customer_id"],
+                    "customer_profile_id": identity["customer_profile_id"],
+                    "customer_name": identity["name"],
                     "sales_count": 0,
                     "sales_total": 0.0,
                     "last_invoice_number": None,
@@ -204,20 +256,23 @@ class CustomerReportingService:
             record["last_invoice_number"] = sale.invoice.invoice_number
 
         return_activity: dict[str, dict[str, object]] = {}
-        credit_note_totals = {}
         for sale_return in sale_returns:
             sale = sales_by_id.get(sale_return.sale_return.sale_id)
             if sale is None:
                 continue
-            customer_key = _customer_key(customer_name=sale.sale.customer_name, customer_gstin=sale.sale.customer_gstin)
-            if customer_key is None:
+            identity = _customer_identity(
+                tenant_id=tenant_id,
+                sale=sale.sale,
+                customer_profiles_by_id=customer_profiles_by_id,
+            )
+            if identity is None:
                 continue
-            customer_id = _customer_id(tenant_id=tenant_id, customer_key=customer_key)
             record = return_activity.setdefault(
-                customer_id,
+                str(identity["customer_id"]),
                 {
-                    "customer_id": customer_id,
-                    "customer_name": sale.sale.customer_name,
+                    "customer_id": identity["customer_id"],
+                    "customer_profile_id": identity["customer_profile_id"],
+                    "customer_name": identity["name"],
                     "return_count": 0,
                     "credit_note_total": 0.0,
                     "exchange_count": 0,
@@ -225,21 +280,24 @@ class CustomerReportingService:
             )
             record["return_count"] += 1
             record["credit_note_total"] += sale_return.credit_note.grand_total
-            credit_note_totals[sale_return.sale_return.id] = sale_return.credit_note.grand_total
 
         for exchange in exchanges:
             sale = sales_by_id.get(exchange.exchange_order.original_sale_id)
             if sale is None:
                 continue
-            customer_key = _customer_key(customer_name=sale.sale.customer_name, customer_gstin=sale.sale.customer_gstin)
-            if customer_key is None:
+            identity = _customer_identity(
+                tenant_id=tenant_id,
+                sale=sale.sale,
+                customer_profiles_by_id=customer_profiles_by_id,
+            )
+            if identity is None:
                 continue
-            customer_id = _customer_id(tenant_id=tenant_id, customer_key=customer_key)
             record = return_activity.setdefault(
-                customer_id,
+                str(identity["customer_id"]),
                 {
-                    "customer_id": customer_id,
-                    "customer_name": sale.sale.customer_name,
+                    "customer_id": identity["customer_id"],
+                    "customer_profile_id": identity["customer_profile_id"],
+                    "customer_name": identity["name"],
                     "return_count": 0,
                     "credit_note_total": 0.0,
                     "exchange_count": 0,
@@ -278,21 +336,25 @@ class CustomerReportingService:
             "return_activity": return_records,
         }
 
-    def _build_customer_index(self, *, tenant_id: str, sales) -> dict[str, dict[str, object]]:
+    def _build_customer_index(self, *, tenant_id: str, sales, customer_profiles_by_id: dict[str, object]) -> dict[str, dict[str, object]]:
         customer_index: dict[str, dict[str, object]] = {}
         for sale in sales:
-            customer_key = _customer_key(customer_name=sale.sale.customer_name, customer_gstin=sale.sale.customer_gstin)
-            if customer_key is None:
+            identity = _customer_identity(
+                tenant_id=tenant_id,
+                sale=sale.sale,
+                customer_profiles_by_id=customer_profiles_by_id,
+            )
+            if identity is None:
                 continue
-            customer_id = _customer_id(tenant_id=tenant_id, customer_key=customer_key)
             record = customer_index.setdefault(
-                customer_id,
+                str(identity["customer_id"]),
                 {
-                    "customer_id": customer_id,
-                    "name": sale.sale.customer_name,
-                    "phone": None,
-                    "email": None,
-                    "gstin": sale.sale.customer_gstin,
+                    "customer_id": identity["customer_id"],
+                    "customer_profile_id": identity["customer_profile_id"],
+                    "name": identity["name"],
+                    "phone": identity["phone"],
+                    "email": identity["email"],
+                    "gstin": identity["gstin"],
                     "visit_count": 0,
                     "lifetime_value": 0.0,
                     "last_sale_id": None,
@@ -311,8 +373,10 @@ class CustomerReportingService:
                 record["last_sale_id"] = sale.sale.id
                 record["last_invoice_number"] = sale.invoice.invoice_number
                 record["last_branch_id"] = sale.sale.branch_id
-                record["name"] = sale.sale.customer_name
-                record["gstin"] = sale.sale.customer_gstin
+                record["name"] = identity["name"]
+                record["phone"] = identity["phone"]
+                record["email"] = identity["email"]
+                record["gstin"] = identity["gstin"]
 
         for record in customer_index.values():
             record["lifetime_value"] = _money(record["lifetime_value"])
