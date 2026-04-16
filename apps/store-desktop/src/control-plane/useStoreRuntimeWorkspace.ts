@@ -69,6 +69,7 @@ import {
 } from './storeCustomerProfileActions';
 import { runLoadCustomerStoreCredit } from './storeCreditActions';
 import { runLoadCustomerLoyalty, runLoadLoyaltyProgram } from './storeLoyaltyActions';
+import { normalizePromotionCodeInput, resolvePromotionCodePayload } from './storePromotionActions';
 import {
   runApproveStockCountSession,
   runCancelStockCountSession,
@@ -184,6 +185,7 @@ export function useStoreRuntimeWorkspace() {
   const [loyaltyProgram, setLoyaltyProgram] = useState<ControlPlaneLoyaltyProgram | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
+  const [promotionCode, setPromotionCodeState] = useState('');
   const [storeCreditAmount, setStoreCreditAmount] = useState('');
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState('');
   const [saleQuantity, setSaleQuantity] = useState('1');
@@ -302,6 +304,7 @@ export function useStoreRuntimeWorkspace() {
     customerProfileId: selectedCustomerProfile?.id ?? null,
     customerName,
     customerGstin,
+    promotionCode,
     loyaltyPointsToRedeem: parsedLoyaltyPointsToRedeem,
     saleQuantity,
     paymentMethod,
@@ -322,6 +325,7 @@ export function useStoreRuntimeWorkspace() {
         setSelectedCustomerLoyalty(null);
         setCustomerName('');
         setCustomerGstin('');
+        setPromotionCodeState('');
         setStoreCreditAmount('');
         setLoyaltyPointsToRedeem('');
         setSaleQuantity('1');
@@ -344,6 +348,14 @@ export function useStoreRuntimeWorkspace() {
       });
       setErrorMessage(message);
     });
+  }
+
+  function setPromotionCode(value: string) {
+    setPromotionCodeState(normalizePromotionCodeInput(value));
+  }
+
+  function clearPromotionCode() {
+    setPromotionCodeState('');
   }
 
   function resetRuntimeWorkspaceState() {
@@ -395,6 +407,9 @@ export function useStoreRuntimeWorkspace() {
       setSelectedCustomerStoreCredit(null);
       setSelectedCustomerLoyalty(null);
       setLoyaltyProgram(null);
+      setCustomerName('');
+      setCustomerGstin('');
+      setPromotionCodeState('');
       setStoreCreditAmount('');
       setLoyaltyPointsToRedeem('');
       setRestockRequestedQuantity('');
@@ -1240,6 +1255,7 @@ export function useStoreRuntimeWorkspace() {
 
   async function createSalesInvoice() {
     const catalogItem = selectedCatalogItem;
+    const parsedPromotionCode = resolvePromotionCodePayload(promotionCode);
     const parsedStoreCreditAmount = selectedCustomerProfile ? Number(storeCreditAmount || 0) : 0;
     const parsedLoyaltyRedemption = selectedCustomerProfile ? Number(loyaltyPointsToRedeem || 0) : 0;
     if (!catalogItem || !actor) {
@@ -1261,6 +1277,7 @@ export function useStoreRuntimeWorkspace() {
         customerProfileId: selectedCustomerProfile?.id ?? null,
         customerName,
         customerGstin: customerGstin || null,
+        promotionCode: parsedPromotionCode,
         paymentMethod,
         storeCreditAmount: parsedStoreCreditAmount,
         loyaltyPointsToRedeem: parsedLoyaltyRedemption,
@@ -1268,6 +1285,10 @@ export function useStoreRuntimeWorkspace() {
       };
 
       if (!accessToken || !tenantId || !branchId) {
+        if (parsedPromotionCode) {
+          setErrorMessage('Promotion codes require a live online runtime session.');
+          return;
+        }
         if (parsedLoyaltyRedemption > 0) {
           setErrorMessage('Loyalty redemption requires a live online runtime session.');
           return;
@@ -1301,6 +1322,7 @@ export function useStoreRuntimeWorkspace() {
           customer_name: customerName,
           customer_gstin: customerGstin || null,
           payment_method: paymentMethod,
+          promotion_code: parsedPromotionCode,
           store_credit_amount: parsedStoreCreditAmount,
           loyalty_points_to_redeem: parsedLoyaltyRedemption,
           lines: [{ product_id: catalogItem.product_id, quantity: Number(saleQuantity) }],
@@ -1320,6 +1342,7 @@ export function useStoreRuntimeWorkspace() {
           setSelectedCustomerLoyalty(null);
           setCustomerName('');
           setCustomerGstin('');
+          setPromotionCodeState('');
           setStoreCreditAmount('');
           setLoyaltyPointsToRedeem('');
           setSaleQuantity('1');
@@ -1331,7 +1354,7 @@ export function useStoreRuntimeWorkspace() {
           setExchangeSettlementMethod('Cash');
         });
       } catch (error) {
-        if (parsedLoyaltyRedemption > 0 || !offlineContinuity.isReady || !shouldQueueRuntimeOutboxMutation(error)) {
+        if (parsedPromotionCode || parsedLoyaltyRedemption > 0 || !offlineContinuity.isReady || !shouldQueueRuntimeOutboxMutation(error)) {
           throw error;
         }
         const offlineSale = await offlineContinuity.createOfflineSale(draftPayload);
@@ -1343,6 +1366,7 @@ export function useStoreRuntimeWorkspace() {
           setSelectedCustomerLoyalty(null);
           setCustomerName('');
           setCustomerGstin('');
+          setPromotionCodeState('');
           setStoreCreditAmount('');
           setLoyaltyPointsToRedeem('');
           setSaleQuantity('1');
@@ -2290,6 +2314,7 @@ export function useStoreRuntimeWorkspace() {
     saleQuantity,
     sales,
     sessionExpiresAt,
+    promotionCode,
     selectedRuntimeDeviceId,
     selectedStockCountProductId,
     blindCountedQuantity,
@@ -2309,6 +2334,7 @@ export function useStoreRuntimeWorkspace() {
     setLoyaltyPointsToRedeem,
     setNewPin,
     setPaymentMethod,
+    setPromotionCode,
     setRestockRequestedQuantity,
     setRestockPickedQuantity,
     setRestockSourcePosture,
@@ -2336,6 +2362,7 @@ export function useStoreRuntimeWorkspace() {
     stockCountReviewNote,
     storeCreditAmount,
     loyaltyPointsToRedeem,
+    clearPromotionCode,
     tenantId,
     tenant,
     completeFirstPrintJob,

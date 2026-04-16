@@ -664,6 +664,7 @@ export const storeControlPlaneClient = {
       customer_name: string;
       customer_gstin?: string | null;
       payment_method: string;
+      promotion_code?: string | null;
       store_credit_amount?: number;
       loyalty_points_to_redeem?: number;
       lines: Array<{ product_id: string; quantity: number }>;
@@ -690,6 +691,7 @@ export const storeControlPlaneClient = {
       customer_profile_id?: string | null;
       customer_name: string;
       customer_gstin?: string | null;
+      promotion_code?: string | null;
       loyalty_points_to_redeem?: number;
       lines: Array<{ product_id: string; quantity: number }>;
     },

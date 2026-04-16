@@ -12,6 +12,7 @@ import type { WorkspaceMetric } from '@store/types';
 import { OwnerInventoryControlSection } from './OwnerInventoryControlSection';
 import { OwnerProcurementFinanceSection } from './OwnerProcurementFinanceSection';
 import { OwnerProcurementSection } from './OwnerProcurementSection';
+import { OwnerPromotionCampaignSection } from './OwnerPromotionCampaignSection';
 import { OwnerReplenishmentSection } from './OwnerReplenishmentSection';
 import { OwnerRestockSection } from './OwnerRestockSection';
 import { OwnerReturnApprovalsSection } from './OwnerReturnApprovalsSection';
@@ -78,6 +79,7 @@ export function OwnerWorkspace() {
       </SectionCard>
 
       <OwnerBillingLifecycleSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} />
+      <OwnerPromotionCampaignSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} />
 
       <SectionCard eyebrow="First branch setup" title="Branch creation">
         <FormField id="branch-name" label="Branch name" value={workspace.branchName} onChange={workspace.setBranchName} />

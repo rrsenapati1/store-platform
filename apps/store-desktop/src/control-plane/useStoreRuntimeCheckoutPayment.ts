@@ -7,6 +7,7 @@ import type {
   ControlPlaneSaleRecord,
 } from '@store/types';
 import { storeControlPlaneClient } from './client';
+import { resolvePromotionCodePayload } from './storePromotionActions';
 
 const CASHFREE_POLL_INTERVAL_MS = 2500;
 
@@ -18,6 +19,7 @@ interface UseStoreRuntimeCheckoutPaymentArgs {
   customerProfileId: string | null;
   customerName: string;
   customerGstin: string;
+  promotionCode: string;
   loyaltyPointsToRedeem: number;
   saleQuantity: string;
   paymentMethod: string;
@@ -78,6 +80,7 @@ export function useStoreRuntimeCheckoutPayment({
   customerProfileId,
   customerName,
   customerGstin,
+  promotionCode,
   loyaltyPointsToRedeem,
   saleQuantity,
   paymentMethod,
@@ -169,6 +172,7 @@ export function useStoreRuntimeCheckoutPayment({
         customer_profile_id: customerProfileId,
         customer_name: customerName,
         customer_gstin: customerGstin || null,
+        promotion_code: resolvePromotionCodePayload(promotionCode),
         loyalty_points_to_redeem: loyaltyPointsToRedeem,
         lines: [{ product_id: selectedCatalogItem.product_id, quantity }],
       });

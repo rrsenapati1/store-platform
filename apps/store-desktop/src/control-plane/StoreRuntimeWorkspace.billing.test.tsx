@@ -308,6 +308,8 @@ describe('store runtime billing foundation flow', () => {
         provider_status: 'ACTIVE',
         order_amount: 388.5,
         currency_code: 'INR',
+        promotion_code: null,
+        promotion_discount_amount: 0,
         action_payload: {
           kind: 'upi_qr',
           value: 'upi://pay?tr=cf_order_checkout-1',
@@ -339,6 +341,8 @@ describe('store runtime billing foundation flow', () => {
             provider_status: 'ACTIVE',
             order_amount: 388.5,
             currency_code: 'INR',
+            promotion_code: null,
+            promotion_discount_amount: 0,
             action_payload: {
               kind: 'upi_qr',
               value: 'upi://pay?tr=cf_order_checkout-1',
@@ -370,6 +374,8 @@ describe('store runtime billing foundation flow', () => {
         provider_status: 'SUCCESS',
         order_amount: 388.5,
         currency_code: 'INR',
+        promotion_code: null,
+        promotion_discount_amount: 0,
         action_payload: {
           kind: 'upi_qr',
           value: 'upi://pay?tr=cf_order_checkout-1',
@@ -435,6 +441,8 @@ describe('store runtime billing foundation flow', () => {
             provider_status: 'SUCCESS',
             order_amount: 388.5,
             currency_code: 'INR',
+            promotion_code: null,
+            promotion_discount_amount: 0,
             action_payload: {
               kind: 'upi_qr',
               value: 'upi://pay?tr=cf_order_checkout-1',
@@ -800,7 +808,7 @@ describe('store runtime billing foundation flow', () => {
     expect(screen.getAllByText('SINV-BLRFLAGSHIP-0002').length).toBeGreaterThan(0);
   });
 
-  test('includes loyalty redemption alongside store credit for a linked customer profile during checkout', async () => {
+  test('includes promotion, loyalty redemption, and store credit for a linked customer profile during checkout', async () => {
     globalThis.fetch = vi.fn(async (input, init) => {
       const url = String(input);
       const method = init?.method ?? 'GET';
@@ -944,12 +952,16 @@ describe('store runtime billing foundation flow', () => {
           cgst_total: 2.31,
           sgst_total: 2.31,
           igst_total: 0,
-          grand_total: 97.12,
+          grand_total: 57.12,
+          promotion_campaign_id: 'campaign-1',
+          promotion_code_id: 'code-1',
+          promotion_code: 'WELCOME20',
+          promotion_discount_amount: 20,
           store_credit_amount: 30,
           loyalty_points_redeemed: 200,
           loyalty_discount_amount: 20,
           loyalty_points_earned: 47,
-          payment: { payment_method: 'UPI', amount: 47.12 },
+          payment: { payment_method: 'UPI', amount: 27.12 },
           lines: [
             {
               product_id: 'product-1',
@@ -987,7 +999,11 @@ describe('store runtime billing foundation flow', () => {
               invoice_kind: 'B2B',
               irn_status: 'IRN_PENDING',
               payment_method: 'UPI',
-              grand_total: 97.12,
+              grand_total: 57.12,
+              promotion_campaign_id: 'campaign-1',
+              promotion_code_id: 'code-1',
+              promotion_code: 'WELCOME20',
+              promotion_discount_amount: 20,
               store_credit_amount: 30,
               loyalty_points_redeemed: 200,
               loyalty_discount_amount: 20,
@@ -1014,6 +1030,7 @@ describe('store runtime billing foundation flow', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Use customer profile Acme Traders' }));
 
     expect(await screen.findByText('Available loyalty points')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Promotion code'), { target: { value: 'welcome20' } });
     fireEvent.change(screen.getByLabelText('Apply store credit amount'), { target: { value: '30' } });
     fireEvent.change(screen.getByLabelText('Redeem loyalty points'), { target: { value: '200' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'UPI' } });
@@ -1030,6 +1047,7 @@ describe('store runtime billing foundation flow', () => {
       expect(JSON.parse(String(createSaleCall?.[1]?.body ?? '{}'))).toMatchObject({
         customer_profile_id: 'profile-1',
         payment_method: 'UPI',
+        promotion_code: 'WELCOME20',
         store_credit_amount: 30,
         loyalty_points_to_redeem: 200,
       });

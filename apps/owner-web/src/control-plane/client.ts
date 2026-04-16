@@ -35,6 +35,9 @@ import type {
   ControlPlaneInventorySnapshotRecord,
   ControlPlaneMembership,
   ControlPlanePrintJob,
+  ControlPlanePromotionCampaign,
+  ControlPlanePromotionCampaignListResponse,
+  ControlPlanePromotionCode,
   ControlPlanePurchaseApprovalReport,
   ControlPlanePurchaseInvoice,
   ControlPlanePurchaseInvoiceRecord,
@@ -793,6 +796,95 @@ export const ownerControlPlaneClient = {
     return request<ControlPlaneCustomerStoreCredit>(
       `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/store-credit`,
       undefined,
+      accessToken,
+    );
+  },
+  listPromotionCampaigns(accessToken: string, tenantId: string) {
+    return request<ControlPlanePromotionCampaignListResponse>(
+      `/v1/tenants/${tenantId}/promotion-campaigns`,
+      undefined,
+      accessToken,
+    );
+  },
+  createPromotionCampaign(
+    accessToken: string,
+    tenantId: string,
+    payload: {
+      name: string;
+      status: string;
+      discount_type: string;
+      discount_value: number;
+      minimum_order_amount?: number | null;
+      maximum_discount_amount?: number | null;
+      redemption_limit_total?: number | null;
+    },
+  ) {
+    return request<ControlPlanePromotionCampaign>(
+      `/v1/tenants/${tenantId}/promotion-campaigns`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  updatePromotionCampaign(
+    accessToken: string,
+    tenantId: string,
+    campaignId: string,
+    payload: {
+      name?: string | null;
+      status?: string | null;
+      discount_type?: string | null;
+      discount_value?: number | null;
+      minimum_order_amount?: number | null;
+      maximum_discount_amount?: number | null;
+      redemption_limit_total?: number | null;
+    },
+  ) {
+    return request<ControlPlanePromotionCampaign>(
+      `/v1/tenants/${tenantId}/promotion-campaigns/${campaignId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  createPromotionCode(
+    accessToken: string,
+    tenantId: string,
+    campaignId: string,
+    payload: {
+      code: string;
+      status: string;
+      redemption_limit_per_code?: number | null;
+    },
+  ) {
+    return request<ControlPlanePromotionCode>(
+      `/v1/tenants/${tenantId}/promotion-campaigns/${campaignId}/codes`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  disablePromotionCampaign(accessToken: string, tenantId: string, campaignId: string) {
+    return request<ControlPlanePromotionCampaign>(
+      `/v1/tenants/${tenantId}/promotion-campaigns/${campaignId}/disable`,
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  reactivatePromotionCampaign(accessToken: string, tenantId: string, campaignId: string) {
+    return request<ControlPlanePromotionCampaign>(
+      `/v1/tenants/${tenantId}/promotion-campaigns/${campaignId}/reactivate`,
+      {
+        method: 'POST',
+      },
       accessToken,
     );
   },

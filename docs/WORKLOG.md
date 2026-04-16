@@ -785,6 +785,22 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+- Completed the `V2-005` promotion-code foundation slice:
+  - added control-plane `promotion_campaigns` and `promotion_codes` authority with billing and checkout-session validation
+  - persisted promotion snapshot fields on finalized sales and checkout payment sessions
+  - added owner-web promotion campaign and shared-code management
+  - extended store-desktop checkout to accept one cashier-applied promotion code across direct sale creation and Cashfree payment-session flows
+- Hardened owner-web and store-desktop UI tests against older fixture shapes by:
+  - making promotion campaign loading explicit instead of auto-fetching on every owner workspace mount
+  - treating missing checkout-session promotion discount values as zero in desktop payment detail rendering
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_promotions_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
 
 - Added Store Desktop reviewed stock-count sessions with:
   - dedicated `StoreStockCountSection` board-driven blind-count UI

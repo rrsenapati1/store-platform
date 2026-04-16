@@ -122,6 +122,7 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
   const digitalPaymentTitle = checkoutPaymentSession
     ? (checkoutPaymentSession.handoff_surface === 'BRANDED_UPI_QR' ? 'Korsenex UPI QR' : 'Cashfree hosted checkout')
     : paymentMethodDescription.title;
+  const checkoutPromotionDiscountAmount = checkoutPaymentSession?.promotion_discount_amount ?? 0;
   const isCheckoutActionDisabled = workspace.isBusy
     || workspace.isCheckoutPaymentBusy
     || (!workspace.isSessionLive && !workspace.offlineContinuityReady)
@@ -222,6 +223,19 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
           </>
         ) : null}
         <FormField
+          id="runtime-promotion-code"
+          label="Promotion code"
+          value={workspace.promotionCode}
+          onChange={workspace.setPromotionCode}
+        />
+        {workspace.promotionCode ? (
+          <div style={{ marginBottom: '14px' }}>
+            <ActionButton onClick={() => workspace.clearPromotionCode()} disabled={workspace.isBusy}>
+              Clear promotion code
+            </ActionButton>
+          </div>
+        ) : null}
+        <FormField
           id="runtime-customer-name"
           label="Customer name"
           value={workspace.customerName}
@@ -269,6 +283,8 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                   { label: 'Mode', value: checkoutPaymentSession.provider_payment_mode },
                   { label: 'Surface', value: checkoutPaymentSession.handoff_surface },
                   { label: 'Amount', value: `${checkoutPaymentSession.currency_code} ${checkoutPaymentSession.order_amount.toFixed(2)}` },
+                  { label: 'Promotion code', value: checkoutPaymentSession.promotion_code ?? 'None' },
+                  { label: 'Promotion discount', value: checkoutPromotionDiscountAmount.toFixed(2) },
                   { label: 'Recovery', value: checkoutPaymentSession.recovery_state },
                 ]}
               />
