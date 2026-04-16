@@ -727,6 +727,11 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+
+- Added Store Desktop reviewed stock-count sessions with:
+  - dedicated `StoreStockCountSection` board-driven blind-count UI
+  - extracted desktop stock-count client and workspace action coverage
+  - reviewed-session lifecycle support for create, record, approve, and cancel
 - Completed the Store Desktop reviewed expiry session slice for `V2-004`:
   - added reviewed batch-expiry client routes for board, create, review, approve, and cancel
   - replaced the desktop one-step expiry write-off shortcut with the real reviewed-session workflow

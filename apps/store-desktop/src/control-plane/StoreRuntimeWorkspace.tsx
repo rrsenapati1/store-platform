@@ -14,6 +14,7 @@ import { StoreRestockSection } from './StoreRestockSection';
 import { StoreRuntimeReleaseSection } from './StoreRuntimeReleaseSection';
 import { StoreReturnsSection } from './StoreReturnsSection';
 import { StoreRuntimeShellSection } from './StoreRuntimeShellSection';
+import { StoreStockCountSection } from './StoreStockCountSection';
 import { StoreSupplierReportingSection } from './StoreSupplierReportingSection';
 import { StoreSyncRuntimeSection } from './StoreSyncRuntimeSection';
 import { useStoreRuntimeWorkspace } from './useStoreRuntimeWorkspace';
@@ -264,6 +265,7 @@ export function StoreRuntimeWorkspace() {
       {!isLocalAuthGateActive ? <StoreBillingSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBarcodeLookupSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreRestockSection workspace={workspace} /> : null}
+      {!isLocalAuthGateActive ? <StoreStockCountSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBatchExpirySection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StorePrintQueueSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreReturnsSection workspace={workspace} /> : null}
