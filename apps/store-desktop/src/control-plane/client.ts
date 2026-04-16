@@ -14,6 +14,7 @@ import type {
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
   ControlPlaneCustomerProfile,
+  ControlPlaneCustomerStoreCredit,
   ControlPlaneDeviceRecord,
   ControlPlaneExchange,
   ControlPlaneGoodsReceipt,
@@ -527,6 +528,13 @@ export const storeControlPlaneClient = {
       accessToken,
     );
   },
+  getCustomerStoreCredit(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<ControlPlaneCustomerStoreCredit>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/store-credit`,
+      undefined,
+      accessToken,
+    );
+  },
   createCustomerProfile(
     accessToken: string,
     tenantId: string,
@@ -640,6 +648,7 @@ export const storeControlPlaneClient = {
       customer_name: string;
       customer_gstin?: string | null;
       payment_method: string;
+      store_credit_amount?: number;
       lines: Array<{ product_id: string; quantity: number }>;
     },
   ) {

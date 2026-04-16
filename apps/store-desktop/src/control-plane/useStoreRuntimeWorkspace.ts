@@ -10,6 +10,7 @@ import type {
   ControlPlaneExchange,
   ControlPlaneBranchRecord,
   ControlPlaneCustomerProfile,
+  ControlPlaneCustomerStoreCredit,
   ControlPlaneDeviceRecord,
   ControlPlaneGoodsReceipt,
   ControlPlaneGoodsReceiptRecord,
@@ -64,6 +65,7 @@ import {
   runCreateCheckoutCustomerProfile,
   runLoadCustomerProfiles,
 } from './storeCustomerProfileActions';
+import { runLoadCustomerStoreCredit } from './storeCreditActions';
 import {
   runApproveStockCountSession,
   runCancelStockCountSession,
@@ -174,8 +176,10 @@ export function useStoreRuntimeWorkspace() {
   const [customerProfiles, setCustomerProfiles] = useState<ControlPlaneCustomerProfile[]>([]);
   const [customerProfileSearchQuery, setCustomerProfileSearchQuery] = useState('');
   const [selectedCustomerProfile, setSelectedCustomerProfile] = useState<ControlPlaneCustomerProfile | null>(null);
+  const [selectedCustomerStoreCredit, setSelectedCustomerStoreCredit] = useState<ControlPlaneCustomerStoreCredit | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
+  const [storeCreditAmount, setStoreCreditAmount] = useState('');
   const [saleQuantity, setSaleQuantity] = useState('1');
   const [scannedBarcode, setScannedBarcode] = useState('');
   const [restockRequestedQuantity, setRestockRequestedQuantity] = useState('');
@@ -376,6 +380,8 @@ export function useStoreRuntimeWorkspace() {
       setCustomerProfiles([]);
       setCustomerProfileSearchQuery('');
       setSelectedCustomerProfile(null);
+      setSelectedCustomerStoreCredit(null);
+      setStoreCreditAmount('');
       setRestockRequestedQuantity('');
       setRestockPickedQuantity('');
       setRestockSourcePosture('BACKROOM_AVAILABLE');
@@ -394,11 +400,24 @@ export function useStoreRuntimeWorkspace() {
   function applySelectedCustomerProfile(profile: ControlPlaneCustomerProfile | null) {
     applyStateTransition(() => {
       setSelectedCustomerProfile(profile);
+      setSelectedCustomerStoreCredit(null);
+      setStoreCreditAmount('');
       if (profile) {
         setCustomerName(profile.full_name);
         setCustomerGstin(profile.gstin ?? '');
       }
       setErrorMessage('');
+    });
+  }
+
+  async function loadCustomerStoreCredit(customerProfileId: string) {
+    if (!accessToken || !tenantId || !customerProfileId) {
+      return null;
+    }
+    return runLoadCustomerStoreCredit({
+      accessToken,
+      tenantId,
+      customerProfileId,
     });
   }
 
@@ -428,12 +447,24 @@ export function useStoreRuntimeWorkspace() {
     }
   }
 
-  function selectCustomerProfile(customerProfileId: string) {
+  async function selectCustomerProfile(customerProfileId: string) {
     const profile = customerProfiles.find((record) => record.id === customerProfileId) ?? null;
     if (!profile) {
       return;
     }
-    applySelectedCustomerProfile(profile);
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const storeCredit = await loadCustomerStoreCredit(profile.id);
+      applySelectedCustomerProfile(profile);
+      applyStateTransition(() => {
+        setSelectedCustomerStoreCredit(storeCredit);
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer store credit');
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   async function createCustomerProfileFromCheckout() {
@@ -454,6 +485,7 @@ export function useStoreRuntimeWorkspace() {
         fullName,
         gstin: customerGstin.trim() || null,
       });
+      const storeCredit = await loadCustomerStoreCredit(profile.id);
       applyStateTransition(() => {
         setCustomerProfiles((current) => {
           const next = current.filter((record) => record.id !== profile.id);
@@ -462,6 +494,9 @@ export function useStoreRuntimeWorkspace() {
         setCustomerProfileSearchQuery(profile.full_name);
       });
       applySelectedCustomerProfile(profile);
+      applyStateTransition(() => {
+        setSelectedCustomerStoreCredit(storeCredit);
+      });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create customer profile');
     } finally {
@@ -1155,6 +1190,7 @@ export function useStoreRuntimeWorkspace() {
 
   async function createSalesInvoice() {
     const catalogItem = selectedCatalogItem;
+    const parsedStoreCreditAmount = selectedCustomerProfile ? Number(storeCreditAmount || 0) : 0;
     if (!catalogItem || !actor) {
       return;
     }
@@ -1175,6 +1211,7 @@ export function useStoreRuntimeWorkspace() {
         customerName,
         customerGstin: customerGstin || null,
         paymentMethod,
+        storeCreditAmount: parsedStoreCreditAmount,
         lineInputs: [{ product_id: catalogItem.product_id, quantity: Number(saleQuantity) }],
       };
 
@@ -1187,8 +1224,10 @@ export function useStoreRuntimeWorkspace() {
         applyStateTransition(() => {
           setLatestPrintJob(null);
           setSelectedCustomerProfile(null);
+          setSelectedCustomerStoreCredit(null);
           setCustomerName('');
           setCustomerGstin('');
+          setStoreCreditAmount('');
           setSaleQuantity('1');
           setReturnQuantity('1');
           setRefundAmount(String(offlineSale.grand_total));
@@ -1206,6 +1245,7 @@ export function useStoreRuntimeWorkspace() {
           customer_name: customerName,
           customer_gstin: customerGstin || null,
           payment_method: paymentMethod,
+          store_credit_amount: parsedStoreCreditAmount,
           lines: [{ product_id: catalogItem.product_id, quantity: Number(saleQuantity) }],
         });
         const [salesResponse, snapshotResponse] = await Promise.all([
@@ -1219,8 +1259,10 @@ export function useStoreRuntimeWorkspace() {
           setInventorySnapshot(snapshotResponse.records);
           setLatestPrintJob(null);
           setSelectedCustomerProfile(null);
+          setSelectedCustomerStoreCredit(null);
           setCustomerName('');
           setCustomerGstin('');
+          setStoreCreditAmount('');
           setSaleQuantity('1');
           setReturnQuantity('1');
           setRefundAmount(String(sale.payment.amount));
@@ -1238,8 +1280,10 @@ export function useStoreRuntimeWorkspace() {
         applyStateTransition(() => {
           setLatestPrintJob(null);
           setSelectedCustomerProfile(null);
+          setSelectedCustomerStoreCredit(null);
           setCustomerName('');
           setCustomerGstin('');
+          setStoreCreditAmount('');
           setSaleQuantity('1');
           setReturnQuantity('1');
           setRefundAmount(String(offlineSale.grand_total));
@@ -2028,6 +2072,7 @@ export function useStoreRuntimeWorkspace() {
     customerName,
     customerProfiles,
     customerProfileSearchQuery,
+    selectedCustomerStoreCredit,
     errorMessage,
     expiryReviewNote,
     expirySessionNote,
@@ -2208,6 +2253,7 @@ export function useStoreRuntimeWorkspace() {
     setScannedBarcode,
     setSelectedRuntimeDeviceId,
     setSelectedStockCountProductId,
+    setStoreCreditAmount,
     setReplacementQuantity,
     setRefundAmount,
     setRefundMethod,
@@ -2224,6 +2270,7 @@ export function useStoreRuntimeWorkspace() {
     stockCountBoard,
     stockCountNote,
     stockCountReviewNote,
+    storeCreditAmount,
     tenantId,
     tenant,
     completeFirstPrintJob,

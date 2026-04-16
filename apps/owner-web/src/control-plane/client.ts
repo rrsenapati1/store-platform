@@ -18,6 +18,7 @@ import type {
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerProfile,
   ControlPlaneCustomerHistoryResponse,
+  ControlPlaneCustomerStoreCredit,
   ControlPlaneComplianceProviderProfile,
   ControlPlaneDeviceClaimApproval,
   ControlPlaneDeviceClaimRecord,
@@ -782,6 +783,49 @@ export const ownerControlPlaneClient = {
       `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/reactivate`,
       {
         method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  getCustomerStoreCredit(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<ControlPlaneCustomerStoreCredit>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/store-credit`,
+      undefined,
+      accessToken,
+    );
+  },
+  issueCustomerStoreCredit(
+    accessToken: string,
+    tenantId: string,
+    customerProfileId: string,
+    payload: {
+      amount: number;
+      note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneCustomerStoreCredit>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/store-credit/issue`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  adjustCustomerStoreCredit(
+    accessToken: string,
+    tenantId: string,
+    customerProfileId: string,
+    payload: {
+      amount_delta: number;
+      note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneCustomerStoreCredit>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/store-credit/adjust`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
       },
       accessToken,
     );

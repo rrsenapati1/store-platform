@@ -90,6 +90,7 @@ function buildSnapshot(): StoreRuntimeCacheSnapshot {
       irn_status: 'IRN_PENDING',
       payment_method: 'UPI',
       grand_total: 388.5,
+      store_credit_amount: 0,
       issued_on: '2026-04-13',
     },
   ];

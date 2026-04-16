@@ -107,6 +107,7 @@ function CheckoutPaymentActionCard({ checkoutPaymentSession }: { checkoutPayment
 export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const selectedItem = workspace.branchCatalogItems[0];
   const hasSelectedCustomerProfile = workspace.selectedCustomerProfile !== null;
+  const selectedCustomerStoreCredit = workspace.selectedCustomerStoreCredit;
   const paymentMethodDescription = describePaymentMethod(workspace.paymentMethod);
   const isDigitalCheckout = isProviderBackedPaymentMethod(workspace.paymentMethod);
   const checkoutPaymentSession = workspace.checkoutPaymentSession;
@@ -169,6 +170,25 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
           <p style={{ marginTop: 0, marginBottom: '14px', color: '#4e5871' }}>
             Linked customer profile: <strong>{workspace.selectedCustomerProfile?.full_name}</strong>
           </p>
+        ) : null}
+        {hasSelectedCustomerProfile && selectedCustomerStoreCredit ? (
+          <>
+            <DetailList
+              items={[
+                { label: 'Available store credit', value: String(selectedCustomerStoreCredit.available_balance) },
+                { label: 'Issued total', value: String(selectedCustomerStoreCredit.issued_total) },
+                { label: 'Redeemed total', value: String(selectedCustomerStoreCredit.redeemed_total) },
+              ]}
+            />
+            <div style={{ marginTop: '14px' }}>
+              <FormField
+                id="runtime-store-credit-amount"
+                label="Apply store credit amount"
+                value={workspace.storeCreditAmount}
+                onChange={workspace.setStoreCreditAmount}
+              />
+            </div>
+          </>
         ) : null}
         <FormField
           id="runtime-customer-name"

@@ -74,6 +74,18 @@ function buildCustomerProfile(id: string, fullName: string, gstin: string | null
   };
 }
 
+function buildStoreCreditResponse(customerProfileId: string) {
+  return {
+    customer_profile_id: customerProfileId,
+    available_balance: 120,
+    issued_total: 120,
+    redeemed_total: 0,
+    adjusted_total: 0,
+    lots: [],
+    ledger_entries: [],
+  };
+}
+
 describe('store runtime checkout customer profiles', () => {
   const originalFetch = globalThis.fetch;
 
@@ -179,6 +191,10 @@ describe('store runtime checkout customer profiles', () => {
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
+      }
+      if (/\/v1\/tenants\/tenant-acme\/customer-profiles\/[^/]+\/store-credit$/.test(url) && method === 'GET') {
+        const customerProfileId = url.split('/customer-profiles/')[1]?.split('/store-credit')[0] ?? 'profile-created';
+        return jsonResponse(buildStoreCreditResponse(customerProfileId)) as never;
       }
       if (url.includes('/v1/tenants/tenant-acme/customer-profiles') && method === 'GET') {
         return jsonResponse({ records: profileRecords }) as never;
@@ -378,6 +394,9 @@ describe('store runtime checkout customer profiles', () => {
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
       }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/store-credit') && method === 'GET') {
+        return jsonResponse(buildStoreCreditResponse('profile-1')) as never;
+      }
       if (url.includes('/v1/tenants/tenant-acme/customer-profiles') && method === 'GET') {
         return jsonResponse({
           records: [buildCustomerProfile('profile-1', 'Acme Traders', '29AAEPM0111C1Z3')],
@@ -409,6 +428,7 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
     fireEvent.click(await screen.findByRole('button', { name: /Use customer profile Acme Traders/i }));
+    expect(await screen.findByText('Available store credit')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Use manual customer details' }));
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Walk-in Customer' } });
@@ -515,6 +535,9 @@ describe('store runtime checkout customer profiles', () => {
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
       }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/store-credit') && method === 'GET') {
+        return jsonResponse(buildStoreCreditResponse('profile-1')) as never;
+      }
       if (url.includes('/v1/tenants/tenant-acme/customer-profiles') && method === 'GET') {
         return jsonResponse({
           records: [buildCustomerProfile('profile-1', 'Acme Traders', '29AAEPM0111C1Z3')],
@@ -570,6 +593,7 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
     fireEvent.click(await screen.findByRole('button', { name: /Use customer profile Acme Traders/i }));
+    expect(await screen.findByText('Available store credit')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'CASHFREE_UPI_QR' } });
     fireEvent.click(screen.getByRole('button', { name: 'Start branded UPI QR' }));

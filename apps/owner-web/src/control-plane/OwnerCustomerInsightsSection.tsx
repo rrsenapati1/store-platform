@@ -5,6 +5,7 @@ import type {
   ControlPlaneCustomerDirectoryRecord,
   ControlPlaneCustomerHistoryResponse,
   ControlPlaneCustomerProfile,
+  ControlPlaneCustomerStoreCredit,
 } from '@store/types';
 import { ownerControlPlaneClient } from './client';
 
@@ -50,6 +51,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<ControlPlaneCustomerProfile | null>(null);
+  const [selectedStoreCredit, setSelectedStoreCredit] = useState<ControlPlaneCustomerStoreCredit | null>(null);
   const [profileDraft, setProfileDraft] = useState<CustomerProfileDraft>({
     fullName: '',
     phone: '',
@@ -58,13 +60,26 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     defaultNote: '',
     tags: '',
   });
+  const [issueAmount, setIssueAmount] = useState('');
+  const [issueNote, setIssueNote] = useState('');
+  const [adjustmentDelta, setAdjustmentDelta] = useState('');
+  const [adjustmentNote, setAdjustmentNote] = useState('');
   const [customerHistory, setCustomerHistory] = useState<ControlPlaneCustomerHistoryResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
 
+  function clearStoreCreditDrafts() {
+    setIssueAmount('');
+    setIssueNote('');
+    setAdjustmentDelta('');
+    setAdjustmentNote('');
+  }
+
   function applySelectedProfile(profile: ControlPlaneCustomerProfile | null) {
     setSelectedProfile(profile);
     setSelectedCustomerId(profile?.id ?? '');
+    setSelectedStoreCredit(null);
+    clearStoreCreditDrafts();
     setProfileDraft(
       profile
         ? buildProfileDraft(profile)
@@ -92,9 +107,10 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
         branchId ? ownerControlPlaneClient.getBranchCustomerReport(accessToken, tenantId, branchId) : Promise.resolve(null),
       ]);
       const nextProfileId = profilesResponse.records[0]?.id ?? '';
-      const [profile, history] = await Promise.all([
+      const [profile, history, storeCredit] = await Promise.all([
         nextProfileId ? ownerControlPlaneClient.getCustomerProfile(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
         nextProfileId ? ownerControlPlaneClient.getCustomerHistory(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
+        nextProfileId ? ownerControlPlaneClient.getCustomerStoreCredit(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
       ]);
       startTransition(() => {
         setCustomerProfiles(profilesResponse.records);
@@ -102,6 +118,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
         setBranchReport(reportResponse);
         applySelectedProfile(profile);
         setCustomerHistory(history);
+        setSelectedStoreCredit(storeCredit);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer insights');
@@ -117,13 +134,15 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const [profile, history] = await Promise.all([
+      const [profile, history, storeCredit] = await Promise.all([
         ownerControlPlaneClient.getCustomerProfile(accessToken, tenantId, customerProfileId),
         ownerControlPlaneClient.getCustomerHistory(accessToken, tenantId, customerProfileId),
+        ownerControlPlaneClient.getCustomerStoreCredit(accessToken, tenantId, customerProfileId),
       ]);
       startTransition(() => {
         applySelectedProfile(profile);
         setCustomerHistory(history);
+        setSelectedStoreCredit(storeCredit);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer profile');
@@ -139,6 +158,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setIsBusy(true);
     setErrorMessage('');
     try {
+      const currentStoreCredit = selectedStoreCredit;
       const updated = await ownerControlPlaneClient.updateCustomerProfile(accessToken, tenantId, selectedProfile.id, {
         full_name: profileDraft.fullName,
         phone: profileDraft.phone || null,
@@ -153,6 +173,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
       startTransition(() => {
         setCustomerProfiles((current) => current.map((record) => (record.id === updated.id ? updated : record)));
         applySelectedProfile(updated);
+        setSelectedStoreCredit(currentStoreCredit);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to save customer profile');
@@ -168,10 +189,12 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setIsBusy(true);
     setErrorMessage('');
     try {
+      const currentStoreCredit = selectedStoreCredit;
       const updated = await ownerControlPlaneClient.archiveCustomerProfile(accessToken, tenantId, selectedProfile.id);
       startTransition(() => {
         setCustomerProfiles((current) => current.map((record) => (record.id === updated.id ? updated : record)));
         applySelectedProfile(updated);
+        setSelectedStoreCredit(currentStoreCredit);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to archive customer profile');
@@ -187,13 +210,67 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setIsBusy(true);
     setErrorMessage('');
     try {
+      const currentStoreCredit = selectedStoreCredit;
       const updated = await ownerControlPlaneClient.reactivateCustomerProfile(accessToken, tenantId, selectedProfile.id);
       startTransition(() => {
         setCustomerProfiles((current) => current.map((record) => (record.id === updated.id ? updated : record)));
         applySelectedProfile(updated);
+        setSelectedStoreCredit(currentStoreCredit);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to reactivate customer profile');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function issueSelectedCustomerStoreCredit() {
+    if (!accessToken || !tenantId || !selectedProfile) {
+      return;
+    }
+    const amount = Number(issueAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const nextStoreCredit = await ownerControlPlaneClient.issueCustomerStoreCredit(accessToken, tenantId, selectedProfile.id, {
+        amount,
+        note: issueNote || null,
+      });
+      startTransition(() => {
+        setSelectedStoreCredit(nextStoreCredit);
+        clearStoreCreditDrafts();
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to issue store credit');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function adjustSelectedCustomerStoreCredit() {
+    if (!accessToken || !tenantId || !selectedProfile) {
+      return;
+    }
+    const amountDelta = Number(adjustmentDelta);
+    if (!Number.isFinite(amountDelta) || amountDelta === 0) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const nextStoreCredit = await ownerControlPlaneClient.adjustCustomerStoreCredit(accessToken, tenantId, selectedProfile.id, {
+        amount_delta: amountDelta,
+        note: adjustmentNote || null,
+      });
+      startTransition(() => {
+        setSelectedStoreCredit(nextStoreCredit);
+        clearStoreCreditDrafts();
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to adjust store credit');
     } finally {
       setIsBusy(false);
     }
@@ -316,6 +393,56 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
               </ActionButton>
             )}
           </div>
+
+          {selectedStoreCredit ? (
+            <div style={{ marginTop: '20px' }}>
+              <h3 style={{ marginBottom: '10px' }}>Store credit</h3>
+              <DetailList
+                items={[
+                  { label: 'Available store credit', value: String(selectedStoreCredit.available_balance) },
+                  { label: 'Issued total', value: String(selectedStoreCredit.issued_total) },
+                  { label: 'Redeemed total', value: String(selectedStoreCredit.redeemed_total) },
+                  { label: 'Adjusted total', value: String(selectedStoreCredit.adjusted_total) },
+                ]}
+              />
+
+              <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
+                <FormField id="issue-store-credit-amount" label="Issue store credit amount" value={issueAmount} onChange={setIssueAmount} />
+                <FormField id="issue-store-credit-note" label="Issue store credit note" value={issueNote} onChange={setIssueNote} />
+                <ActionButton onClick={() => void issueSelectedCustomerStoreCredit()} disabled={isBusy || !selectedProfile}>
+                  Issue store credit
+                </ActionButton>
+              </div>
+
+              <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
+                <FormField
+                  id="adjust-store-credit-delta"
+                  label="Adjust store credit delta"
+                  value={adjustmentDelta}
+                  onChange={setAdjustmentDelta}
+                />
+                <FormField
+                  id="adjust-store-credit-note"
+                  label="Adjust store credit note"
+                  value={adjustmentNote}
+                  onChange={setAdjustmentNote}
+                />
+                <ActionButton onClick={() => void adjustSelectedCustomerStoreCredit()} disabled={isBusy || !selectedProfile}>
+                  Adjust store credit
+                </ActionButton>
+              </div>
+
+              {selectedStoreCredit.ledger_entries.length ? (
+                <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
+                  {selectedStoreCredit.ledger_entries.map((entry) => (
+                    <li key={entry.id}>
+                      {entry.entry_type} {entry.source_type} {entry.amount} {entry.note ? `- ${entry.note}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

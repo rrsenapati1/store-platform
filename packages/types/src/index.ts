@@ -1441,6 +1441,7 @@ export interface ControlPlaneSale {
   sgst_total: number;
   igst_total: number;
   grand_total: number;
+  store_credit_amount: number;
   payment: ControlPlanePayment;
   lines: ControlPlaneSaleLine[];
   tax_lines: ControlPlaneInvoiceTaxLine[];
@@ -1455,6 +1456,7 @@ export interface ControlPlaneSaleRecord {
   irn_status: string;
   payment_method: string;
   grand_total: number;
+  store_credit_amount: number;
   issued_on: string;
 }
 
@@ -1500,6 +1502,40 @@ export interface ControlPlaneCustomerProfile {
   status: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ControlPlaneCustomerStoreCreditLot {
+  id: string;
+  source_type: string;
+  source_reference_id?: string | null;
+  original_amount: number;
+  remaining_amount: number;
+  status: string;
+  issued_at: string;
+  branch_id?: string | null;
+}
+
+export interface ControlPlaneCustomerStoreCreditLedgerEntry {
+  id: string;
+  entry_type: string;
+  source_type: string;
+  source_reference_id?: string | null;
+  amount: number;
+  running_balance: number;
+  note?: string | null;
+  lot_id?: string | null;
+  branch_id?: string | null;
+  created_at: string;
+}
+
+export interface ControlPlaneCustomerStoreCredit {
+  customer_profile_id: string;
+  available_balance: number;
+  issued_total: number;
+  redeemed_total: number;
+  adjusted_total: number;
+  lots: ControlPlaneCustomerStoreCreditLot[];
+  ledger_entries: ControlPlaneCustomerStoreCreditLedgerEntry[];
 }
 
 export interface ControlPlaneCustomerDirectoryRecord {
