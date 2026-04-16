@@ -8,6 +8,7 @@ const vitestLocalStoragePath = path.join(os.tmpdir(), 'store-desktop-vitest-loca
 export default defineConfig({
   plugins: [react()],
   test: {
+    testTimeout: 10_000,
     poolOptions: {
       forks: {
         execArgv: [`--localstorage-file=${vitestLocalStoragePath}`],

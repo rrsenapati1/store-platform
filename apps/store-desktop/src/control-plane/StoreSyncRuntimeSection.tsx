@@ -27,6 +27,9 @@ export function StoreSyncRuntimeSection({
     runtimeHubManifestUrl,
     runtimeHubServiceUrl,
   });
+  const conflicts = syncMonitoring.conflicts ?? [];
+  const spokes = syncMonitoring.spokes ?? [];
+  const envelopes = syncMonitoring.envelopes ?? [];
 
   return (
     <SectionCard eyebrow="Runtime sync" title="Hub sync monitoring">
@@ -98,9 +101,9 @@ export function StoreSyncRuntimeSection({
         </div>
       ) : null}
 
-      {syncMonitoring.conflicts.length ? (
+      {conflicts.length ? (
         <ul style={{ marginBottom: '16px', marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {syncMonitoring.conflicts.map((record) => (
+          {conflicts.map((record) => (
             <li key={record.id}>
               {record.table_name} :: {record.record_id} :: {record.reason}
             </li>
@@ -108,9 +111,9 @@ export function StoreSyncRuntimeSection({
         </ul>
       ) : null}
 
-      {syncMonitoring.spokes.length ? (
+      {spokes.length ? (
         <ul style={{ marginBottom: '16px', marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {syncMonitoring.spokes.map((record) => (
+          {spokes.map((record) => (
             <li key={record.spoke_device_id}>
               {record.runtime_profile} :: {record.connection_state} :: {record.hostname ?? record.runtime_kind}
             </li>
@@ -118,9 +121,9 @@ export function StoreSyncRuntimeSection({
         </ul>
       ) : null}
 
-      {syncMonitoring.envelopes.length ? (
+      {envelopes.length ? (
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {syncMonitoring.envelopes.map((record) => (
+          {envelopes.map((record) => (
             <li key={record.id}>
               {record.entity_type} :: {record.status}
             </li>

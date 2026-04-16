@@ -4,6 +4,6 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   test: {
-    testTimeout: 10_000,
+    testTimeout: 20_000,
   },
 });

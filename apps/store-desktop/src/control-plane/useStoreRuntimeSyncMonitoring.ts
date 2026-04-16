@@ -39,9 +39,9 @@ export function useStoreRuntimeSyncMonitoring({
         storeControlPlaneClient.listRuntimeSyncEnvelopes(accessToken, tenantId, branchId),
       ]);
       setSyncStatus(statusResponse);
-      setConflicts(conflictResponse.records);
-      setSpokes(spokeResponse.records);
-      setEnvelopes(envelopeResponse.records);
+      setConflicts(Array.isArray(conflictResponse.records) ? conflictResponse.records : []);
+      setSpokes(Array.isArray(spokeResponse.records) ? spokeResponse.records : []);
+      setEnvelopes(Array.isArray(envelopeResponse.records) ? envelopeResponse.records : []);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load sync monitoring');
     } finally {
