@@ -291,6 +291,29 @@ def test_cashier_creates_checkout_payment_session_and_receives_qr_ready_state(mo
     assert inventory_snapshot.json()["records"][0]["stock_on_hand"] == 24.0
 
 
+def test_checkout_payment_session_rejects_missing_cashier_session_id(monkeypatch) -> None:
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", "cashfree-secret")
+    database_url = sqlite_test_database_url("checkout-payment-session-cashier-session-required")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+
+    response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(product_id=str(context["product_id"])),
+    )
+
+    assert response.status_code == 422
+
+
 def test_cashier_can_create_hosted_terminal_and_phone_checkout_payment_sessions(monkeypatch) -> None:
     monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", "cashfree-secret")
     database_url = sqlite_test_database_url("checkout-payment-session-hosted-actions")
