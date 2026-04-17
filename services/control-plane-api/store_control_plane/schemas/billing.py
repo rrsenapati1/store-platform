@@ -17,6 +17,8 @@ class SaleCreateRequest(BaseModel):
     payment_method: str
     promotion_code: str | None = None
     customer_voucher_id: str | None = None
+    gift_card_code: str | None = None
+    gift_card_amount: float = Field(default=0, ge=0)
     store_credit_amount: float = Field(default=0, ge=0)
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
@@ -32,6 +34,8 @@ class CheckoutPaymentSessionCreateRequest(BaseModel):
     customer_gstin: str | None = None
     promotion_code: str | None = None
     customer_voucher_id: str | None = None
+    gift_card_code: str | None = None
+    gift_card_amount: float = Field(default=0, ge=0)
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
     store_credit_amount: float = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
@@ -43,6 +47,8 @@ class CheckoutPricePreviewRequest(BaseModel):
     customer_gstin: str | None = None
     promotion_code: str | None = None
     customer_voucher_id: str | None = None
+    gift_card_code: str | None = None
+    gift_card_amount: float = Field(default=0, ge=0)
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
     store_credit_amount: float = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
@@ -60,6 +66,14 @@ class CheckoutPricePreviewCampaignResponse(BaseModel):
 class CheckoutPricePreviewCodeCampaignResponse(CheckoutPricePreviewCampaignResponse):
     code_id: str
     code: str
+
+
+class CheckoutPricePreviewGiftCardResponse(BaseModel):
+    id: str
+    gift_card_code: str
+    display_name: str
+    status: str
+    available_balance: float
 
 
 class CheckoutPricePreviewCustomerVoucherResponse(BaseModel):
@@ -80,6 +94,7 @@ class CheckoutPricePreviewSummaryResponse(BaseModel):
     tax_total: float
     invoice_total: float
     grand_total: float
+    gift_card_amount: float = 0
     store_credit_amount: float = 0
     final_payable_amount: float
 
@@ -107,6 +122,7 @@ class CheckoutPricePreviewResponse(BaseModel):
     automatic_campaign: CheckoutPricePreviewCampaignResponse | None = None
     promotion_code_campaign: CheckoutPricePreviewCodeCampaignResponse | None = None
     customer_voucher: CheckoutPricePreviewCustomerVoucherResponse | None = None
+    gift_card: CheckoutPricePreviewGiftCardResponse | None = None
     summary: CheckoutPricePreviewSummaryResponse
     lines: list[CheckoutPricePreviewLineResponse]
     tax_lines: list["InvoiceTaxLineResponse"]
@@ -148,6 +164,9 @@ class CheckoutPaymentSessionResponse(BaseModel):
     customer_voucher_id: str | None = None
     customer_voucher_name: str | None = None
     customer_voucher_discount_total: float = 0
+    gift_card_id: str | None = None
+    gift_card_code: str | None = None
+    gift_card_amount: float = 0
     store_credit_amount: float = 0
     action_payload: CheckoutPaymentActionPayloadResponse
     action_expires_at: datetime | None = None
@@ -229,10 +248,13 @@ class SaleResponse(BaseModel):
     promotion_campaign_id: str | None = None
     promotion_code_id: str | None = None
     customer_voucher_id: str | None = None
+    gift_card_id: str | None = None
     customer_voucher_name: str | None = None
+    gift_card_code: str | None = None
     promotion_code: str | None = None
     promotion_discount_amount: float = 0
     customer_voucher_discount_total: float = 0
+    gift_card_amount: float = 0
     store_credit_amount: float = 0
     loyalty_points_redeemed: int = 0
     loyalty_discount_amount: float = 0
@@ -259,10 +281,13 @@ class SaleRecord(BaseModel):
     promotion_campaign_id: str | None = None
     promotion_code_id: str | None = None
     customer_voucher_id: str | None = None
+    gift_card_id: str | None = None
     customer_voucher_name: str | None = None
+    gift_card_code: str | None = None
     promotion_code: str | None = None
     promotion_discount_amount: float = 0
     customer_voucher_discount_total: float = 0
+    gift_card_amount: float = 0
     store_credit_amount: float = 0
     loyalty_points_redeemed: int = 0
     loyalty_discount_amount: float = 0

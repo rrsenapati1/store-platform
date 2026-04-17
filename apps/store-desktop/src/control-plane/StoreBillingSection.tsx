@@ -159,7 +159,6 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
     || (!workspace.isSessionLive && !workspace.offlineContinuityReady)
     || !workspace.actor
     || !selectedItem
-    || !workspace.customerName
     || !workspace.saleQuantity
     || !workspace.paymentMethod
     || (isDigitalCheckout && !workspace.isSessionLive);
@@ -305,6 +304,18 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
           </div>
         ) : null}
         <FormField
+          id="runtime-gift-card-code"
+          label="Gift card code"
+          value={workspace.giftCardCode}
+          onChange={workspace.setGiftCardCode}
+        />
+        <FormField
+          id="runtime-gift-card-amount"
+          label="Apply gift card amount"
+          value={workspace.giftCardAmount}
+          onChange={workspace.setGiftCardAmount}
+        />
+        <FormField
           id="runtime-customer-name"
           label="Customer name"
           value={workspace.customerName}
@@ -335,7 +346,6 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
               || !workspace.isSessionLive
               || !workspace.actor
               || !selectedItem
-              || !workspace.customerName
               || !workspace.saleQuantity
             }
           >
@@ -374,6 +384,10 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                   label: 'Customer voucher',
                   value: checkoutPricePreview.customer_voucher?.voucher_code ?? 'None',
                 },
+                {
+                  label: 'Gift card',
+                  value: checkoutPricePreview.gift_card?.gift_card_code ?? 'None',
+                },
                 { label: 'MRP total', value: String(checkoutPricePreview.summary.mrp_total) },
                 {
                   label: 'Selling subtotal',
@@ -403,6 +417,10 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                 {
                   label: 'Store credit used',
                   value: String(checkoutPricePreview.summary.store_credit_amount),
+                },
+                {
+                  label: 'Gift card used',
+                  value: String(checkoutPricePreview.summary.gift_card_amount ?? 0),
                 },
                 {
                   label: 'Remaining payable',
@@ -458,8 +476,10 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                   { label: 'Amount', value: `${checkoutPaymentSession.currency_code} ${checkoutPaymentSession.order_amount.toFixed(2)}` },
                   { label: 'Promotion code', value: checkoutPaymentSession.promotion_code ?? 'None' },
                   { label: 'Customer voucher', value: checkoutPaymentSession.customer_voucher_name ?? 'None' },
+                  { label: 'Gift card', value: checkoutPaymentSession.gift_card_code ?? 'None' },
                   { label: 'Promotion discount', value: checkoutPromotionDiscountAmount.toFixed(2) },
                   { label: 'Voucher discount', value: (checkoutPaymentSession.customer_voucher_discount_total ?? 0).toFixed(2) },
+                  { label: 'Gift card amount', value: (checkoutPaymentSession.gift_card_amount ?? 0).toFixed(2) },
                   { label: 'Recovery', value: checkoutPaymentSession.recovery_state },
                 ]}
               />

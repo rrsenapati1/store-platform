@@ -28,7 +28,7 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
     vi.restoreAllMocks();
   });
 
-  test('sends checkout-price-preview payloads with voucher, promotion, loyalty, and store credit posture', async () => {
+  test('sends checkout-price-preview payloads with voucher, promotion, loyalty, store credit, and gift card posture', async () => {
     const preview: ControlPlaneCheckoutPricePreview = {
       customer_profile_id: 'profile-1',
       customer_name: 'Acme Traders',
@@ -57,6 +57,13 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
         voucher_name: 'Welcome voucher',
         voucher_amount: 15,
       },
+      gift_card: {
+        id: 'gift-card-1',
+        gift_card_code: 'GIFT-1000',
+        display_name: 'Diwali gift card',
+        status: 'ACTIVE',
+        available_balance: 300,
+      },
       summary: {
         mrp_total: 120,
         selling_price_subtotal: 92.5,
@@ -69,6 +76,7 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
         invoice_total: 31.41,
         grand_total: 11.41,
         store_credit_amount: 10,
+        gift_card_amount: 1.41,
         final_payable_amount: 1.41,
       },
       lines: [
@@ -100,6 +108,8 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
       customer_voucher_id: 'voucher-1',
       loyalty_points_to_redeem: 200,
       store_credit_amount: 10,
+      gift_card_code: 'GIFT-1000',
+      gift_card_amount: 1.41,
       lines: [{ product_id: 'product-1', quantity: 1 }],
     });
 
@@ -115,13 +125,15 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
           customer_voucher_id: 'voucher-1',
           loyalty_points_to_redeem: 200,
           store_credit_amount: 10,
+          gift_card_code: 'GIFT-1000',
+          gift_card_amount: 1.41,
           lines: [{ product_id: 'product-1', quantity: 1 }],
         }),
       }),
     );
   });
 
-  test('sends store_credit_amount in checkout payment session payloads', async () => {
+  test('sends store_credit_amount and gift card posture in checkout payment session payloads', async () => {
     const session: ControlPlaneCheckoutPaymentSession = {
       id: 'checkout-1',
       tenant_id: 'tenant-1',
@@ -147,6 +159,9 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
       promotion_code_discount_total: 20,
       customer_voucher_discount_total: 15,
       store_credit_amount: 10,
+      gift_card_id: 'gift-card-1',
+      gift_card_code: 'GIFT-1000',
+      gift_card_amount: 1.41,
       action_payload: { kind: 'upi_qr', value: 'upi://pay', label: 'Korsenex QR', description: null },
       action_expires_at: null,
       qr_payload: { format: 'upi_qr', value: 'upi://pay' },
@@ -170,6 +185,8 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
       customer_voucher_id: 'voucher-1',
       loyalty_points_to_redeem: 200,
       store_credit_amount: 10,
+      gift_card_code: 'GIFT-1000',
+      gift_card_amount: 1.41,
       lines: [{ product_id: 'product-1', quantity: 1 }],
     });
 
@@ -189,6 +206,8 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
           customer_voucher_id: 'voucher-1',
           loyalty_points_to_redeem: 200,
           store_credit_amount: 10,
+          gift_card_code: 'GIFT-1000',
+          gift_card_amount: 1.41,
           lines: [{ product_id: 'product-1', quantity: 1 }],
         }),
       }),

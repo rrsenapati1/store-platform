@@ -7,6 +7,7 @@ import type {
   ControlPlaneSaleRecord,
 } from '@store/types';
 import { storeControlPlaneClient } from './client';
+import { resolveGiftCardCodePayload } from './storeGiftCardActions';
 import { resolvePromotionCodePayload } from './storePromotionActions';
 
 const CASHFREE_POLL_INTERVAL_MS = 2500;
@@ -21,6 +22,8 @@ interface UseStoreRuntimeCheckoutPaymentArgs {
   customerName: string;
   customerGstin: string;
   promotionCode: string;
+  giftCardCode: string;
+  giftCardAmount: number;
   loyaltyPointsToRedeem: number;
   storeCreditAmount: number;
   saleQuantity: string;
@@ -84,6 +87,8 @@ export function useStoreRuntimeCheckoutPayment({
   customerName,
   customerGstin,
   promotionCode,
+  giftCardCode,
+  giftCardAmount,
   loyaltyPointsToRedeem,
   storeCreditAmount,
   saleQuantity,
@@ -180,6 +185,8 @@ export function useStoreRuntimeCheckoutPayment({
         customer_voucher_id: customerVoucherId,
         loyalty_points_to_redeem: loyaltyPointsToRedeem,
         store_credit_amount: storeCreditAmount,
+        gift_card_code: resolveGiftCardCodePayload(giftCardCode),
+        gift_card_amount: giftCardAmount,
         lines: [{ product_id: selectedCatalogItem.product_id, quantity }],
       });
       setCheckoutPaymentSession(session);

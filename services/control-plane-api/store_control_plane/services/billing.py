@@ -8,6 +8,7 @@ from ..utils import utc_now
 from .billing_policy import build_sale_draft, ensure_sale_stock_available, sale_invoice_number
 from .checkout_pricing import CheckoutPricingService
 from .customer_profiles import CustomerProfileService
+from .gift_cards import GiftCardService
 from .exchange_policy import build_exchange_settlement
 from .loyalty import LoyaltyService
 from .promotions import PromotionService
@@ -27,6 +28,7 @@ class BillingService:
         self._customer_profile_service = CustomerProfileService(session)
         self._loyalty_service = LoyaltyService(session)
         self._promotion_service = PromotionService(session)
+        self._gift_card_service = GiftCardService(session)
         self._store_credit_service = StoreCreditService(session)
 
     async def create_sale(
@@ -41,6 +43,8 @@ class BillingService:
         payment_method: str,
         promotion_code: str | None = None,
         customer_voucher_id: str | None = None,
+        gift_card_code: str | None = None,
+        gift_card_amount: float = 0.0,
         pricing_snapshot: dict[str, object] | None = None,
         store_credit_amount: float = 0.0,
         loyalty_points_to_redeem: int = 0,
@@ -61,6 +65,8 @@ class BillingService:
                 customer_gstin=customer_gstin,
                 promotion_code=promotion_code,
                 customer_voucher_id=customer_voucher_id,
+                gift_card_code=gift_card_code,
+                gift_card_amount=gift_card_amount,
                 loyalty_points_to_redeem=loyalty_points_to_redeem,
                 store_credit_amount=store_credit_amount,
                 lines=lines,
@@ -73,17 +79,23 @@ class BillingService:
         automatic_campaign = preview.get("automatic_campaign")
         promotion_code_campaign = preview.get("promotion_code_campaign")
         customer_voucher = preview.get("customer_voucher")
+        gift_card = preview.get("gift_card")
         loyalty_points_redeemed = int(preview.get("loyalty_points_to_redeem", 0))
         loyalty_points_earned = int(preview.get("loyalty_points_earned", 0))
         loyalty_discount_amount = round(float(preview_summary.get("loyalty_discount_total", 0.0)), 2)
+        gift_card_amount = round(float(preview_summary.get("gift_card_amount", 0.0)), 2)
         store_credit_amount = round(float(preview_summary.get("store_credit_amount", 0.0)), 2)
         net_sale_total = round(float(preview_summary.get("grand_total", 0.0)), 2)
-        payment_rows: list[dict[str, float | str]] | None = None
+        payment_rows: list[dict[str, float | str]] = []
+        remaining_payment_amount = net_sale_total
         if store_credit_amount > 0:
-            payment_rows = [{"payment_method": "STORE_CREDIT", "amount": store_credit_amount}]
-            remaining_payment_amount = round(net_sale_total - store_credit_amount, 2)
-            if remaining_payment_amount > 0:
-                payment_rows.append({"payment_method": payment_method, "amount": remaining_payment_amount})
+            payment_rows.append({"payment_method": "STORE_CREDIT", "amount": store_credit_amount})
+            remaining_payment_amount = round(remaining_payment_amount - store_credit_amount, 2)
+        if gift_card_amount > 0:
+            payment_rows.append({"payment_method": "GIFT_CARD", "amount": gift_card_amount})
+            remaining_payment_amount = round(remaining_payment_amount - gift_card_amount, 2)
+        if remaining_payment_amount > 0:
+            payment_rows.append({"payment_method": payment_method, "amount": remaining_payment_amount})
 
         sequence_number = await self._billing_repo.next_branch_sale_sequence(tenant_id=tenant_id, branch_id=branch_id)
         persisted = await self._billing_repo.create_sale(
@@ -97,7 +109,10 @@ class BillingService:
             promotion_campaign_id=promotion_code_campaign["id"] if promotion_code_campaign is not None else None,
             promotion_code_id=promotion_code_campaign["code_id"] if promotion_code_campaign is not None else None,
             customer_voucher_id=customer_voucher["id"] if customer_voucher is not None else None,
+            gift_card_id=gift_card["id"] if gift_card is not None else None,
             customer_voucher_name=customer_voucher["voucher_name"] if customer_voucher is not None else None,
+            gift_card_code=gift_card["gift_card_code"] if gift_card is not None else None,
+            gift_card_amount=gift_card_amount,
             promotion_code=promotion_code_campaign["code"] if promotion_code_campaign is not None else None,
             promotion_discount_amount=round(float(preview_summary.get("promotion_code_discount_total", 0.0)), 2),
             customer_voucher_discount_total=round(
@@ -132,7 +147,7 @@ class BillingService:
             loyalty_discount_amount=loyalty_discount_amount,
             loyalty_points_earned=loyalty_points_earned,
             payment_method=payment_method,
-            payments=payment_rows,
+            payments=payment_rows or None,
             lines=preview_lines,
             tax_lines=preview_tax_lines,
         )
@@ -146,6 +161,15 @@ class BillingService:
                 tenant_id=tenant_id,
                 voucher_id=str(customer_voucher["id"]),
                 sale_id=persisted.sale.id,
+            )
+        if gift_card is not None and gift_card_amount > 0:
+            await self._gift_card_service.redeem_gift_card(
+                tenant_id=tenant_id,
+                gift_card_id=str(gift_card["id"]),
+                amount=gift_card_amount,
+                branch_id=branch_id,
+                source_reference_id=persisted.sale.id,
+                note=f"Sale {persisted.invoice.invoice_number}",
             )
         if store_credit_amount > 0:
             await self._store_credit_service.redeem_customer_store_credit(
@@ -253,6 +277,11 @@ class BillingService:
                 "promotion_code_id": sale.promotion_code_id,
                 "promotion_code": sale.promotion_code,
                 "promotion_discount_amount": sale.promotion_discount_amount,
+                "gift_card_id": sale.gift_card_id,
+                "gift_card_code": sale.gift_card_code,
+                "gift_card_amount": sale.gift_card_amount
+                if sale.gift_card_amount > 0
+                else round(sum(payment.amount for payment in payments if payment.payment_method == "GIFT_CARD"), 2),
                 "store_credit_amount": round(
                     sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
                     2,
@@ -609,8 +638,14 @@ class BillingService:
             customer_gstin=replacement_draft.customer_gstin,
             promotion_campaign_id=None,
             promotion_code_id=None,
+            customer_voucher_id=None,
+            gift_card_id=None,
+            customer_voucher_name=None,
+            gift_card_code=None,
+            gift_card_amount=0.0,
             promotion_code=None,
             promotion_discount_amount=0.0,
+            customer_voucher_discount_total=0.0,
             invoice_kind=replacement_draft.invoice_kind,
             irn_status=replacement_draft.irn_status,
             issued_on=utc_now().date(),
@@ -862,10 +897,15 @@ class BillingService:
             "promotion_campaign_id": sale.promotion_campaign_id,
             "promotion_code_id": sale.promotion_code_id,
             "customer_voucher_id": sale.customer_voucher_id,
+            "gift_card_id": sale.gift_card_id,
             "customer_voucher_name": sale.customer_voucher_name,
+            "gift_card_code": sale.gift_card_code,
             "promotion_code": sale.promotion_code,
             "promotion_discount_amount": sale.promotion_discount_amount,
             "customer_voucher_discount_total": sale.customer_voucher_discount_total,
+            "gift_card_amount": sale.gift_card_amount
+            if sale.gift_card_amount > 0
+            else round(sum(payment.amount for payment in payments if payment.payment_method == "GIFT_CARD"), 2),
             "store_credit_amount": round(
                 sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
                 2,

@@ -2,6 +2,21 @@
 
 ## 2026-04-17
 
+- Completed `V2-005` with gift-card foundation as the final commercial-control slice:
+  - added control-plane-owned gift card accounts, append-only gift-card ledger entries, owner issue/adjust/disable/reactivate flows, and billing plus checkout-payment integration so gift cards behave as a distinct stored-value instrument instead of being folded into store credit or promotions
+  - extended owner-web with a dedicated gift-card management surface for issuing cards, inspecting balances and ledger history, and operationally disabling or reactivating cards without leaving the customer/commercial workspace
+  - extended Store Desktop checkout pricing preview, direct sales, and provider-backed checkout sessions with gift-card code and partial gift-card redemption support while explicitly rejecting offline local gift-card redemption so cloud authority remains intact
+  - closed `V2-005` in the task ledger now that customer profiles, store credit, loyalty, promotion codes, automatic discounts, assigned vouchers, price tiers, and gift cards all exist end-to-end on control-plane authority
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_gift_card_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py services/control-plane-api/tests/test_checkout_price_preview_flow.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 - Expanded `V2-005` with the next three commercial-control slices as one coordinated stack:
   - added promotion arbitration controls so automatic and manual campaigns now obey explicit `priority` and `stacking_rule` authority instead of implicit discount ordering, with owner-web campaign management exposing those controls
   - added price-tier foundation with control-plane-owned tier master data, branch tier prices, owner-web tier management, and shared contracts for non-default commercial pricing

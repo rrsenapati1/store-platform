@@ -34,7 +34,14 @@ class Sale(Base, TimestampMixin):
         default=None,
         index=True,
     )
+    gift_card_id: Mapped[str | None] = mapped_column(
+        ForeignKey("gift_cards.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
     customer_voucher_name: Mapped[str | None] = mapped_column(String(255), default=None)
+    gift_card_code: Mapped[str | None] = mapped_column(String(64), default=None)
+    gift_card_amount: Mapped[float] = mapped_column(default=0.0)
     promotion_code: Mapped[str | None] = mapped_column(String(64), default=None)
     promotion_discount_amount: Mapped[float] = mapped_column(default=0.0)
     promotion_code_discount_total: Mapped[float] = mapped_column(default=0.0)

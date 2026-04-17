@@ -17,6 +17,8 @@ import type {
   ControlPlaneCatalogProduct,
   ControlPlaneCatalogProductRecord,
   ControlPlaneCustomerDirectoryRecord,
+  ControlPlaneGiftCard,
+  ControlPlaneGiftCardListResponse,
   ControlPlaneCustomerLoyalty,
   ControlPlaneCustomerProfile,
   ControlPlaneCustomerHistoryResponse,
@@ -1073,6 +1075,83 @@ export const ownerControlPlaneClient = {
       {
         method: 'POST',
         body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  listGiftCards(accessToken: string, tenantId: string, query?: string) {
+    const queryParam = query ? `?query=${encodeURIComponent(query)}` : '';
+    return request<ControlPlaneGiftCardListResponse>(
+      `/v1/tenants/${tenantId}/gift-cards${queryParam}`,
+      undefined,
+      accessToken,
+    );
+  },
+  createGiftCard(
+    accessToken: string,
+    tenantId: string,
+    payload: {
+      display_name: string;
+      gift_card_code: string;
+      initial_amount: number;
+      note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneGiftCard>(
+      `/v1/tenants/${tenantId}/gift-cards`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  getGiftCard(accessToken: string, tenantId: string, giftCardId: string) {
+    return request<ControlPlaneGiftCard>(
+      `/v1/tenants/${tenantId}/gift-cards/${giftCardId}`,
+      undefined,
+      accessToken,
+    );
+  },
+  getGiftCardByCode(accessToken: string, tenantId: string, giftCardCode: string) {
+    return request<ControlPlaneGiftCard>(
+      `/v1/tenants/${tenantId}/gift-cards/code/${encodeURIComponent(giftCardCode)}`,
+      undefined,
+      accessToken,
+    );
+  },
+  adjustGiftCard(
+    accessToken: string,
+    tenantId: string,
+    giftCardId: string,
+    payload: {
+      amount_delta: number;
+      note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneGiftCard>(
+      `/v1/tenants/${tenantId}/gift-cards/${giftCardId}/adjust`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  disableGiftCard(accessToken: string, tenantId: string, giftCardId: string) {
+    return request<ControlPlaneGiftCard>(
+      `/v1/tenants/${tenantId}/gift-cards/${giftCardId}/disable`,
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  reactivateGiftCard(accessToken: string, tenantId: string, giftCardId: string) {
+    return request<ControlPlaneGiftCard>(
+      `/v1/tenants/${tenantId}/gift-cards/${giftCardId}/reactivate`,
+      {
+        method: 'POST',
       },
       accessToken,
     );

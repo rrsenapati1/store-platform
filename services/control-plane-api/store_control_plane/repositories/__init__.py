@@ -6,6 +6,7 @@ from .catalog import CatalogRepository
 from .compliance import ComplianceRepository
 from .commerce import CommerceRepository
 from .customers import CustomerProfileRepository, CustomerReportingRepository
+from .gift_cards import GiftCardRepository
 from .identity import IdentityRepository
 from .inventory import InventoryRepository
 from .memberships import MembershipRepository
@@ -29,6 +30,7 @@ __all__ = [
     "CommerceRepository",
     "CustomerProfileRepository",
     "CustomerReportingRepository",
+    "GiftCardRepository",
     "IdentityRepository",
     "InventoryRepository",
     "MembershipRepository",

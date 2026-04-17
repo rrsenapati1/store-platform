@@ -7,6 +7,10 @@ from ..dependencies import get_current_actor, get_session
 from ..schemas import (
     BranchCustomerReportResponse,
     CustomerDirectoryResponse,
+    GiftCardAdjustRequest,
+    GiftCardCreateRequest,
+    GiftCardListResponse,
+    GiftCardResponse,
     CustomerHistoryResponse,
     CustomerLoyaltyAdjustmentRequest,
     CustomerLoyaltyResponse,
@@ -24,6 +28,7 @@ from ..services import (
     ActorContext,
     CustomerProfileService,
     CustomerReportingService,
+    GiftCardService,
     LoyaltyService,
     StoreCreditService,
     assert_branch_any_capability,
@@ -57,6 +62,128 @@ async def update_loyalty_program(
     record = await service.update_loyalty_program(tenant_id=tenant_id, **payload.model_dump())
     await session.commit()
     return LoyaltyProgramResponse(**record)
+
+
+@router.get("/{tenant_id}/gift-cards", response_model=GiftCardListResponse)
+async def list_gift_cards(
+    tenant_id: str,
+    query: str | None = None,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> GiftCardListResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("tenant.manage", "sales.bill"),
+    )
+    service = GiftCardService(session)
+    record = await service.list_gift_cards(tenant_id=tenant_id, query=query)
+    return GiftCardListResponse(**record)
+
+
+@router.post("/{tenant_id}/gift-cards", response_model=GiftCardResponse)
+async def create_gift_card(
+    tenant_id: str,
+    payload: GiftCardCreateRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> GiftCardResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = GiftCardService(session)
+    record = await service.issue_gift_card(
+        tenant_id=tenant_id,
+        display_name=payload.display_name,
+        gift_card_code=payload.gift_card_code,
+        initial_amount=payload.initial_amount,
+        note=payload.note,
+    )
+    await session.commit()
+    return GiftCardResponse(**record)
+
+
+@router.get("/{tenant_id}/gift-cards/{gift_card_id}", response_model=GiftCardResponse)
+async def get_gift_card(
+    tenant_id: str,
+    gift_card_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> GiftCardResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("tenant.manage", "sales.bill"),
+    )
+    service = GiftCardService(session)
+    record = await service.get_gift_card(tenant_id=tenant_id, gift_card_id=gift_card_id)
+    return GiftCardResponse(**record)
+
+
+@router.get("/{tenant_id}/gift-cards/code/{gift_card_code}", response_model=GiftCardResponse)
+async def get_gift_card_by_code(
+    tenant_id: str,
+    gift_card_code: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> GiftCardResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id="",
+        capabilities=("tenant.manage", "sales.bill"),
+    )
+    service = GiftCardService(session)
+    record = await service.get_gift_card_by_code(tenant_id=tenant_id, gift_card_code=gift_card_code)
+    return GiftCardResponse(**record)
+
+
+@router.post("/{tenant_id}/gift-cards/{gift_card_id}/adjust", response_model=GiftCardResponse)
+async def adjust_gift_card(
+    tenant_id: str,
+    gift_card_id: str,
+    payload: GiftCardAdjustRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> GiftCardResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = GiftCardService(session)
+    record = await service.adjust_gift_card(
+        tenant_id=tenant_id,
+        gift_card_id=gift_card_id,
+        amount_delta=payload.amount_delta,
+        note=payload.note,
+    )
+    await session.commit()
+    return GiftCardResponse(**record)
+
+
+@router.post("/{tenant_id}/gift-cards/{gift_card_id}/disable", response_model=GiftCardResponse)
+async def disable_gift_card(
+    tenant_id: str,
+    gift_card_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> GiftCardResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = GiftCardService(session)
+    record = await service.disable_gift_card(tenant_id=tenant_id, gift_card_id=gift_card_id)
+    await session.commit()
+    return GiftCardResponse(**record)
+
+
+@router.post("/{tenant_id}/gift-cards/{gift_card_id}/reactivate", response_model=GiftCardResponse)
+async def reactivate_gift_card(
+    tenant_id: str,
+    gift_card_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> GiftCardResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = GiftCardService(session)
+    record = await service.reactivate_gift_card(tenant_id=tenant_id, gift_card_id=gift_card_id)
+    await session.commit()
+    return GiftCardResponse(**record)
 
 
 @router.get("/{tenant_id}/customer-profiles", response_model=CustomerProfileListResponse)

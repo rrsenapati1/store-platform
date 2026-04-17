@@ -47,6 +47,8 @@ class CheckoutPaymentsService:
         customer_gstin: str | None,
         promotion_code: str | None,
         customer_voucher_id: str | None,
+        gift_card_code: str | None,
+        gift_card_amount: float,
         loyalty_points_to_redeem: int,
         store_credit_amount: float,
         lines: list[dict[str, object]],
@@ -67,6 +69,8 @@ class CheckoutPaymentsService:
             customer_gstin=customer_gstin,
             promotion_code=promotion_code,
             customer_voucher_id=customer_voucher_id,
+            gift_card_code=gift_card_code,
+            gift_card_amount=gift_card_amount,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
             store_credit_amount=store_credit_amount,
             lines=lines,
@@ -238,6 +242,8 @@ class CheckoutPaymentsService:
             customer_gstin=record.customer_gstin,
             promotion_code=record.cart_snapshot.get("promotion_code"),
             customer_voucher_id=(record.cart_snapshot.get("customer_voucher") or {}).get("id"),
+            gift_card_code=(record.cart_snapshot.get("gift_card") or {}).get("gift_card_code"),
+            gift_card_amount=float(record.cart_snapshot.get("summary", {}).get("gift_card_amount", 0.0)),
             loyalty_points_to_redeem=int(record.cart_snapshot.get("loyalty_points_to_redeem", 0)),
             store_credit_amount=float(record.cart_snapshot.get("summary", {}).get("store_credit_amount", 0.0)),
             lines=lines,
@@ -326,6 +332,8 @@ class CheckoutPaymentsService:
         customer_gstin: str | None,
         promotion_code: str | None,
         customer_voucher_id: str | None,
+        gift_card_code: str | None,
+        gift_card_amount: float,
         loyalty_points_to_redeem: int,
         store_credit_amount: float,
         lines: list[dict[str, object]],
@@ -338,6 +346,8 @@ class CheckoutPaymentsService:
             customer_gstin=customer_gstin,
             promotion_code=promotion_code,
             customer_voucher_id=customer_voucher_id,
+            gift_card_code=gift_card_code,
+            gift_card_amount=gift_card_amount,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
             store_credit_amount=store_credit_amount,
             lines=lines,
@@ -451,6 +461,8 @@ class CheckoutPaymentsService:
                 payment_method=record.payment_method,
                 pricing_snapshot=dict(record.cart_snapshot),
                 customer_voucher_id=(record.cart_snapshot.get("customer_voucher") or {}).get("id"),
+                gift_card_code=(record.cart_snapshot.get("gift_card") or {}).get("gift_card_code"),
+                gift_card_amount=float(record.cart_snapshot.get("summary", {}).get("gift_card_amount", 0.0)),
                 store_credit_amount=float(record.cart_snapshot.get("summary", {}).get("store_credit_amount", 0.0)),
                 loyalty_points_to_redeem=int(record.cart_snapshot.get("loyalty_points_to_redeem", 0)),
                 lines=list(record.cart_snapshot.get("requested_lines", [])),
@@ -530,6 +542,7 @@ class CheckoutPaymentsService:
     def _serialize_checkout_payment_session(self, record, *, sale: dict[str, object] | None) -> dict[str, object]:
         qr_payload = record.qr_payload or None
         customer_voucher = record.cart_snapshot.get("customer_voucher") or {}
+        gift_card = record.cart_snapshot.get("gift_card") or {}
         return {
             "id": record.id,
             "tenant_id": record.tenant_id,
@@ -558,6 +571,9 @@ class CheckoutPaymentsService:
             "customer_voucher_discount_total": float(
                 record.cart_snapshot.get("summary", {}).get("customer_voucher_discount_total", 0.0)
             ),
+            "gift_card_id": gift_card.get("id"),
+            "gift_card_code": gift_card.get("gift_card_code"),
+            "gift_card_amount": float(record.cart_snapshot.get("summary", {}).get("gift_card_amount", 0.0)),
             "store_credit_amount": float(record.cart_snapshot.get("summary", {}).get("store_credit_amount", 0.0)),
             "action_payload": record.action_payload,
             "action_expires_at": record.action_expires_at,

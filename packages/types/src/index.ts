@@ -1508,6 +1508,9 @@ export interface ControlPlaneSale {
   promotion_discount_amount: number;
   customer_voucher_discount_total?: number;
   store_credit_amount: number;
+  gift_card_id?: string | null;
+  gift_card_code?: string | null;
+  gift_card_amount?: number;
   loyalty_points_redeemed: number;
   loyalty_discount_amount: number;
   loyalty_points_earned: number;
@@ -1538,6 +1541,9 @@ export interface ControlPlaneSaleRecord {
   promotion_discount_amount: number;
   customer_voucher_discount_total?: number;
   store_credit_amount: number;
+  gift_card_id?: string | null;
+  gift_card_code?: string | null;
+  gift_card_amount?: number;
   loyalty_points_redeemed: number;
   loyalty_discount_amount: number;
   loyalty_points_earned: number;
@@ -1569,6 +1575,9 @@ export interface ControlPlaneCheckoutPaymentSession {
   promotion_code_discount_total?: number;
   customer_voucher_discount_total?: number;
   store_credit_amount?: number;
+  gift_card_id?: string | null;
+  gift_card_code?: string | null;
+  gift_card_amount?: number;
   action_payload: ControlPlaneCheckoutPaymentActionPayload;
   action_expires_at?: string | null;
   qr_payload?: ControlPlaneCheckoutPaymentQrPayload | null;
@@ -1644,6 +1653,14 @@ export interface ControlPlaneCheckoutPricePreviewCustomerVoucher {
   voucher_amount: number;
 }
 
+export interface ControlPlaneCheckoutPricePreviewGiftCard {
+  id: string;
+  gift_card_code: string;
+  display_name: string;
+  status: string;
+  available_balance: number;
+}
+
 export interface ControlPlaneCheckoutPricePreviewSummary {
   mrp_total: number;
   selling_price_subtotal: number;
@@ -1656,6 +1673,7 @@ export interface ControlPlaneCheckoutPricePreviewSummary {
   invoice_total: number;
   grand_total: number;
   store_credit_amount: number;
+  gift_card_amount?: number;
   final_payable_amount: number;
 }
 
@@ -1682,6 +1700,7 @@ export interface ControlPlaneCheckoutPricePreview {
   automatic_campaign?: ControlPlaneCheckoutPricePreviewCampaign | null;
   promotion_code_campaign?: ControlPlaneCheckoutPricePreviewCodeCampaign | null;
   customer_voucher?: ControlPlaneCheckoutPricePreviewCustomerVoucher | null;
+  gift_card?: ControlPlaneCheckoutPricePreviewGiftCard | null;
   summary: ControlPlaneCheckoutPricePreviewSummary;
   lines: ControlPlaneCheckoutPricePreviewLine[];
   tax_lines: ControlPlaneInvoiceTaxLine[];
@@ -1701,6 +1720,40 @@ export interface ControlPlaneCustomerVoucher {
   created_at: string;
   updated_at: string;
   redeemed_at?: string | null;
+}
+
+export interface ControlPlaneGiftCardLedgerEntry {
+  id: string;
+  entry_type: string;
+  source_type: string;
+  source_reference_id?: string | null;
+  amount: number;
+  balance_after: number;
+  note?: string | null;
+  branch_id?: string | null;
+  created_at: string;
+}
+
+export interface ControlPlaneGiftCardRecord {
+  id: string;
+  tenant_id: string;
+  gift_card_code: string;
+  display_name: string;
+  available_balance: number;
+  issued_total: number;
+  redeemed_total: number;
+  adjusted_total: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ControlPlaneGiftCard extends ControlPlaneGiftCardRecord {
+  ledger_entries: ControlPlaneGiftCardLedgerEntry[];
+}
+
+export interface ControlPlaneGiftCardListResponse {
+  records: ControlPlaneGiftCardRecord[];
 }
 
 export interface ControlPlaneCustomerProfile {

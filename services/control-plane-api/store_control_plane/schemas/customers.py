@@ -46,6 +46,52 @@ class CustomerProfileListResponse(BaseModel):
     records: list[CustomerProfileResponse]
 
 
+class GiftCardCreateRequest(BaseModel):
+    display_name: str
+    gift_card_code: str
+    initial_amount: float = Field(gt=0)
+    note: str | None = None
+
+
+class GiftCardAdjustRequest(BaseModel):
+    amount_delta: float
+    note: str | None = None
+
+
+class GiftCardLedgerEntryResponse(BaseModel):
+    id: str
+    entry_type: str
+    source_type: str
+    source_reference_id: str | None = None
+    amount: float
+    balance_after: float
+    note: str | None = None
+    branch_id: str | None = None
+    created_at: datetime
+
+
+class GiftCardRecord(BaseModel):
+    id: str
+    tenant_id: str
+    gift_card_code: str
+    display_name: str
+    available_balance: float
+    issued_total: float
+    redeemed_total: float
+    adjusted_total: float
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class GiftCardResponse(GiftCardRecord):
+    ledger_entries: list[GiftCardLedgerEntryResponse]
+
+
+class GiftCardListResponse(BaseModel):
+    records: list[GiftCardRecord]
+
+
 class CustomerStoreCreditIssueRequest(BaseModel):
     amount: float
     note: str | None = None

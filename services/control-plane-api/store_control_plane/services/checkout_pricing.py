@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..repositories import CatalogRepository, InventoryRepository, TenantRepository
 from .billing_policy import build_sale_draft, ensure_sale_stock_available
 from .customer_profiles import CustomerProfileService
+from .gift_cards import GiftCardService
 from .loyalty import LoyaltyService
 from .promotions import PromotionService
 from .purchase_policy import money
@@ -41,6 +42,7 @@ class CheckoutPricingService:
         self._customer_profile_service = CustomerProfileService(session)
         self._promotion_service = PromotionService(session)
         self._loyalty_service = LoyaltyService(session)
+        self._gift_card_service = GiftCardService(session)
         self._store_credit_service = StoreCreditService(session)
 
     async def build_preview(
@@ -53,6 +55,8 @@ class CheckoutPricingService:
         customer_gstin: str | None,
         promotion_code: str | None,
         customer_voucher_id: str | None,
+        gift_card_code: str | None,
+        gift_card_amount: float,
         loyalty_points_to_redeem: int,
         store_credit_amount: float,
         lines: list[dict[str, object]],
@@ -323,6 +327,24 @@ class CheckoutPricingService:
                     detail="Customer store credit balance is insufficient",
                 )
 
+        gift_card = None
+        applied_gift_card_amount = 0.0
+        requested_gift_card_amount = money(float(gift_card_amount or 0.0))
+        if requested_gift_card_amount > 0:
+            if not gift_card_code:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Gift card code is required for gift card redemption",
+                )
+            gift_card_redemption = await self._gift_card_service.preview_redemption(
+                tenant_id=tenant_id,
+                gift_card_code=gift_card_code,
+                requested_amount=requested_gift_card_amount,
+                sale_total=money(grand_total - store_credit_amount),
+            )
+            gift_card = gift_card_redemption["gift_card"]
+            applied_gift_card_amount = money(float(gift_card_redemption["applied_amount"]))
+
         loyalty_points_earned = 0
         if customer_profile_id is not None:
             loyalty_points_earned = await self._loyalty_service.calculate_sale_earn_points(
@@ -344,6 +366,7 @@ class CheckoutPricingService:
             "automatic_campaign": automatic_campaign,
             "promotion_code_campaign": promotion_code_campaign,
             "customer_voucher": customer_voucher,
+            "gift_card": gift_card,
             "summary": {
                 "mrp_total": mrp_total,
                 "selling_price_subtotal": selling_price_subtotal,
@@ -360,8 +383,9 @@ class CheckoutPricingService:
                 "tax_total": tax_total,
                 "invoice_total": invoice_total,
                 "grand_total": grand_total,
+                "gift_card_amount": applied_gift_card_amount,
                 "store_credit_amount": store_credit_amount,
-                "final_payable_amount": money(grand_total - store_credit_amount),
+                "final_payable_amount": money(grand_total - store_credit_amount - applied_gift_card_amount),
             },
             "lines": preview_lines,
             "tax_lines": tax_lines,

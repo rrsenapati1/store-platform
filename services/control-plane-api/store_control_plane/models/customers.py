@@ -163,6 +163,38 @@ class CustomerLoyaltyLedgerEntry(Base, TimestampMixin):
     note: Mapped[str | None] = mapped_column(String(1024), default=None)
 
 
+class GiftCard(Base, TimestampMixin):
+    __tablename__ = "gift_cards"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "gift_card_code", name="uq_gift_cards_tenant_code"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    gift_card_code: Mapped[str] = mapped_column(String(64), index=True)
+    display_name: Mapped[str] = mapped_column(String(255))
+    available_balance: Mapped[float] = mapped_column(Float(), default=0.0)
+    issued_total: Mapped[float] = mapped_column(Float(), default=0.0)
+    redeemed_total: Mapped[float] = mapped_column(Float(), default=0.0)
+    adjusted_total: Mapped[float] = mapped_column(Float(), default=0.0)
+    status: Mapped[str] = mapped_column(String(32), default="ACTIVE", index=True)
+
+
+class GiftCardLedgerEntry(Base, TimestampMixin):
+    __tablename__ = "gift_card_ledger_entries"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    gift_card_id: Mapped[str] = mapped_column(ForeignKey("gift_cards.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), default=None)
+    entry_type: Mapped[str] = mapped_column(String(32))
+    source_type: Mapped[str] = mapped_column(String(32))
+    source_reference_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    amount: Mapped[float] = mapped_column(Float(), default=0.0)
+    balance_after: Mapped[float] = mapped_column(Float(), default=0.0)
+    note: Mapped[str | None] = mapped_column(String(1024), default=None)
+
+
 @dataclass(slots=True)
 class CustomerSaleSnapshot:
     sale: Sale

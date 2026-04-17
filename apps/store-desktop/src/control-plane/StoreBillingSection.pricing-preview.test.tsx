@@ -100,6 +100,8 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     customerName: 'Acme Traders',
     customerGstin: '29AAEPM0111C1Z3',
     promotionCode: 'WELCOME20',
+    giftCardCode: 'GIFT-1000',
+    giftCardAmount: '1.41',
     storeCreditAmount: '10',
     loyaltyPointsToRedeem: '200',
     saleQuantity: '1',
@@ -115,6 +117,8 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     clearSelectedCustomerVoucher: vi.fn(),
     setPromotionCode: vi.fn(),
     clearPromotionCode: vi.fn(),
+    setGiftCardCode: vi.fn(),
+    setGiftCardAmount: vi.fn(),
     setCustomerName: vi.fn(),
     setCustomerGstin: vi.fn(),
     setSaleQuantity: vi.fn(),
@@ -167,6 +171,13 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
         voucher_name: 'Welcome voucher',
         voucher_amount: 15,
       },
+      gift_card: {
+        id: 'gift-card-1',
+        gift_card_code: 'GIFT-1000',
+        display_name: 'Diwali gift card',
+        status: 'ACTIVE',
+        available_balance: 300,
+      },
       summary: {
         mrp_total: 120,
         selling_price_subtotal: 92.5,
@@ -179,7 +190,8 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
         invoice_total: 31.41,
         grand_total: 11.41,
         store_credit_amount: 10,
-        final_payable_amount: 1.41,
+        gift_card_amount: 1.41,
+        final_payable_amount: 0,
       },
       lines: [
         {
@@ -221,6 +233,7 @@ describe('store billing section pricing preview', () => {
     expect(pricingQueries.getByText('Tea Auto')).toBeInTheDocument();
     expect(pricingQueries.getByText('WELCOME20')).toBeInTheDocument();
     expect(pricingQueries.getByText('VCH-0001')).toBeInTheDocument();
+    expect(pricingQueries.getByText('GIFT-1000')).toBeInTheDocument();
     expect(screen.getByText(/Wholesale price tier/)).toBeInTheDocument();
     expect(pricingQueries.getByText('MRP total')).toBeInTheDocument();
     expect(pricingQueries.getByText('120')).toBeInTheDocument();
@@ -232,8 +245,10 @@ describe('store billing section pricing preview', () => {
     expect(pricingQueries.getByText('15')).toBeInTheDocument();
     expect(pricingQueries.getByText('Store credit used')).toBeInTheDocument();
     expect(pricingQueries.getByText('10')).toBeInTheDocument();
-    expect(pricingQueries.getByText('Remaining payable')).toBeInTheDocument();
+    expect(pricingQueries.getByText('Gift card used')).toBeInTheDocument();
     expect(pricingQueries.getByText('1.41')).toBeInTheDocument();
+    expect(pricingQueries.getByText('Remaining payable')).toBeInTheDocument();
+    expect(pricingQueries.getByText('0')).toBeInTheDocument();
     expect(pricingQueries.getByText('Classic Tea x 1')).toBeInTheDocument();
     expect(pricingQueries.getByText('Discount source')).toBeInTheDocument();
     expect(pricingQueries.getByText('Tea Auto + WELCOME20 + VCH-0001')).toBeInTheDocument();

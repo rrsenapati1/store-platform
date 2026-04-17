@@ -1,6 +1,6 @@
 # Store Task Ledger
 
-Updated: 2026-04-16
+Updated: 2026-04-17
 
 | ID | Pri | Status | Track | Surface | Task | Exit Criteria |
 |---|---|---|---|---|---|---|
@@ -58,7 +58,7 @@ Updated: 2026-04-16
 | V2-002 | P0 | Done | V2 launch program | Barcode + device input | Add camera barcode scanning, richer HID/USB scanner support, and scan-first workflows across desktop/mobile/tablet surfaces. | Operators can scan reliably through camera and richer hardware paths, with diagnostics, fallback posture, and branch-safe lookup workflows. |
 | V2-003 | P0 | Done | V2 launch program | Advanced hardware | Add cash drawer, weighing scale, and payment terminal integrations with operator diagnostics and recovery flows. | Core retail hardware beyond printers/scanners is supported through a bounded device bridge with clear assignment, failure, and audit posture. |
 | V2-004 | P0 | In Progress | V2 launch program | Store operations depth | Deepen receiving, counting, expiry, replenishment, shelf/backroom, and assisted stock workflows for serious physical-retail operations. | Branch operators can run richer day-to-day store workflows efficiently across desktop/mobile/tablet surfaces without breaking authority or offline invariants. |
-| V2-005 | P0 | In Progress | V2 launch program | Customer + commercial features | Add CRM, loyalty, promotions, gift/store credit, and multi-price commercial controls required for competitive in-store retail software. | Customer/commercial features are control-plane-owned, runtime-usable, auditable, and entitlement-aware across the suite. |
+| V2-005 | P0 | Done | V2 launch program | Customer + commercial features | Add CRM, loyalty, promotions, gift/store credit, and multi-price commercial controls required for competitive in-store retail software. | Customer/commercial features are control-plane-owned, runtime-usable, auditable, and entitlement-aware across the suite. |
 | V2-006 | P0 | Todo | V2 launch program | Staff + branch controls | Add attendance, shift controls, cashier/session governance, branch/device policies, and stronger operational audit/export controls. | Branch operations have stronger staff/device governance and auditable controls suitable for multi-terminal retail environments. |
 | V2-007 | P1 | Todo | V2 launch program | Reporting + decision support | Add advanced analytics, operator dashboards, branch performance views, and replenishment/purchase decision support. | Owners and operators can use the platform for management and decision support, not only transaction processing. |
 | V2-008 | P1 | Todo | V2 launch program | Vertical extensions | Add pharmacy/prescription controls, serial-number/IMEI tracking, and category-specific compliance modules as isolated vertical capabilities. | Regulated/vertical-specific flows exist without leaking category-specific complexity into the generic retail core. |

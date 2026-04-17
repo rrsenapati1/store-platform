@@ -3,6 +3,7 @@ import type {
   ControlPlaneCheckoutPricePreview,
 } from '@store/types';
 import { storeControlPlaneClient } from './client';
+import { resolveGiftCardCodePayload } from './storeGiftCardActions';
 import { resolvePromotionCodePayload } from './storePromotionActions';
 
 type LoadCheckoutPricePreviewArgs = {
@@ -15,6 +16,8 @@ type LoadCheckoutPricePreviewArgs = {
   customerName: string;
   customerGstin: string;
   promotionCode: string;
+  giftCardCode: string;
+  giftCardAmount: number;
   loyaltyPointsToRedeem: number;
   storeCreditAmount: number;
   saleQuantity: string;
@@ -30,6 +33,8 @@ export async function runLoadCheckoutPricePreview({
   customerName,
   customerGstin,
   promotionCode,
+  giftCardCode,
+  giftCardAmount,
   loyaltyPointsToRedeem,
   storeCreditAmount,
   saleQuantity,
@@ -49,6 +54,8 @@ export async function runLoadCheckoutPricePreview({
     customer_voucher_id: customerVoucherId,
     loyalty_points_to_redeem: loyaltyPointsToRedeem,
     store_credit_amount: storeCreditAmount,
+    gift_card_code: resolveGiftCardCodePayload(giftCardCode),
+    gift_card_amount: giftCardAmount,
     lines: [{ product_id: selectedCatalogItem.product_id, quantity }],
   });
 }

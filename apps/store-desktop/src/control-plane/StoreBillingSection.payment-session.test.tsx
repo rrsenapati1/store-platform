@@ -26,6 +26,9 @@ function createCheckoutPaymentSession(
     currency_code: 'INR',
     promotion_code: null,
     promotion_discount_amount: 0,
+    gift_card_id: 'gift-card-1',
+    gift_card_code: 'GIFT-1000',
+    gift_card_amount: 7.5,
     action_payload: {
       kind: 'upi_qr',
       value: 'upi://pay?tr=cf_order_checkout-1',
@@ -148,6 +151,9 @@ describe('store billing section payment session states', () => {
 
     expect(screen.getByRole('img', { name: 'Cashfree UPI QR code' })).toBeInTheDocument();
     expect(screen.getByText(/Expires in/i)).toBeInTheDocument();
+    expect(screen.getByText('Gift card')).toBeInTheDocument();
+    expect(screen.getByText('GIFT-1000')).toBeInTheDocument();
+    expect(screen.getByText('7.50')).toBeInTheDocument();
   });
 
   test('renders hosted checkout actions and recovery history for terminal and phone handoff sessions', () => {

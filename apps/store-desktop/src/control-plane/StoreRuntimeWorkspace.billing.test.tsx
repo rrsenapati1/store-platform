@@ -1059,4 +1059,252 @@ describe('store runtime billing foundation flow', () => {
       });
     });
   });
+
+  test('includes gift card redemption for checkout without requiring a customer profile', async () => {
+    globalThis.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+
+      if (url.endsWith('/v1/auth/oidc/exchange') && method === 'POST') {
+        return jsonResponse({ access_token: 'session-cashier', token_type: 'Bearer' }) as never;
+      }
+      if (url.endsWith('/v1/auth/me') && method === 'GET') {
+        return jsonResponse({
+          user_id: 'user-cashier',
+          email: 'cashier@acme.local',
+          full_name: 'Counter Cashier',
+          is_platform_admin: false,
+          tenant_memberships: [],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme') && method === 'GET') {
+        return jsonResponse({
+          id: 'tenant-acme',
+          name: 'Acme Retail',
+          slug: 'acme-retail',
+          status: 'ACTIVE',
+          onboarding_status: 'BRANCH_READY',
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches') && method === 'GET') {
+        return jsonResponse({
+          records: [{ branch_id: 'branch-1', tenant_id: 'tenant-acme', name: 'Bengaluru Flagship', code: 'blr-flagship', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/catalog-items') && method === 'GET') {
+        return jsonResponse({
+          records: [
+            {
+              id: 'catalog-item-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              barcode: '8901234567890',
+              hsn_sac_code: '0902',
+              gst_rate: 5,
+              base_selling_price: 92.5,
+              selling_price_override: null,
+              effective_selling_price: 92.5,
+              availability_status: 'ACTIVE',
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/inventory-snapshot') && method === 'GET') {
+        return jsonResponse({
+          records: [
+            {
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              stock_on_hand: 23,
+              last_entry_type: 'SALE',
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices') && method === 'GET') {
+        return jsonResponse({
+          records: [
+            {
+              id: 'device-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              device_name: 'Counter Desktop 1',
+              device_code: 'counter-1',
+              session_surface: 'store_desktop',
+              status: 'ACTIVE',
+              assigned_staff_profile_id: null,
+              assigned_staff_full_name: null,
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/sync-conflicts') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/sync-spokes') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-price-preview') && method === 'POST') {
+        return jsonResponse({
+          customer_profile_id: null,
+          customer_name: null,
+          customer_gstin: null,
+          automatic_campaign: null,
+          promotion_code_campaign: null,
+          customer_voucher: null,
+          gift_card: {
+            id: 'gift-card-1',
+            gift_card_code: 'GIFT-1000',
+            display_name: 'Diwali gift card',
+            status: 'ACTIVE',
+            available_balance: 300,
+          },
+          summary: {
+            mrp_total: 120,
+            selling_price_subtotal: 92.5,
+            automatic_discount_total: 0,
+            promotion_code_discount_total: 0,
+            customer_voucher_discount_total: 0,
+            loyalty_discount_total: 0,
+            total_discount: 0,
+            tax_total: 4.62,
+            invoice_total: 97.12,
+            grand_total: 97.12,
+            store_credit_amount: 0,
+            gift_card_amount: 50,
+            final_payable_amount: 47.12,
+          },
+          lines: [
+            {
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              quantity: 1,
+              mrp: 120,
+              unit_selling_price: 92.5,
+              automatic_discount_amount: 0,
+              promotion_code_discount_amount: 0,
+              customer_voucher_discount_amount: 0,
+              promotion_discount_source: null,
+              taxable_amount: 92.5,
+              tax_amount: 4.62,
+              line_total: 97.12,
+            },
+          ],
+          tax_lines: [],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'POST') {
+        return jsonResponse({
+          id: 'sale-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          customer_profile_id: null,
+          customer_name: null,
+          customer_gstin: null,
+          invoice_kind: 'B2C',
+          irn_status: 'IRN_NOT_REQUIRED',
+          invoice_number: 'SINV-BLRFLAGSHIP-0004',
+          issued_on: '2026-04-17',
+          subtotal: 92.5,
+          cgst_total: 2.31,
+          sgst_total: 2.31,
+          igst_total: 0,
+          grand_total: 97.12,
+          promotion_campaign_id: null,
+          promotion_code_id: null,
+          promotion_code: null,
+          promotion_discount_amount: 0,
+          customer_voucher_id: null,
+          customer_voucher_name: null,
+          customer_voucher_discount_total: 0,
+          store_credit_amount: 0,
+          gift_card_id: 'gift-card-1',
+          gift_card_code: 'GIFT-1000',
+          gift_card_amount: 50,
+          loyalty_points_redeemed: 0,
+          loyalty_discount_amount: 0,
+          loyalty_points_earned: 0,
+          payment: { payment_method: 'UPI', amount: 47.12 },
+          lines: [
+            {
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              hsn_sac_code: '0902',
+              quantity: 1,
+              unit_price: 92.5,
+              gst_rate: 5,
+              line_subtotal: 92.5,
+              tax_total: 4.62,
+              line_total: 97.12,
+            },
+          ],
+          tax_lines: [
+            { tax_type: 'CGST', tax_rate: 2.5, taxable_amount: 92.5, tax_amount: 2.31 },
+            { tax_type: 'SGST', tax_rate: 2.5, taxable_amount: 92.5, tax_amount: 2.31 },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'GET') {
+        return jsonResponse({
+          records: [
+            {
+              sale_id: 'sale-1',
+              customer_profile_id: null,
+              invoice_number: 'SINV-BLRFLAGSHIP-0004',
+              customer_name: null,
+              invoice_kind: 'B2C',
+              irn_status: 'IRN_NOT_REQUIRED',
+              payment_method: 'UPI',
+              grand_total: 97.12,
+              gift_card_id: 'gift-card-1',
+              gift_card_code: 'GIFT-1000',
+              gift_card_amount: 50,
+              issued_on: '2026-04-17',
+            },
+          ],
+        }) as never;
+      }
+
+      throw new Error(`Unexpected fetch call: ${method} ${url}`);
+    }) as typeof fetch;
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('Korsenex token'), {
+      target: { value: 'stub:sub=cashier-1;email=cashier@acme.local;name=Counter Cashier' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
+
+    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Gift card code'), { target: { value: 'gift-1000' } });
+    fireEvent.change(screen.getByLabelText('Apply gift card amount'), { target: { value: '50' } });
+    fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'UPI' } });
+    fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
+
+    await waitFor(() => {
+      const createSaleCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, requestInit]) =>
+          String(url).includes('/v1/tenants/tenant-acme/branches/branch-1/sales')
+          && requestInit?.method === 'POST',
+      );
+      expect(createSaleCall).toBeDefined();
+      expect(JSON.parse(String(createSaleCall?.[1]?.body ?? '{}'))).toMatchObject({
+        payment_method: 'UPI',
+        gift_card_code: 'GIFT-1000',
+        gift_card_amount: 50,
+      });
+    });
+
+    expect(await screen.findByText('Latest sales invoice')).toBeInTheDocument();
+    expect(screen.getAllByText('SINV-BLRFLAGSHIP-0004').length).toBeGreaterThan(0);
+  });
 });

@@ -520,16 +520,18 @@ export const storeControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-    payload: {
-      customer_profile_id?: string | null;
-      customer_name: string;
-      customer_gstin?: string | null;
-      promotion_code?: string | null;
-      customer_voucher_id?: string | null;
-      loyalty_points_to_redeem?: number;
-      store_credit_amount?: number;
-      lines: Array<{ product_id: string; quantity: number }>;
-    },
+      payload: {
+        customer_profile_id?: string | null;
+        customer_name: string;
+        customer_gstin?: string | null;
+        promotion_code?: string | null;
+        customer_voucher_id?: string | null;
+        loyalty_points_to_redeem?: number;
+        store_credit_amount?: number;
+        gift_card_code?: string | null;
+        gift_card_amount?: number;
+        lines: Array<{ product_id: string; quantity: number }>;
+      },
   ) {
     return request<ControlPlaneCheckoutPricePreview>(
       `/v1/tenants/${tenantId}/branches/${branchId}/checkout-price-preview`,
@@ -693,17 +695,19 @@ export const storeControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-    payload: {
-      customer_profile_id?: string | null;
-      customer_name: string;
-      customer_gstin?: string | null;
-      payment_method: string;
-      promotion_code?: string | null;
-      customer_voucher_id?: string | null;
-      store_credit_amount?: number;
-      loyalty_points_to_redeem?: number;
-      lines: Array<{ product_id: string; quantity: number }>;
-    },
+      payload: {
+        customer_profile_id?: string | null;
+        customer_name: string;
+        customer_gstin?: string | null;
+        payment_method: string;
+        promotion_code?: string | null;
+        customer_voucher_id?: string | null;
+        store_credit_amount?: number;
+        gift_card_code?: string | null;
+        gift_card_amount?: number;
+        loyalty_points_to_redeem?: number;
+        lines: Array<{ product_id: string; quantity: number }>;
+      },
   ) {
     return request<ControlPlaneSale>(
       `/v1/tenants/${tenantId}/branches/${branchId}/sales`,
@@ -718,20 +722,22 @@ export const storeControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-    payload: {
-      provider_name: string;
-      payment_method: string;
-      handoff_surface?: string | null;
-      provider_payment_mode?: string | null;
-      customer_profile_id?: string | null;
-      customer_name: string;
-      customer_gstin?: string | null;
-      promotion_code?: string | null;
-      customer_voucher_id?: string | null;
-      loyalty_points_to_redeem?: number;
-      store_credit_amount?: number;
-      lines: Array<{ product_id: string; quantity: number }>;
-    },
+      payload: {
+        provider_name: string;
+        payment_method: string;
+        handoff_surface?: string | null;
+        provider_payment_mode?: string | null;
+        customer_profile_id?: string | null;
+        customer_name: string;
+        customer_gstin?: string | null;
+        promotion_code?: string | null;
+        customer_voucher_id?: string | null;
+        loyalty_points_to_redeem?: number;
+        store_credit_amount?: number;
+        gift_card_code?: string | null;
+        gift_card_amount?: number;
+        lines: Array<{ product_id: string; quantity: number }>;
+      },
   ) {
     return request<ControlPlaneCheckoutPaymentSession>(
       `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions`,
