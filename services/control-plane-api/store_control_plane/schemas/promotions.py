@@ -51,6 +51,35 @@ class PromotionCodeResponse(BaseModel):
     updated_at: datetime
 
 
+class CustomerVoucherIssueRequest(BaseModel):
+    campaign_id: str
+    note: str | None = None
+
+
+class CustomerVoucherCancelRequest(BaseModel):
+    note: str | None = None
+
+
+class CustomerVoucherResponse(BaseModel):
+    id: str
+    tenant_id: str
+    campaign_id: str
+    customer_profile_id: str
+    voucher_code: str
+    voucher_name: str
+    voucher_amount: float
+    status: str
+    issued_note: str | None = None
+    redeemed_sale_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    redeemed_at: datetime | None = None
+
+
+class CustomerVoucherListResponse(BaseModel):
+    records: list[CustomerVoucherResponse]
+
+
 class PromotionCampaignResponse(BaseModel):
     id: str
     tenant_id: str

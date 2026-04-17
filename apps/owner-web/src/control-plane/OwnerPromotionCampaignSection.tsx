@@ -85,8 +85,9 @@ export function OwnerPromotionCampaignSection({
 
   const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId) ?? null;
   const isAutomaticDraft = campaignDraft.triggerMode === 'AUTOMATIC';
+  const isAssignedVoucherDraft = campaignDraft.triggerMode === 'ASSIGNED_VOUCHER';
   const isAutomaticItemCategoryDraft = isAutomaticDraft && campaignDraft.scope === 'ITEM_CATEGORY';
-  const selectedCampaignSupportsSharedCodes = selectedCampaign?.trigger_mode !== 'AUTOMATIC';
+  const selectedCampaignSupportsSharedCodes = selectedCampaign?.trigger_mode === 'CODE';
 
   function applySelectedCampaign(campaign: ControlPlanePromotionCampaign | null) {
     setSelectedCampaignId(campaign?.id ?? '');
@@ -198,7 +199,7 @@ export function OwnerPromotionCampaignSection({
   }
 
   async function createSharedCode() {
-    if (!accessToken || !tenantId || !selectedCampaign || !sharedCodeDraft.trim()) {
+    if (!accessToken || !tenantId || !selectedCampaign || selectedCampaign.trigger_mode !== 'CODE' || !sharedCodeDraft.trim()) {
       return;
     }
     setIsBusy(true);
@@ -320,9 +321,19 @@ export function OwnerPromotionCampaignSection({
               )}
             </>
           ) : (
-            <p style={{ color: '#4e5871' }}>Automatic campaigns apply without cashier-entered shared codes.</p>
+            <p style={{ color: '#4e5871' }}>
+              {selectedCampaign.trigger_mode === 'ASSIGNED_VOUCHER'
+                ? 'Assigned voucher campaigns are issued to one customer profile at a time and do not use shared codes.'
+                : 'Automatic campaigns apply without cashier-entered shared codes.'}
+            </p>
           )}
         </>
+      ) : null}
+
+      {isAssignedVoucherDraft ? (
+        <p style={{ color: '#4e5871' }}>
+          Assigned voucher campaigns are fixed-value, customer-specific voucher templates. Issue the actual voucher from customer insights.
+        </p>
       ) : null}
 
       {errorMessage ? <p style={{ color: '#9d2b19', marginBottom: 0 }}>{errorMessage}</p> : null}

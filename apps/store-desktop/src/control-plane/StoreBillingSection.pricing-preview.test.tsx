@@ -37,6 +37,39 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
       created_at: '2026-04-16T09:00:00Z',
       updated_at: '2026-04-16T09:00:00Z',
     },
+    selectedCustomerVouchers: [
+      {
+        id: 'voucher-1',
+        tenant_id: 'tenant-acme',
+        campaign_id: 'campaign-voucher-1',
+        customer_profile_id: 'profile-1',
+        voucher_code: 'VCH-0001',
+        voucher_name: 'Welcome voucher',
+        voucher_amount: 15,
+        status: 'ACTIVE',
+        issued_note: 'Welcome gift',
+        redeemed_sale_id: null,
+        created_at: '2026-04-17T09:00:00Z',
+        updated_at: '2026-04-17T09:00:00Z',
+        redeemed_at: null,
+      },
+    ],
+    selectedCustomerVoucher: {
+      id: 'voucher-1',
+      tenant_id: 'tenant-acme',
+      campaign_id: 'campaign-voucher-1',
+      customer_profile_id: 'profile-1',
+      voucher_code: 'VCH-0001',
+      voucher_name: 'Welcome voucher',
+      voucher_amount: 15,
+      status: 'ACTIVE',
+      issued_note: 'Welcome gift',
+      redeemed_sale_id: null,
+      created_at: '2026-04-17T09:00:00Z',
+      updated_at: '2026-04-17T09:00:00Z',
+      redeemed_at: null,
+    },
+    selectedCustomerVoucherId: 'voucher-1',
     selectedCustomerStoreCredit: {
       customer_profile_id: 'profile-1',
       available_balance: 120,
@@ -75,6 +108,8 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     selectCustomerProfile: vi.fn(),
     setStoreCreditAmount: vi.fn(),
     setLoyaltyPointsToRedeem: vi.fn(),
+    selectCustomerVoucher: vi.fn(),
+    clearSelectedCustomerVoucher: vi.fn(),
     setPromotionCode: vi.fn(),
     clearPromotionCode: vi.fn(),
     setCustomerName: vi.fn(),
@@ -123,18 +158,25 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
         discount_type: 'FLAT_AMOUNT',
         discount_value: 20,
       },
+      customer_voucher: {
+        id: 'voucher-1',
+        voucher_code: 'VCH-0001',
+        voucher_name: 'Welcome voucher',
+        voucher_amount: 15,
+      },
       summary: {
         mrp_total: 120,
         selling_price_subtotal: 92.5,
         automatic_discount_total: 9.25,
         promotion_code_discount_total: 20,
+        customer_voucher_discount_total: 15,
         loyalty_discount_total: 20,
-        total_discount: 49.25,
-        tax_total: 3.16,
-        invoice_total: 46.41,
-        grand_total: 26.41,
+        total_discount: 64.25,
+        tax_total: 2.41,
+        invoice_total: 31.41,
+        grand_total: 11.41,
         store_credit_amount: 10,
-        final_payable_amount: 16.41,
+        final_payable_amount: 1.41,
       },
       lines: [
         {
@@ -146,10 +188,11 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
           unit_selling_price: 92.5,
           automatic_discount_amount: 9.25,
           promotion_code_discount_amount: 20,
-          promotion_discount_source: 'Tea Auto + WELCOME20',
-          taxable_amount: 63.25,
-          tax_amount: 3.16,
-          line_total: 66.41,
+          customer_voucher_discount_amount: 15,
+          promotion_discount_source: 'AUTOMATIC_ITEM_CATEGORY+CODE+ASSIGNED_VOUCHER',
+          taxable_amount: 48.25,
+          tax_amount: 2.41,
+          line_total: 50.66,
         },
       ],
       tax_lines: [],
@@ -174,18 +217,22 @@ describe('store billing section pricing preview', () => {
     expect(pricingQueries.getByText('Checkout pricing')).toBeInTheDocument();
     expect(pricingQueries.getByText('Tea Auto')).toBeInTheDocument();
     expect(pricingQueries.getByText('WELCOME20')).toBeInTheDocument();
+    expect(pricingQueries.getByText('VCH-0001')).toBeInTheDocument();
     expect(pricingQueries.getByText('MRP total')).toBeInTheDocument();
     expect(pricingQueries.getByText('120')).toBeInTheDocument();
     expect(pricingQueries.getByText('Automatic discount')).toBeInTheDocument();
     expect(pricingQueries.getByText('9.25')).toBeInTheDocument();
     expect(pricingQueries.getByText('Code discount')).toBeInTheDocument();
     expect(pricingQueries.getByText('20')).toBeInTheDocument();
+    expect(pricingQueries.getByText('Voucher discount')).toBeInTheDocument();
+    expect(pricingQueries.getByText('15')).toBeInTheDocument();
     expect(pricingQueries.getByText('Store credit used')).toBeInTheDocument();
     expect(pricingQueries.getByText('10')).toBeInTheDocument();
     expect(pricingQueries.getByText('Remaining payable')).toBeInTheDocument();
-    expect(pricingQueries.getByText('16.41')).toBeInTheDocument();
+    expect(pricingQueries.getByText('1.41')).toBeInTheDocument();
     expect(pricingQueries.getByText('Classic Tea x 1')).toBeInTheDocument();
     expect(pricingQueries.getByText('Discount source')).toBeInTheDocument();
-    expect(pricingQueries.getByText('Tea Auto + WELCOME20')).toBeInTheDocument();
+    expect(pricingQueries.getByText('Tea Auto + WELCOME20 + VCH-0001')).toBeInTheDocument();
+    expect(screen.getByText('Apply voucher VCH-0001')).toBeInTheDocument();
   });
 });

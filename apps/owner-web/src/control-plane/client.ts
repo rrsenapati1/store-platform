@@ -20,6 +20,7 @@ import type {
   ControlPlaneCustomerProfile,
   ControlPlaneCustomerHistoryResponse,
   ControlPlaneCustomerStoreCredit,
+  ControlPlaneCustomerVoucher,
   ControlPlaneLoyaltyProgram,
   ControlPlaneComplianceProviderProfile,
   ControlPlaneDeviceClaimApproval,
@@ -805,6 +806,47 @@ export const ownerControlPlaneClient = {
     return request<ControlPlaneCustomerStoreCredit>(
       `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/store-credit`,
       undefined,
+      accessToken,
+    );
+  },
+  listCustomerVouchers(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<{ records: ControlPlaneCustomerVoucher[] }>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/vouchers`,
+      undefined,
+      accessToken,
+    );
+  },
+  issueCustomerVoucher(
+    accessToken: string,
+    tenantId: string,
+    customerProfileId: string,
+    payload: {
+      campaign_id: string;
+      note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneCustomerVoucher>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/vouchers`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  cancelCustomerVoucher(
+    accessToken: string,
+    tenantId: string,
+    customerProfileId: string,
+    voucherId: string,
+    payload?: { note?: string | null },
+  ) {
+    return request<ControlPlaneCustomerVoucher>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/vouchers/${voucherId}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload ?? {}),
+      },
       accessToken,
     );
   },

@@ -21,7 +21,7 @@ from .operations import OperationsJob
 from .inventory import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, RestockTaskSession, StockAdjustment, StockCountReviewSession, StockCountSession, TransferOrder
 from .membership import BranchMembership, TenantMembership
 from .procurement_finance import PurchaseInvoice, PurchaseInvoiceLine, SupplierPayment, SupplierReturn, SupplierReturnLine
-from .promotions import PromotionCampaign, PromotionCode
+from .promotions import CustomerVoucherAssignment, PromotionCampaign, PromotionCode
 from .purchasing import PurchaseOrder, PurchaseOrderLine, Supplier
 from .role import RoleCapability, RoleDefinition
 from .runtime import PrintJob
@@ -71,6 +71,7 @@ __all__ = [
     "Payment",
     "PlatformAdminAccount",
     "PrintJob",
+    "CustomerVoucherAssignment",
     "PromotionCampaign",
     "PromotionCode",
     "PurchaseInvoice",

@@ -68,6 +68,21 @@ describe('owner customer insights section', () => {
     branch_id?: string | null;
     created_at: string;
   }>;
+  let customerVouchers: Array<{
+    id: string;
+    tenant_id: string;
+    campaign_id: string;
+    customer_profile_id: string;
+    voucher_code: string;
+    voucher_name: string;
+    voucher_amount: number;
+    status: string;
+    issued_note?: string | null;
+    redeemed_sale_id?: string | null;
+    created_at: string;
+    updated_at: string;
+    redeemed_at?: string | null;
+  }>;
 
   function buildStoreCreditResponse() {
     return {
@@ -179,6 +194,7 @@ describe('owner customer insights section', () => {
         created_at: '2026-04-16T09:45:00Z',
       },
     ];
+    customerVouchers = [];
 
     globalThis.fetch = vi.fn(async (input, init) => {
       const url = String(input);
@@ -280,6 +296,69 @@ describe('owner customer insights section', () => {
       }
       if (url.endsWith('/customer-profiles/profile-1/store-credit') && method === 'GET') {
         return jsonResponse(buildStoreCreditResponse()) as never;
+      }
+      if (url.endsWith('/promotion-campaigns') && method === 'GET') {
+        return jsonResponse({
+          records: [
+            {
+              id: 'campaign-voucher-1',
+              tenant_id: 'tenant-acme',
+              name: 'Customer welcome voucher',
+              status: 'ACTIVE',
+              trigger_mode: 'ASSIGNED_VOUCHER',
+              scope: 'CART',
+              discount_type: 'FLAT_AMOUNT',
+              discount_value: 50,
+              minimum_order_amount: 100,
+              maximum_discount_amount: null,
+              redemption_limit_total: null,
+              redemption_count: 0,
+              target_product_ids: [],
+              target_category_codes: [],
+              created_at: '2026-04-17T09:00:00Z',
+              updated_at: '2026-04-17T09:00:00Z',
+              codes: [],
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/customer-profiles/profile-1/vouchers') && method === 'GET') {
+        return jsonResponse({ records: customerVouchers }) as never;
+      }
+      if (url.endsWith('/customer-profiles/profile-1/vouchers') && method === 'POST') {
+        const payload = JSON.parse(String(init?.body ?? '{}'));
+        const createdVoucher = {
+          id: 'voucher-1',
+          tenant_id: 'tenant-acme',
+          campaign_id: String(payload.campaign_id ?? 'campaign-voucher-1'),
+          customer_profile_id: 'profile-1',
+          voucher_code: 'VCH-0001',
+          voucher_name: 'Customer welcome voucher',
+          voucher_amount: 50,
+          status: 'ACTIVE',
+          issued_note: payload.note ?? null,
+          redeemed_sale_id: null,
+          created_at: '2026-04-17T09:10:00Z',
+          updated_at: '2026-04-17T09:10:00Z',
+          redeemed_at: null,
+        };
+        customerVouchers = [createdVoucher, ...customerVouchers];
+        return jsonResponse(createdVoucher) as never;
+      }
+      if (url.endsWith('/customer-profiles/profile-1/vouchers/voucher-1/cancel') && method === 'POST') {
+        const payload = JSON.parse(String(init?.body ?? '{}'));
+        customerVouchers = customerVouchers.map((voucher) => (
+          voucher.id === 'voucher-1'
+            ? { ...voucher, status: 'CANCELED', issued_note: voucher.issued_note, updated_at: '2026-04-17T09:20:00Z' }
+            : voucher
+        ));
+        return jsonResponse({
+          ...customerVouchers.find((voucher) => voucher.id === 'voucher-1'),
+          issued_note: customerVouchers.find((voucher) => voucher.id === 'voucher-1')?.issued_note ?? null,
+          redeemed_sale_id: null,
+          redeemed_at: null,
+          canceled_note: payload.note ?? null,
+        }) as never;
       }
       if (url.endsWith('/customer-profiles/profile-1/loyalty') && method === 'GET') {
         return jsonResponse(buildCustomerLoyaltyResponse()) as never;
@@ -591,6 +670,56 @@ describe('owner customer insights section', () => {
         && content.includes('Counter correction'),
       ),
     ).toBeInTheDocument();
+  });
+
+  test('issues and cancels customer vouchers for the selected profile', async () => {
+    render(
+      <OwnerCustomerInsightsSection
+        accessToken="session-owner"
+        tenantId="tenant-acme"
+        branchId="branch-1"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load customer insights' }));
+    await screen.findByText('Customer vouchers');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use voucher campaign Customer welcome voucher' }));
+    fireEvent.change(screen.getByLabelText('Issue voucher note'), { target: { value: 'Welcome bonus' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Issue customer voucher' }));
+
+    await waitFor(() => {
+      const issueCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) =>
+          String(url).includes('/v1/tenants/tenant-acme/customer-profiles/profile-1/vouchers')
+          && !String(url).includes('/cancel')
+          && init?.method === 'POST',
+      );
+      expect(issueCall).toBeDefined();
+      expect(JSON.parse(String(issueCall?.[1]?.body ?? '{}'))).toEqual({
+        campaign_id: 'campaign-voucher-1',
+        note: 'Welcome bonus',
+      });
+    });
+
+    expect(await screen.findByText(/Customer welcome voucher VCH-0001 ACTIVE 50/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Cancel voucher note'), { target: { value: 'Issued in error' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel voucher VCH-0001' }));
+
+    await waitFor(() => {
+      const cancelCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) =>
+          String(url).includes('/v1/tenants/tenant-acme/customer-profiles/profile-1/vouchers/voucher-1/cancel')
+          && init?.method === 'POST',
+      );
+      expect(cancelCall).toBeDefined();
+      expect(JSON.parse(String(cancelCall?.[1]?.body ?? '{}'))).toEqual({
+        note: 'Issued in error',
+      });
+    });
+
+    expect(await screen.findByText(/Customer welcome voucher VCH-0001 CANCELED 50/)).toBeInTheDocument();
   });
 
   test('loads and manages loyalty program and customer loyalty points', async () => {

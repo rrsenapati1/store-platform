@@ -11,6 +11,7 @@ type LoadCheckoutPricePreviewArgs = {
   branchId: string;
   selectedCatalogItem: ControlPlaneBranchCatalogItem | null;
   customerProfileId: string | null;
+  customerVoucherId: string | null;
   customerName: string;
   customerGstin: string;
   promotionCode: string;
@@ -25,6 +26,7 @@ export async function runLoadCheckoutPricePreview({
   branchId,
   selectedCatalogItem,
   customerProfileId,
+  customerVoucherId,
   customerName,
   customerGstin,
   promotionCode,
@@ -44,6 +46,7 @@ export async function runLoadCheckoutPricePreview({
     customer_name: customerName,
     customer_gstin: customerGstin || null,
     promotion_code: resolvePromotionCodePayload(promotionCode),
+    customer_voucher_id: customerVoucherId,
     loyalty_points_to_redeem: loyaltyPointsToRedeem,
     store_credit_amount: storeCreditAmount,
     lines: [{ product_id: selectedCatalogItem.product_id, quantity }],

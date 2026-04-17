@@ -802,6 +802,21 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+- Completed V2-005 customer-assigned vouchers on top of promotion foundations:
+  - `ASSIGNED_VOUCHER` promotion campaigns with customer-specific voucher issuance, cancellation, and redemption authority
+  - checkout pricing preview, direct sale, and Cashfree checkout session support for `customer_voucher_id`
+  - finalized sale and payment-session voucher snapshot fields for audit-safe invoice history
+- Extended the owner and desktop surfaces to manage:
+  - owner-web customer voucher issuance and cancellation from customer insights
+  - owner-web promotion campaign posture for assigned-voucher campaigns without shared-code controls
+  - store-desktop customer voucher selection with promotion-code mutual exclusion during checkout
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_promotions_flow.py services/control-plane-api/tests/test_checkout_price_preview_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
 - Completed the `V2-005` promotion-code foundation slice:
   - added control-plane `promotion_campaigns` and `promotion_codes` authority with billing and checkout-session validation
   - persisted promotion snapshot fields on finalized sales and checkout payment sessions

@@ -264,3 +264,193 @@ def test_checkout_price_preview_applies_category_targets_only_to_matching_lines(
     assert preview.json()["lines"][0]["automatic_discount_amount"] == 9.25
     assert preview.json()["lines"][1]["product_id"] == context["coffee_product_id"]
     assert preview.json()["lines"][1]["automatic_discount_amount"] == 0.0
+
+
+def test_checkout_price_preview_applies_customer_voucher_after_automatic_discount() -> None:
+    database_url = sqlite_test_database_url("checkout-price-preview-customer-voucher")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_pricing_context(client, slug="checkout-price-preview-customer-voucher")
+
+    automatic_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Tea automatic discount",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_category_codes": ["TEA"],
+        },
+    )
+    assert automatic_campaign.status_code == 200
+
+    voucher_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Customer welcome voucher",
+            "status": "ACTIVE",
+            "trigger_mode": "ASSIGNED_VOUCHER",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 25.0,
+            "minimum_order_amount": 50.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert voucher_campaign.status_code == 200
+
+    customer_profile = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles",
+        headers=context["owner_headers"],
+        json={
+            "full_name": "Acme Traders",
+            "phone": "+919999999999",
+            "email": "billing@acme.example",
+            "gstin": "29AAEPM0111C1Z3",
+        },
+    )
+    assert customer_profile.status_code == 200
+    customer_profile_id = customer_profile.json()["id"]
+
+    issued_voucher = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/vouchers",
+        headers=context["owner_headers"],
+        json={"campaign_id": voucher_campaign.json()["id"]},
+    )
+    assert issued_voucher.status_code == 200
+    voucher_id = issued_voucher.json()["id"]
+
+    preview = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-price-preview",
+        headers=context["owner_headers"],
+        json={
+            "customer_profile_id": customer_profile_id,
+            "customer_name": "Acme Traders",
+            "customer_gstin": "29AAEPM0111C1Z3",
+            "customer_voucher_id": voucher_id,
+            "lines": [{"product_id": context["tea_product_id"], "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200
+    assert preview.json()["automatic_campaign"]["name"] == "Tea automatic discount"
+    assert preview.json()["customer_voucher"]["id"] == voucher_id
+    assert preview.json()["summary"]["automatic_discount_total"] == 9.25
+    assert preview.json()["summary"]["customer_voucher_discount_total"] == 25.0
+    assert preview.json()["summary"]["invoice_total"] == 61.16
+    assert preview.json()["summary"]["final_payable_amount"] == 61.16
+    assert preview.json()["lines"] == [
+        {
+            "product_id": context["tea_product_id"],
+            "product_name": "Classic Tea",
+            "sku_code": "tea-classic-250g",
+            "quantity": 1.0,
+            "mrp": 120.0,
+            "unit_selling_price": 92.5,
+            "automatic_discount_amount": 9.25,
+            "promotion_code_discount_amount": 0.0,
+            "customer_voucher_discount_amount": 25.0,
+            "promotion_discount_source": "AUTOMATIC_ITEM_CATEGORY+ASSIGNED_VOUCHER",
+            "taxable_amount": 58.25,
+            "tax_amount": 2.91,
+            "line_total": 61.16,
+        }
+    ]
+
+
+def test_checkout_price_preview_rejects_code_and_customer_voucher_together() -> None:
+    database_url = sqlite_test_database_url("checkout-price-preview-voucher-conflict")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_pricing_context(client, slug="checkout-price-preview-voucher-conflict")
+
+    code_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "WELCOME flat discount",
+            "status": "ACTIVE",
+            "trigger_mode": "CODE",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 20.0,
+            "minimum_order_amount": 50.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert code_campaign.status_code == 200
+
+    created_code = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns/{code_campaign.json()['id']}/codes",
+        headers=context["owner_headers"],
+        json={"code": "WELCOME20", "status": "ACTIVE", "redemption_limit_per_code": None},
+    )
+    assert created_code.status_code == 200
+
+    voucher_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Customer welcome voucher",
+            "status": "ACTIVE",
+            "trigger_mode": "ASSIGNED_VOUCHER",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 25.0,
+            "minimum_order_amount": 50.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert voucher_campaign.status_code == 200
+
+    customer_profile = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles",
+        headers=context["owner_headers"],
+        json={"full_name": "Acme Traders"},
+    )
+    assert customer_profile.status_code == 200
+    customer_profile_id = customer_profile.json()["id"]
+
+    issued_voucher = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/vouchers",
+        headers=context["owner_headers"],
+        json={"campaign_id": voucher_campaign.json()["id"]},
+    )
+    assert issued_voucher.status_code == 200
+
+    preview = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-price-preview",
+        headers=context["owner_headers"],
+        json={
+            "customer_profile_id": customer_profile_id,
+            "customer_name": "Acme Traders",
+            "promotion_code": "WELCOME20",
+            "customer_voucher_id": issued_voucher.json()["id"],
+            "lines": [{"product_id": context["tea_product_id"], "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 400
+    assert preview.json()["detail"] == "Shared promotion codes and customer vouchers cannot be combined"

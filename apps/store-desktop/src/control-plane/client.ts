@@ -17,6 +17,7 @@ import type {
   ControlPlaneCustomerLoyalty,
   ControlPlaneCustomerProfile,
   ControlPlaneCustomerStoreCredit,
+  ControlPlaneCustomerVoucher,
   ControlPlaneDeviceRecord,
   ControlPlaneExchange,
   ControlPlaneGoodsReceipt,
@@ -524,6 +525,7 @@ export const storeControlPlaneClient = {
       customer_name: string;
       customer_gstin?: string | null;
       promotion_code?: string | null;
+      customer_voucher_id?: string | null;
       loyalty_points_to_redeem?: number;
       store_credit_amount?: number;
       lines: Array<{ product_id: string; quantity: number }>;
@@ -557,6 +559,13 @@ export const storeControlPlaneClient = {
   getCustomerStoreCredit(accessToken: string, tenantId: string, customerProfileId: string) {
     return request<ControlPlaneCustomerStoreCredit>(
       `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/store-credit`,
+      undefined,
+      accessToken,
+    );
+  },
+  listCustomerVouchers(accessToken: string, tenantId: string, customerProfileId: string) {
+    return request<{ records: ControlPlaneCustomerVoucher[] }>(
+      `/v1/tenants/${tenantId}/customer-profiles/${customerProfileId}/vouchers`,
       undefined,
       accessToken,
     );
@@ -689,6 +698,7 @@ export const storeControlPlaneClient = {
       customer_gstin?: string | null;
       payment_method: string;
       promotion_code?: string | null;
+      customer_voucher_id?: string | null;
       store_credit_amount?: number;
       loyalty_points_to_redeem?: number;
       lines: Array<{ product_id: string; quantity: number }>;
@@ -716,6 +726,7 @@ export const storeControlPlaneClient = {
       customer_name: string;
       customer_gstin?: string | null;
       promotion_code?: string | null;
+      customer_voucher_id?: string | null;
       loyalty_points_to_redeem?: number;
       store_credit_amount?: number;
       lines: Array<{ product_id: string; quantity: number }>;

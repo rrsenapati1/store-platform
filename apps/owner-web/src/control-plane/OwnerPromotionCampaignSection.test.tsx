@@ -231,4 +231,39 @@ describe('owner promotion campaign section', () => {
       });
     });
   });
+
+  test('creates an assigned voucher campaign without shared code controls', async () => {
+    render(<OwnerPromotionCampaignSection accessToken="access-token" tenantId="tenant-acme" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh promotion campaigns' }));
+    await screen.findByText('Weekend Savings');
+
+    fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Customer welcome voucher' } });
+    fireEvent.change(screen.getByLabelText('Trigger mode'), { target: { value: 'ASSIGNED_VOUCHER' } });
+    fireEvent.change(screen.getByLabelText('Scope'), { target: { value: 'CART' } });
+    fireEvent.change(screen.getByLabelText('Discount type'), { target: { value: 'FLAT_AMOUNT' } });
+    fireEvent.change(screen.getByLabelText('Discount value'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create promotion campaign' }));
+
+    expect(await screen.findByText('Customer welcome voucher')).toBeInTheDocument();
+    expect(screen.getByText('ASSIGNED_VOUCHER')).toBeInTheDocument();
+    expect(screen.getByText('Assigned voucher campaigns are issued to one customer profile at a time and do not use shared codes.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Shared promotion code')).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      const createCampaignCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) =>
+          String(url).endsWith('/promotion-campaigns')
+          && init?.method === 'POST'
+          && JSON.parse(String(init?.body ?? '{}')).name === 'Customer welcome voucher',
+      );
+      expect(createCampaignCall).toBeDefined();
+      expect(JSON.parse(String(createCampaignCall?.[1]?.body ?? '{}'))).toMatchObject({
+        trigger_mode: 'ASSIGNED_VOUCHER',
+        scope: 'CART',
+        discount_type: 'FLAT_AMOUNT',
+        discount_value: 50,
+      });
+    });
+  });
 });

@@ -36,7 +36,11 @@ branch_router = APIRouter(prefix="/v1/tenants", tags=["billing"])
 webhook_router = APIRouter(prefix="/v1/billing", tags=["billing"])
 
 
-@branch_router.post("/{tenant_id}/branches/{branch_id}/sales", response_model=SaleResponse)
+@branch_router.post(
+    "/{tenant_id}/branches/{branch_id}/sales",
+    response_model=SaleResponse,
+    response_model_exclude_none=True,
+)
 async def create_sale(
     tenant_id: str,
     branch_id: str,
@@ -55,6 +59,7 @@ async def create_sale(
         customer_gstin=payload.customer_gstin,
         payment_method=payload.payment_method,
         promotion_code=payload.promotion_code,
+        customer_voucher_id=payload.customer_voucher_id,
         store_credit_amount=payload.store_credit_amount,
         loyalty_points_to_redeem=payload.loyalty_points_to_redeem,
         lines=[line.model_dump() for line in payload.lines],
@@ -62,7 +67,11 @@ async def create_sale(
     return SaleResponse(**sale)
 
 
-@branch_router.post("/{tenant_id}/branches/{branch_id}/checkout-price-preview", response_model=CheckoutPricePreviewResponse)
+@branch_router.post(
+    "/{tenant_id}/branches/{branch_id}/checkout-price-preview",
+    response_model=CheckoutPricePreviewResponse,
+    response_model_exclude_none=True,
+)
 async def checkout_price_preview(
     tenant_id: str,
     branch_id: str,
@@ -79,6 +88,7 @@ async def checkout_price_preview(
         customer_name=payload.customer_name,
         customer_gstin=payload.customer_gstin,
         promotion_code=payload.promotion_code,
+        customer_voucher_id=payload.customer_voucher_id,
         loyalty_points_to_redeem=payload.loyalty_points_to_redeem,
         store_credit_amount=payload.store_credit_amount,
         lines=[line.model_dump() for line in payload.lines],
@@ -110,6 +120,7 @@ async def create_checkout_payment_session(
         customer_name=payload.customer_name,
         customer_gstin=payload.customer_gstin,
         promotion_code=payload.promotion_code,
+        customer_voucher_id=payload.customer_voucher_id,
         loyalty_points_to_redeem=payload.loyalty_points_to_redeem,
         store_credit_amount=payload.store_credit_amount,
         lines=[line.model_dump() for line in payload.lines],

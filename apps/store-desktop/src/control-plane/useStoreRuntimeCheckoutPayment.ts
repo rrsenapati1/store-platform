@@ -17,6 +17,7 @@ interface UseStoreRuntimeCheckoutPaymentArgs {
   branchId: string;
   selectedCatalogItem: ControlPlaneBranchCatalogItem | null;
   customerProfileId: string | null;
+  customerVoucherId: string | null;
   customerName: string;
   customerGstin: string;
   promotionCode: string;
@@ -79,6 +80,7 @@ export function useStoreRuntimeCheckoutPayment({
   branchId,
   selectedCatalogItem,
   customerProfileId,
+  customerVoucherId,
   customerName,
   customerGstin,
   promotionCode,
@@ -175,6 +177,7 @@ export function useStoreRuntimeCheckoutPayment({
         customer_name: customerName,
         customer_gstin: customerGstin || null,
         promotion_code: resolvePromotionCodePayload(promotionCode),
+        customer_voucher_id: customerVoucherId,
         loyalty_points_to_redeem: loyaltyPointsToRedeem,
         store_credit_amount: storeCreditAmount,
         lines: [{ product_id: selectedCatalogItem.product_id, quantity }],

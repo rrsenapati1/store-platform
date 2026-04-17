@@ -40,6 +40,7 @@ class BillingService:
         customer_gstin: str | None,
         payment_method: str,
         promotion_code: str | None = None,
+        customer_voucher_id: str | None = None,
         pricing_snapshot: dict[str, object] | None = None,
         store_credit_amount: float = 0.0,
         loyalty_points_to_redeem: int = 0,
@@ -59,6 +60,7 @@ class BillingService:
                 customer_name=customer_name,
                 customer_gstin=customer_gstin,
                 promotion_code=promotion_code,
+                customer_voucher_id=customer_voucher_id,
                 loyalty_points_to_redeem=loyalty_points_to_redeem,
                 store_credit_amount=store_credit_amount,
                 lines=lines,
@@ -70,6 +72,7 @@ class BillingService:
         preview_tax_lines = list(preview["tax_lines"])
         automatic_campaign = preview.get("automatic_campaign")
         promotion_code_campaign = preview.get("promotion_code_campaign")
+        customer_voucher = preview.get("customer_voucher")
         loyalty_points_redeemed = int(preview.get("loyalty_points_to_redeem", 0))
         loyalty_points_earned = int(preview.get("loyalty_points_earned", 0))
         loyalty_discount_amount = round(float(preview_summary.get("loyalty_discount_total", 0.0)), 2)
@@ -93,8 +96,14 @@ class BillingService:
             automatic_discount_total=round(float(preview_summary.get("automatic_discount_total", 0.0)), 2),
             promotion_campaign_id=promotion_code_campaign["id"] if promotion_code_campaign is not None else None,
             promotion_code_id=promotion_code_campaign["code_id"] if promotion_code_campaign is not None else None,
+            customer_voucher_id=customer_voucher["id"] if customer_voucher is not None else None,
+            customer_voucher_name=customer_voucher["voucher_name"] if customer_voucher is not None else None,
             promotion_code=promotion_code_campaign["code"] if promotion_code_campaign is not None else None,
             promotion_discount_amount=round(float(preview_summary.get("promotion_code_discount_total", 0.0)), 2),
+            customer_voucher_discount_total=round(
+                float(preview_summary.get("customer_voucher_discount_total", 0.0)),
+                2,
+            ),
             promotion_code_discount_total=round(float(preview_summary.get("promotion_code_discount_total", 0.0)), 2),
             invoice_kind=str(preview["invoice_kind"]),
             irn_status=str(preview["irn_status"]),
@@ -131,6 +140,12 @@ class BillingService:
             await self._promotion_service.mark_code_redeemed(
                 tenant_id=tenant_id,
                 promotion_code_id=str(promotion_code_campaign["code_id"]),
+            )
+        if customer_voucher is not None:
+            await self._promotion_service.mark_customer_voucher_redeemed(
+                tenant_id=tenant_id,
+                voucher_id=str(customer_voucher["id"]),
+                sale_id=persisted.sale.id,
             )
         if store_credit_amount > 0:
             await self._store_credit_service.redeem_customer_store_credit(
@@ -822,6 +837,7 @@ class BillingService:
     ) -> dict[str, object]:
         return {
             "id": sale.id,
+            "sale_id": sale.id,
             "tenant_id": sale.tenant_id,
             "branch_id": sale.branch_id,
             "customer_profile_id": sale.customer_profile_id,
@@ -845,8 +861,11 @@ class BillingService:
             "grand_total": sale.grand_total,
             "promotion_campaign_id": sale.promotion_campaign_id,
             "promotion_code_id": sale.promotion_code_id,
+            "customer_voucher_id": sale.customer_voucher_id,
+            "customer_voucher_name": sale.customer_voucher_name,
             "promotion_code": sale.promotion_code,
             "promotion_discount_amount": sale.promotion_discount_amount,
+            "customer_voucher_discount_total": sale.customer_voucher_discount_total,
             "store_credit_amount": round(
                 sum(payment.amount for payment in payments if payment.payment_method == "STORE_CREDIT"),
                 2,
@@ -868,6 +887,9 @@ class BillingService:
                     "gst_rate": line.gst_rate,
                     "automatic_discount_amount": line.automatic_discount_amount,
                     "promotion_code_discount_amount": line.promotion_code_discount_amount,
+                    "customer_voucher_discount_amount": (
+                        line.customer_voucher_discount_amount if line.customer_voucher_discount_amount > 0 else None
+                    ),
                     "promotion_discount_source": line.promotion_discount_source,
                     "taxable_amount": line.taxable_amount,
                     "tax_amount": line.tax_amount,

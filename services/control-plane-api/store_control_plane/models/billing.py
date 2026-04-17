@@ -29,9 +29,16 @@ class Sale(Base, TimestampMixin):
         default=None,
         index=True,
     )
+    customer_voucher_id: Mapped[str | None] = mapped_column(
+        ForeignKey("customer_voucher_assignments.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
+    customer_voucher_name: Mapped[str | None] = mapped_column(String(255), default=None)
     promotion_code: Mapped[str | None] = mapped_column(String(64), default=None)
     promotion_discount_amount: Mapped[float] = mapped_column(default=0.0)
     promotion_code_discount_total: Mapped[float] = mapped_column(default=0.0)
+    customer_voucher_discount_total: Mapped[float] = mapped_column(default=0.0)
     invoice_kind: Mapped[str] = mapped_column(String(16))
     irn_status: Mapped[str] = mapped_column(String(32), default="NOT_REQUIRED")
     loyalty_points_redeemed: Mapped[int] = mapped_column(default=0)
@@ -59,6 +66,7 @@ class SaleLine(Base, TimestampMixin):
     gst_rate: Mapped[float] = mapped_column(default=0.0)
     automatic_discount_amount: Mapped[float] = mapped_column(default=0.0)
     promotion_code_discount_amount: Mapped[float] = mapped_column(default=0.0)
+    customer_voucher_discount_amount: Mapped[float] = mapped_column(default=0.0)
     promotion_discount_source: Mapped[str | None] = mapped_column(String(64), default=None)
     taxable_amount: Mapped[float] = mapped_column(default=0.0)
     tax_amount: Mapped[float] = mapped_column(default=0.0)

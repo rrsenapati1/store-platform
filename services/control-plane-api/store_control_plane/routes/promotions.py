@@ -5,6 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_actor, get_session
 from ..schemas import (
+    CustomerVoucherCancelRequest,
+    CustomerVoucherIssueRequest,
+    CustomerVoucherListResponse,
+    CustomerVoucherResponse,
     PromotionCampaignCreateRequest,
     PromotionCampaignListResponse,
     PromotionCampaignResponse,
@@ -116,3 +120,68 @@ async def reactivate_promotion_campaign(
     record = await service.reactivate_campaign(tenant_id=tenant_id, campaign_id=campaign_id)
     await session.commit()
     return PromotionCampaignResponse(**record)
+
+
+@router.get(
+    "/{tenant_id}/customer-profiles/{customer_profile_id}/vouchers",
+    response_model=CustomerVoucherListResponse,
+)
+async def list_customer_vouchers(
+    tenant_id: str,
+    customer_profile_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerVoucherListResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = PromotionService(session)
+    records = await service.list_customer_vouchers(
+        tenant_id=tenant_id,
+        customer_profile_id=customer_profile_id,
+    )
+    return CustomerVoucherListResponse(**records)
+
+
+@router.post(
+    "/{tenant_id}/customer-profiles/{customer_profile_id}/vouchers",
+    response_model=CustomerVoucherResponse,
+)
+async def issue_customer_voucher(
+    tenant_id: str,
+    customer_profile_id: str,
+    payload: CustomerVoucherIssueRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerVoucherResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = PromotionService(session)
+    record = await service.issue_customer_voucher(
+        tenant_id=tenant_id,
+        customer_profile_id=customer_profile_id,
+        **payload.model_dump(),
+    )
+    await session.commit()
+    return CustomerVoucherResponse(**record)
+
+
+@router.post(
+    "/{tenant_id}/customer-profiles/{customer_profile_id}/vouchers/{voucher_id}/cancel",
+    response_model=CustomerVoucherResponse,
+)
+async def cancel_customer_voucher(
+    tenant_id: str,
+    customer_profile_id: str,
+    voucher_id: str,
+    payload: CustomerVoucherCancelRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CustomerVoucherResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="tenant.manage")
+    service = PromotionService(session)
+    record = await service.cancel_customer_voucher(
+        tenant_id=tenant_id,
+        customer_profile_id=customer_profile_id,
+        voucher_id=voucher_id,
+        **payload.model_dump(),
+    )
+    await session.commit()
+    return CustomerVoucherResponse(**record)

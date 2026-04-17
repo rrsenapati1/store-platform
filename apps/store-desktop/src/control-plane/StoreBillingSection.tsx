@@ -125,6 +125,9 @@ function describePreviewLineDiscountSource(
       if (trimmedSegment === 'AUTOMATIC_CART' || trimmedSegment === 'AUTOMATIC_ITEM_CATEGORY') {
         return preview.automatic_campaign?.name ?? trimmedSegment;
       }
+      if (trimmedSegment === 'ASSIGNED_VOUCHER') {
+        return preview.customer_voucher?.voucher_code ?? trimmedSegment;
+      }
       return trimmedSegment;
     })
     .join(' + ');
@@ -133,6 +136,8 @@ function describePreviewLineDiscountSource(
 export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const selectedItem = workspace.branchCatalogItems[0];
   const hasSelectedCustomerProfile = workspace.selectedCustomerProfile !== null;
+  const selectedCustomerVouchers = workspace.selectedCustomerVouchers;
+  const selectedCustomerVoucher = workspace.selectedCustomerVoucher;
   const selectedCustomerStoreCredit = workspace.selectedCustomerStoreCredit;
   const selectedCustomerLoyalty = workspace.selectedCustomerLoyalty;
   const loyaltyProgram = workspace.loyaltyProgram;
@@ -199,6 +204,39 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
           <p style={{ marginTop: 0, marginBottom: '14px', color: '#4e5871' }}>
             Linked customer profile: <strong>{workspace.selectedCustomerProfile?.full_name}</strong>
           </p>
+        ) : null}
+        {hasSelectedCustomerProfile ? (
+          <div style={{ marginBottom: '14px' }}>
+            <DetailList
+              items={[
+                { label: 'Available customer vouchers', value: String(selectedCustomerVouchers.length) },
+                {
+                  label: 'Selected voucher',
+                  value: selectedCustomerVoucher
+                    ? `${selectedCustomerVoucher.voucher_name} (${selectedCustomerVoucher.voucher_amount})`
+                    : 'None',
+                },
+              ]}
+            />
+            {selectedCustomerVouchers.length ? (
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px' }}>
+                {selectedCustomerVouchers.map((voucher) => (
+                  <ActionButton
+                    key={voucher.id}
+                    onClick={() => workspace.selectCustomerVoucher(voucher.id)}
+                    disabled={workspace.isBusy || voucher.status !== 'ACTIVE'}
+                  >
+                    {`Apply voucher ${voucher.voucher_code}`}
+                  </ActionButton>
+                ))}
+                {selectedCustomerVoucher ? (
+                  <ActionButton onClick={() => workspace.clearSelectedCustomerVoucher()} disabled={workspace.isBusy}>
+                    Clear customer voucher
+                  </ActionButton>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         ) : null}
         {hasSelectedCustomerProfile && selectedCustomerStoreCredit ? (
           <>
@@ -327,6 +365,10 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                   label: 'Promotion code',
                   value: checkoutPricePreview.promotion_code_campaign?.code ?? 'None',
                 },
+                {
+                  label: 'Customer voucher',
+                  value: checkoutPricePreview.customer_voucher?.voucher_code ?? 'None',
+                },
                 { label: 'MRP total', value: String(checkoutPricePreview.summary.mrp_total) },
                 {
                   label: 'Selling subtotal',
@@ -339,6 +381,10 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                 {
                   label: 'Code discount',
                   value: String(checkoutPricePreview.summary.promotion_code_discount_total),
+                },
+                {
+                  label: 'Voucher discount',
+                  value: String(checkoutPricePreview.summary.customer_voucher_discount_total),
                 },
                 {
                   label: 'Loyalty discount',
@@ -406,7 +452,9 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                   { label: 'Surface', value: checkoutPaymentSession.handoff_surface },
                   { label: 'Amount', value: `${checkoutPaymentSession.currency_code} ${checkoutPaymentSession.order_amount.toFixed(2)}` },
                   { label: 'Promotion code', value: checkoutPaymentSession.promotion_code ?? 'None' },
+                  { label: 'Customer voucher', value: checkoutPaymentSession.customer_voucher_name ?? 'None' },
                   { label: 'Promotion discount', value: checkoutPromotionDiscountAmount.toFixed(2) },
+                  { label: 'Voucher discount', value: (checkoutPaymentSession.customer_voucher_discount_total ?? 0).toFixed(2) },
                   { label: 'Recovery', value: checkoutPaymentSession.recovery_state },
                 ]}
               />

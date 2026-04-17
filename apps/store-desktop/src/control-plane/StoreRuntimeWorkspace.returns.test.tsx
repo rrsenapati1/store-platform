@@ -363,6 +363,9 @@ describe('store runtime sale return flow', () => {
           ledger_entries: [],
         }) as never;
       }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/vouchers') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
       if (url.endsWith('/v1/tenants/tenant-acme/loyalty-program') && method === 'GET') {
         return jsonResponse({
           status: 'ACTIVE',

@@ -42,6 +42,7 @@ class CheckoutPricingService:
         customer_name: str,
         customer_gstin: str | None,
         promotion_code: str | None,
+        customer_voucher_id: str | None,
         loyalty_points_to_redeem: int,
         store_credit_amount: float,
         lines: list[dict[str, object]],
@@ -116,6 +117,14 @@ class CheckoutPricingService:
         promotion_code_campaign = None
         promotion_code_discount_total = 0.0
         promotion_code_line_discounts = [0.0] * len(draft.lines)
+        customer_voucher = None
+        customer_voucher_discount_total = 0.0
+        customer_voucher_line_discounts = [0.0] * len(draft.lines)
+        if promotion_code and customer_voucher_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Shared promotion codes and customer vouchers cannot be combined",
+            )
         if promotion_code:
             validated = await self._promotion_service.validate_promotion_code(
                 tenant_id=tenant_id,
@@ -132,6 +141,24 @@ class CheckoutPricingService:
                 total_discount=promotion_code_discount_total,
                 weights=post_automatic_line_subtotals,
             )
+        elif customer_voucher_id:
+            if customer_profile_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Customer profile is required for customer vouchers",
+                )
+            validated = await self._promotion_service.validate_customer_voucher(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+                voucher_id=customer_voucher_id,
+                sale_total=post_automatic_subtotal,
+            )
+            customer_voucher = self._promotion_service.serialize_customer_voucher_snapshot(validated["voucher"])
+            customer_voucher_discount_total = money(float(validated["discount_amount"]))
+            customer_voucher_line_discounts = self._allocate_discount(
+                total_discount=customer_voucher_discount_total,
+                weights=post_automatic_line_subtotals,
+            )
 
         is_inter_state = any(tax_line.tax_type == "IGST" for tax_line in draft.tax_lines)
         preview_lines: list[dict[str, object]] = []
@@ -145,7 +172,13 @@ class CheckoutPricingService:
             product = products[line.product_id]
             automatic_discount_amount = money(automatic_line_discounts[index])
             promotion_code_discount_amount = money(promotion_code_line_discounts[index])
-            taxable_amount = money(line.line_subtotal - automatic_discount_amount - promotion_code_discount_amount)
+            customer_voucher_discount_amount = money(customer_voucher_line_discounts[index])
+            taxable_amount = money(
+                line.line_subtotal
+                - automatic_discount_amount
+                - promotion_code_discount_amount
+                - customer_voucher_discount_amount
+            )
             tax_amount = money(taxable_amount * line.gst_rate / 100)
             line_total = money(taxable_amount + tax_amount)
             mrp = money(float(product.mrp) * line.quantity)
@@ -159,6 +192,8 @@ class CheckoutPricingService:
                 source_segments.append(automatic_evaluation.scope_label if automatic_evaluation is not None else "AUTOMATIC")
             if promotion_code_discount_amount > 0:
                 source_segments.append("CODE")
+            if customer_voucher_discount_amount > 0:
+                source_segments.append("ASSIGNED_VOUCHER")
             promotion_discount_source = "+".join(source_segments) if source_segments else None
 
             preview_lines.append(
@@ -174,6 +209,9 @@ class CheckoutPricingService:
                     "gst_rate": line.gst_rate,
                     "automatic_discount_amount": automatic_discount_amount,
                     "promotion_code_discount_amount": promotion_code_discount_amount,
+                    "customer_voucher_discount_amount": (
+                        customer_voucher_discount_amount if customer_voucher_discount_amount > 0 else None
+                    ),
                     "promotion_discount_source": promotion_discount_source,
                     "taxable_amount": taxable_amount,
                     "tax_amount": tax_amount,
@@ -262,13 +300,20 @@ class CheckoutPricingService:
             "irn_status": draft.irn_status,
             "automatic_campaign": automatic_campaign,
             "promotion_code_campaign": promotion_code_campaign,
+            "customer_voucher": customer_voucher,
             "summary": {
                 "mrp_total": mrp_total,
                 "selling_price_subtotal": selling_price_subtotal,
                 "automatic_discount_total": automatic_discount_total,
                 "promotion_code_discount_total": promotion_code_discount_total,
+                "customer_voucher_discount_total": customer_voucher_discount_total,
                 "loyalty_discount_total": loyalty_discount_total,
-                "total_discount": money(automatic_discount_total + promotion_code_discount_total + loyalty_discount_total),
+                "total_discount": money(
+                    automatic_discount_total
+                    + promotion_code_discount_total
+                    + customer_voucher_discount_total
+                    + loyalty_discount_total
+                ),
                 "tax_total": tax_total,
                 "invoice_total": invoice_total,
                 "grand_total": grand_total,

@@ -1434,6 +1434,7 @@ export interface ControlPlaneSaleLine {
   gst_rate: number;
   automatic_discount_amount?: number;
   promotion_code_discount_amount?: number;
+  customer_voucher_discount_amount?: number | null;
   promotion_discount_source?: string | null;
   taxable_amount?: number;
   tax_amount?: number;
@@ -1474,8 +1475,11 @@ export interface ControlPlaneSale {
   grand_total: number;
   promotion_campaign_id?: string | null;
   promotion_code_id?: string | null;
+  customer_voucher_id?: string | null;
+  customer_voucher_name?: string | null;
   promotion_code?: string | null;
   promotion_discount_amount: number;
+  customer_voucher_discount_total?: number;
   store_credit_amount: number;
   loyalty_points_redeemed: number;
   loyalty_discount_amount: number;
@@ -1501,8 +1505,11 @@ export interface ControlPlaneSaleRecord {
   grand_total: number;
   promotion_campaign_id?: string | null;
   promotion_code_id?: string | null;
+  customer_voucher_id?: string | null;
+  customer_voucher_name?: string | null;
   promotion_code?: string | null;
   promotion_discount_amount: number;
+  customer_voucher_discount_total?: number;
   store_credit_amount: number;
   loyalty_points_redeemed: number;
   loyalty_discount_amount: number;
@@ -1529,8 +1536,11 @@ export interface ControlPlaneCheckoutPaymentSession {
   automatic_campaign_name?: string | null;
   automatic_discount_total?: number;
   promotion_code?: string | null;
+  customer_voucher_id?: string | null;
+  customer_voucher_name?: string | null;
   promotion_discount_amount: number;
   promotion_code_discount_total?: number;
+  customer_voucher_discount_total?: number;
   store_credit_amount?: number;
   action_payload: ControlPlaneCheckoutPaymentActionPayload;
   action_expires_at?: string | null;
@@ -1596,11 +1606,19 @@ export interface ControlPlaneCheckoutPricePreviewCodeCampaign extends ControlPla
   code: string;
 }
 
+export interface ControlPlaneCheckoutPricePreviewCustomerVoucher {
+  id: string;
+  voucher_code: string;
+  voucher_name: string;
+  voucher_amount: number;
+}
+
 export interface ControlPlaneCheckoutPricePreviewSummary {
   mrp_total: number;
   selling_price_subtotal: number;
   automatic_discount_total: number;
   promotion_code_discount_total: number;
+  customer_voucher_discount_total: number;
   loyalty_discount_total: number;
   total_discount: number;
   tax_total: number;
@@ -1619,6 +1637,7 @@ export interface ControlPlaneCheckoutPricePreviewLine {
   unit_selling_price: number;
   automatic_discount_amount: number;
   promotion_code_discount_amount: number;
+  customer_voucher_discount_amount?: number | null;
   promotion_discount_source?: string | null;
   taxable_amount: number;
   tax_amount: number;
@@ -1631,9 +1650,26 @@ export interface ControlPlaneCheckoutPricePreview {
   customer_gstin?: string | null;
   automatic_campaign?: ControlPlaneCheckoutPricePreviewCampaign | null;
   promotion_code_campaign?: ControlPlaneCheckoutPricePreviewCodeCampaign | null;
+  customer_voucher?: ControlPlaneCheckoutPricePreviewCustomerVoucher | null;
   summary: ControlPlaneCheckoutPricePreviewSummary;
   lines: ControlPlaneCheckoutPricePreviewLine[];
   tax_lines: ControlPlaneInvoiceTaxLine[];
+}
+
+export interface ControlPlaneCustomerVoucher {
+  id: string;
+  tenant_id: string;
+  campaign_id: string;
+  customer_profile_id: string;
+  voucher_code: string;
+  voucher_name: string;
+  voucher_amount: number;
+  status: string;
+  issued_note?: string | null;
+  redeemed_sale_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  redeemed_at?: string | null;
 }
 
 export interface ControlPlaneCustomerProfile {

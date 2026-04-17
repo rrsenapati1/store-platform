@@ -4,7 +4,8 @@ from fastapi import HTTPException, status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import PromotionRepository, TenantRepository
-from ..utils import new_id
+from ..utils import new_id, utc_now
+from .customer_profiles import CustomerProfileService
 
 
 def _normalize_optional(value: str | None) -> str | None:
@@ -29,6 +30,7 @@ class PromotionService:
         self._session = session
         self._tenant_repo = TenantRepository(session)
         self._promotion_repo = PromotionRepository(session)
+        self._customer_profile_service = CustomerProfileService(session)
 
     async def list_campaigns(self, *, tenant_id: str) -> dict[str, object]:
         await self._require_tenant(tenant_id)
@@ -68,7 +70,7 @@ class PromotionService:
         await self._require_tenant(tenant_id)
         normalized_trigger_mode = _normalize_status(
             trigger_mode,
-            allowed={"CODE", "AUTOMATIC"},
+            allowed={"CODE", "AUTOMATIC", "ASSIGNED_VOUCHER"},
             field_name="Trigger mode",
         )
         normalized_scope = _normalize_status(
@@ -76,11 +78,21 @@ class PromotionService:
             allowed={"CART", "ITEM_CATEGORY"},
             field_name="Scope",
         )
+        normalized_discount_type = _normalize_status(
+            discount_type,
+            allowed={"FLAT_AMOUNT", "PERCENTAGE"},
+            field_name="Discount type",
+        )
         normalized_targets = self._normalize_targets(
             trigger_mode=normalized_trigger_mode,
             scope=normalized_scope,
             target_product_ids=target_product_ids,
             target_category_codes=target_category_codes,
+        )
+        self._validate_campaign_shape(
+            trigger_mode=normalized_trigger_mode,
+            scope=normalized_scope,
+            discount_type=normalized_discount_type,
         )
         record = await self._promotion_repo.create_campaign(
             tenant_id=tenant_id,
@@ -89,7 +101,7 @@ class PromotionService:
             status=_normalize_status(status, allowed={"ACTIVE", "DISABLED", "ARCHIVED"}, field_name="Status"),
             trigger_mode=normalized_trigger_mode,
             scope=normalized_scope,
-            discount_type=_normalize_status(discount_type, allowed={"FLAT_AMOUNT", "PERCENTAGE"}, field_name="Discount type"),
+            discount_type=normalized_discount_type,
             discount_value=self._normalize_discount_value(discount_value),
             minimum_order_amount=self._normalize_amount(minimum_order_amount, field_name="Minimum order amount"),
             maximum_discount_amount=self._normalize_amount(maximum_discount_amount, field_name="Maximum discount amount"),
@@ -104,6 +116,7 @@ class PromotionService:
         record = await self._require_campaign(tenant_id=tenant_id, campaign_id=campaign_id)
         next_trigger_mode = record.trigger_mode
         next_scope = record.scope
+        next_discount_type = record.discount_type
         next_target_product_ids = list(record.target_product_ids or [])
         next_target_category_codes = list(record.target_category_codes or [])
         if "name" in updates:
@@ -111,11 +124,19 @@ class PromotionService:
         if "status" in updates:
             record.status = _normalize_status(updates.get("status"), allowed={"ACTIVE", "DISABLED", "ARCHIVED"}, field_name="Status")
         if "trigger_mode" in updates:
-            next_trigger_mode = _normalize_status(updates.get("trigger_mode"), allowed={"CODE", "AUTOMATIC"}, field_name="Trigger mode")
+            next_trigger_mode = _normalize_status(
+                updates.get("trigger_mode"),
+                allowed={"CODE", "AUTOMATIC", "ASSIGNED_VOUCHER"},
+                field_name="Trigger mode",
+            )
         if "scope" in updates:
             next_scope = _normalize_status(updates.get("scope"), allowed={"CART", "ITEM_CATEGORY"}, field_name="Scope")
         if "discount_type" in updates:
-            record.discount_type = _normalize_status(updates.get("discount_type"), allowed={"FLAT_AMOUNT", "PERCENTAGE"}, field_name="Discount type")
+            next_discount_type = _normalize_status(
+                updates.get("discount_type"),
+                allowed={"FLAT_AMOUNT", "PERCENTAGE"},
+                field_name="Discount type",
+            )
         if "discount_value" in updates:
             record.discount_value = self._normalize_discount_value(updates.get("discount_value"))
         if "minimum_order_amount" in updates:
@@ -134,8 +155,14 @@ class PromotionService:
             target_product_ids=next_target_product_ids,
             target_category_codes=next_target_category_codes,
         )
+        self._validate_campaign_shape(
+            trigger_mode=next_trigger_mode,
+            scope=next_scope,
+            discount_type=next_discount_type,
+        )
         record.trigger_mode = next_trigger_mode
         record.scope = next_scope
+        record.discount_type = next_discount_type
         record.target_product_ids = normalized_targets["target_product_ids"]
         record.target_category_codes = normalized_targets["target_category_codes"]
         await self._session.flush()
@@ -166,11 +193,18 @@ class PromotionService:
     ) -> dict[str, object]:
         await self._require_tenant(tenant_id)
         campaign = await self._require_campaign(tenant_id=tenant_id, campaign_id=campaign_id)
-        if campaign.trigger_mode != "CODE":
+        if campaign.trigger_mode == "AUTOMATIC":
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
                 detail="Automatic campaigns do not support shared promotion codes",
             )
+        if campaign.trigger_mode == "ASSIGNED_VOUCHER":
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="Assigned voucher campaigns do not support shared promotion codes",
+            )
+        if campaign.trigger_mode != "CODE":
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Shared promotion codes are unsupported")
         normalized_code = self._normalize_code(code)
         existing = await self._promotion_repo.get_code_by_value(tenant_id=tenant_id, code=normalized_code)
         if existing is not None:
@@ -216,10 +250,137 @@ class PromotionService:
         code.redemption_count += 1
         await self._session.flush()
 
+    async def list_customer_vouchers(self, *, tenant_id: str, customer_profile_id: str) -> dict[str, object]:
+        await self._require_tenant(tenant_id)
+        await self._customer_profile_service.require_active_profile(
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+        )
+        records = await self._promotion_repo.list_customer_vouchers(
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+        )
+        return {"records": [self._serialize_customer_voucher(record) for record in records]}
+
+    async def issue_customer_voucher(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        campaign_id: str,
+        note: str | None,
+    ) -> dict[str, object]:
+        await self._require_tenant(tenant_id)
+        await self._customer_profile_service.require_active_profile(
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+        )
+        campaign = await self._require_campaign(tenant_id=tenant_id, campaign_id=campaign_id)
+        if campaign.status != "ACTIVE" or campaign.trigger_mode != "ASSIGNED_VOUCHER":
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="Assigned voucher campaign is invalid",
+            )
+        record = await self._promotion_repo.create_customer_voucher(
+            tenant_id=tenant_id,
+            campaign_id=campaign.id,
+            customer_profile_id=customer_profile_id,
+            voucher_id=new_id(),
+            voucher_code=await self._generate_customer_voucher_code(tenant_id=tenant_id),
+            voucher_name_snapshot=campaign.name,
+            voucher_amount=round(float(campaign.discount_value), 2),
+            status="ACTIVE",
+            issued_note=_normalize_optional(note),
+        )
+        return self._serialize_customer_voucher(record)
+
+    async def cancel_customer_voucher(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        voucher_id: str,
+        note: str | None,
+    ) -> dict[str, object]:
+        await self._require_tenant(tenant_id)
+        await self._customer_profile_service.require_active_profile(
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+        )
+        record = await self._require_customer_voucher(
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+            voucher_id=voucher_id,
+        )
+        if record.status != "ACTIVE":
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="Only active customer vouchers can be canceled",
+            )
+        record.status = "CANCELED"
+        record.canceled_note = _normalize_optional(note)
+        await self._session.flush()
+        return self._serialize_customer_voucher(record)
+
+    async def mark_customer_voucher_redeemed(self, *, tenant_id: str, voucher_id: str, sale_id: str) -> None:
+        record = await self._require_customer_voucher(tenant_id=tenant_id, voucher_id=voucher_id)
+        if record.status != "ACTIVE":
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Customer voucher is invalid")
+        campaign = await self._require_campaign(tenant_id=tenant_id, campaign_id=record.campaign_id)
+        record.status = "REDEEMED"
+        record.redeemed_sale_id = sale_id
+        record.redeemed_at = record.redeemed_at or utc_now()
+        campaign.redemption_count += 1
+        await self._session.flush()
+
+    async def validate_customer_voucher(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+        voucher_id: str,
+        sale_total: float,
+    ) -> dict[str, object]:
+        await self._require_tenant(tenant_id)
+        await self._customer_profile_service.require_active_profile(
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+        )
+        record = await self._require_customer_voucher(
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+            voucher_id=voucher_id,
+        )
+        if record.status != "ACTIVE":
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Customer voucher is invalid")
+        campaign = await self._require_campaign(tenant_id=tenant_id, campaign_id=record.campaign_id)
+        if campaign.status != "ACTIVE" or campaign.trigger_mode != "ASSIGNED_VOUCHER":
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Customer voucher is invalid")
+        if campaign.minimum_order_amount is not None and float(sale_total) < float(campaign.minimum_order_amount):
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Customer voucher is invalid")
+        discount_amount = min(round(float(record.voucher_amount), 2), round(float(sale_total), 2))
+        return {"campaign": campaign, "voucher": record, "discount_amount": discount_amount}
+
     async def _require_code_by_id(self, *, tenant_id: str, promotion_code_id: str):
         record = await self._promotion_repo.get_code_by_id(tenant_id=tenant_id, promotion_code_id=promotion_code_id)
         if record is None:
             raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Promotion code not found")
+        return record
+
+    async def _require_customer_voucher(
+        self,
+        *,
+        tenant_id: str,
+        voucher_id: str,
+        customer_profile_id: str | None = None,
+    ):
+        record = await self._promotion_repo.get_customer_voucher(
+            tenant_id=tenant_id,
+            voucher_id=voucher_id,
+            customer_profile_id=customer_profile_id,
+        )
+        if record is None:
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Customer voucher not found")
         return record
 
     async def _require_tenant(self, tenant_id: str) -> None:
@@ -267,6 +428,15 @@ class PromotionService:
         }
 
     @staticmethod
+    def serialize_customer_voucher_snapshot(record) -> dict[str, object]:
+        return {
+            "id": record.id,
+            "voucher_code": record.voucher_code,
+            "voucher_name": record.voucher_name_snapshot,
+            "voucher_amount": float(record.voucher_amount),
+        }
+
+    @staticmethod
     def _serialize_code(record) -> dict[str, object]:
         return {
             "id": record.id,
@@ -278,6 +448,24 @@ class PromotionService:
             "redemption_count": record.redemption_count,
             "created_at": record.created_at,
             "updated_at": record.updated_at,
+        }
+
+    @staticmethod
+    def _serialize_customer_voucher(record) -> dict[str, object]:
+        return {
+            "id": record.id,
+            "tenant_id": record.tenant_id,
+            "campaign_id": record.campaign_id,
+            "customer_profile_id": record.customer_profile_id,
+            "voucher_code": record.voucher_code,
+            "voucher_name": record.voucher_name_snapshot,
+            "voucher_amount": float(record.voucher_amount),
+            "status": record.status,
+            "issued_note": record.issued_note,
+            "redeemed_sale_id": record.redeemed_sale_id,
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "redeemed_at": record.redeemed_at,
         }
 
     @staticmethod
@@ -364,6 +552,11 @@ class PromotionService:
                 "target_product_ids": [],
                 "target_category_codes": [],
             }
+        if trigger_mode == "ASSIGNED_VOUCHER":
+            return {
+                "target_product_ids": [],
+                "target_category_codes": [],
+            }
         if scope == "ITEM_CATEGORY" and not normalized_product_ids and not normalized_category_codes:
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -378,3 +571,28 @@ class PromotionService:
             "target_product_ids": normalized_product_ids,
             "target_category_codes": normalized_category_codes,
         }
+
+    @staticmethod
+    def _validate_campaign_shape(*, trigger_mode: str, scope: str, discount_type: str) -> None:
+        if trigger_mode != "ASSIGNED_VOUCHER":
+            return
+        if scope != "CART":
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="Assigned voucher campaigns must use cart scope",
+            )
+        if discount_type != "FLAT_AMOUNT":
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="Assigned voucher campaigns must use flat amount discounts",
+            )
+
+    async def _generate_customer_voucher_code(self, *, tenant_id: str) -> str:
+        while True:
+            voucher_code = f"VCHR-{new_id()[:10].upper()}"
+            existing = await self._promotion_repo.get_customer_voucher_by_code(
+                tenant_id=tenant_id,
+                voucher_code=voucher_code,
+            )
+            if existing is None:
+                return voucher_code

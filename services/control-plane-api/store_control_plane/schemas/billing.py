@@ -16,6 +16,7 @@ class SaleCreateRequest(BaseModel):
     customer_gstin: str | None = None
     payment_method: str
     promotion_code: str | None = None
+    customer_voucher_id: str | None = None
     store_credit_amount: float = Field(default=0, ge=0)
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
@@ -30,6 +31,7 @@ class CheckoutPaymentSessionCreateRequest(BaseModel):
     customer_name: str
     customer_gstin: str | None = None
     promotion_code: str | None = None
+    customer_voucher_id: str | None = None
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
     store_credit_amount: float = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
@@ -40,6 +42,7 @@ class CheckoutPricePreviewRequest(BaseModel):
     customer_name: str
     customer_gstin: str | None = None
     promotion_code: str | None = None
+    customer_voucher_id: str | None = None
     loyalty_points_to_redeem: int = Field(default=0, ge=0)
     store_credit_amount: float = Field(default=0, ge=0)
     lines: list[SaleLineCreateRequest]
@@ -59,11 +62,19 @@ class CheckoutPricePreviewCodeCampaignResponse(CheckoutPricePreviewCampaignRespo
     code: str
 
 
+class CheckoutPricePreviewCustomerVoucherResponse(BaseModel):
+    id: str
+    voucher_code: str
+    voucher_name: str
+    voucher_amount: float
+
+
 class CheckoutPricePreviewSummaryResponse(BaseModel):
     mrp_total: float
     selling_price_subtotal: float
     automatic_discount_total: float = 0
     promotion_code_discount_total: float = 0
+    customer_voucher_discount_total: float = 0
     loyalty_discount_total: float = 0
     total_discount: float = 0
     tax_total: float
@@ -82,6 +93,7 @@ class CheckoutPricePreviewLineResponse(BaseModel):
     unit_selling_price: float
     automatic_discount_amount: float = 0
     promotion_code_discount_amount: float = 0
+    customer_voucher_discount_amount: float | None = None
     promotion_discount_source: str | None = None
     taxable_amount: float
     tax_amount: float
@@ -94,6 +106,7 @@ class CheckoutPricePreviewResponse(BaseModel):
     customer_gstin: str | None = None
     automatic_campaign: CheckoutPricePreviewCampaignResponse | None = None
     promotion_code_campaign: CheckoutPricePreviewCodeCampaignResponse | None = None
+    customer_voucher: CheckoutPricePreviewCustomerVoucherResponse | None = None
     summary: CheckoutPricePreviewSummaryResponse
     lines: list[CheckoutPricePreviewLineResponse]
     tax_lines: list["InvoiceTaxLineResponse"]
@@ -132,6 +145,9 @@ class CheckoutPaymentSessionResponse(BaseModel):
     promotion_code: str | None = None
     promotion_discount_amount: float = 0
     promotion_code_discount_total: float = 0
+    customer_voucher_id: str | None = None
+    customer_voucher_name: str | None = None
+    customer_voucher_discount_total: float = 0
     store_credit_amount: float = 0
     action_payload: CheckoutPaymentActionPayloadResponse
     action_expires_at: datetime | None = None
@@ -170,6 +186,7 @@ class SaleLineResponse(BaseModel):
     gst_rate: float
     automatic_discount_amount: float = 0
     promotion_code_discount_amount: float = 0
+    customer_voucher_discount_amount: float | None = None
     promotion_discount_source: str | None = None
     taxable_amount: float = 0
     tax_amount: float = 0
@@ -187,6 +204,7 @@ class InvoiceTaxLineResponse(BaseModel):
 
 class SaleResponse(BaseModel):
     id: str
+    sale_id: str
     tenant_id: str
     branch_id: str
     customer_profile_id: str | None = None
@@ -210,8 +228,11 @@ class SaleResponse(BaseModel):
     grand_total: float
     promotion_campaign_id: str | None = None
     promotion_code_id: str | None = None
+    customer_voucher_id: str | None = None
+    customer_voucher_name: str | None = None
     promotion_code: str | None = None
     promotion_discount_amount: float = 0
+    customer_voucher_discount_total: float = 0
     store_credit_amount: float = 0
     loyalty_points_redeemed: int = 0
     loyalty_discount_amount: float = 0
@@ -237,8 +258,11 @@ class SaleRecord(BaseModel):
     grand_total: float
     promotion_campaign_id: str | None = None
     promotion_code_id: str | None = None
+    customer_voucher_id: str | None = None
+    customer_voucher_name: str | None = None
     promotion_code: str | None = None
     promotion_discount_amount: float = 0
+    customer_voucher_discount_total: float = 0
     store_credit_amount: float = 0
     loyalty_points_redeemed: int = 0
     loyalty_discount_amount: float = 0

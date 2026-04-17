@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import PromotionCampaign, PromotionCode
+from ..models import CustomerVoucherAssignment, PromotionCampaign, PromotionCode
 
 
 class PromotionRepository:
@@ -105,6 +105,77 @@ class PromotionRepository:
             status=status,
             redemption_limit_per_code=redemption_limit_per_code,
             redemption_count=0,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def list_customer_vouchers(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str,
+    ) -> list[CustomerVoucherAssignment]:
+        statement = (
+            select(CustomerVoucherAssignment)
+            .where(
+                CustomerVoucherAssignment.tenant_id == tenant_id,
+                CustomerVoucherAssignment.customer_profile_id == customer_profile_id,
+            )
+            .order_by(CustomerVoucherAssignment.created_at.asc(), CustomerVoucherAssignment.id.asc())
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def get_customer_voucher(
+        self,
+        *,
+        tenant_id: str,
+        voucher_id: str,
+        customer_profile_id: str | None = None,
+    ) -> CustomerVoucherAssignment | None:
+        statement = select(CustomerVoucherAssignment).where(
+            CustomerVoucherAssignment.tenant_id == tenant_id,
+            CustomerVoucherAssignment.id == voucher_id,
+        )
+        if customer_profile_id is not None:
+            statement = statement.where(CustomerVoucherAssignment.customer_profile_id == customer_profile_id)
+        return await self._session.scalar(statement)
+
+    async def get_customer_voucher_by_code(
+        self,
+        *,
+        tenant_id: str,
+        voucher_code: str,
+    ) -> CustomerVoucherAssignment | None:
+        statement = select(CustomerVoucherAssignment).where(
+            CustomerVoucherAssignment.tenant_id == tenant_id,
+            CustomerVoucherAssignment.voucher_code == voucher_code,
+        )
+        return await self._session.scalar(statement)
+
+    async def create_customer_voucher(
+        self,
+        *,
+        tenant_id: str,
+        campaign_id: str,
+        customer_profile_id: str,
+        voucher_id: str,
+        voucher_code: str,
+        voucher_name_snapshot: str,
+        voucher_amount: float,
+        status: str,
+        issued_note: str | None,
+    ) -> CustomerVoucherAssignment:
+        record = CustomerVoucherAssignment(
+            id=voucher_id,
+            tenant_id=tenant_id,
+            campaign_id=campaign_id,
+            customer_profile_id=customer_profile_id,
+            voucher_code=voucher_code,
+            voucher_name_snapshot=voucher_name_snapshot,
+            voucher_amount=voucher_amount,
+            status=status,
+            issued_note=issued_note,
         )
         self._session.add(record)
         await self._session.flush()

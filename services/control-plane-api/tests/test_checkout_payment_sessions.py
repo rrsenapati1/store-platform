@@ -144,6 +144,7 @@ def _payment_session_payload(
     provider_payment_mode: str | None = None,
     customer_profile_id: str | None = None,
     promotion_code: str | None = None,
+    customer_voucher_id: str | None = None,
     loyalty_points_to_redeem: int = 0,
     store_credit_amount: float = 0.0,
 ) -> dict[str, object]:
@@ -154,6 +155,7 @@ def _payment_session_payload(
         "provider_payment_mode": provider_payment_mode,
         "customer_profile_id": customer_profile_id,
         "promotion_code": promotion_code,
+        "customer_voucher_id": customer_voucher_id,
         "customer_name": "Acme Traders",
         "customer_gstin": "29AAEPM0111C1Z3",
         "loyalty_points_to_redeem": loyalty_points_to_redeem,
@@ -692,6 +694,211 @@ def test_checkout_payment_session_amount_matches_price_preview_with_automatic_di
     assert create_response.json()["automatic_discount_total"] == 37.0
     assert create_response.json()["promotion_code_discount_total"] == 20.0
     assert create_response.json()["store_credit_amount"] == 10.0
+
+
+def test_checkout_payment_session_snapshots_customer_voucher_and_redeems_it_on_finalize(monkeypatch) -> None:
+    secret = "cashfree-secret"
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", secret)
+    database_url = sqlite_test_database_url("checkout-payment-session-customer-voucher")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+
+    customer_profile = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles",
+        headers=context["owner_headers"],
+        json={
+            "full_name": "Acme Traders",
+            "phone": "+919999999999",
+            "email": "billing@acme.example",
+            "gstin": "29AAEPM0111C1Z3",
+        },
+    )
+    assert customer_profile.status_code == 200
+    customer_profile_id = customer_profile.json()["id"]
+
+    automatic_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Tea automatic discount",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_category_codes": ["TEA"],
+        },
+    )
+    assert automatic_campaign.status_code == 200
+
+    voucher_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Customer welcome voucher",
+            "status": "ACTIVE",
+            "trigger_mode": "ASSIGNED_VOUCHER",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 50.0,
+            "minimum_order_amount": 100.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert voucher_campaign.status_code == 200
+
+    issued_voucher = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/vouchers",
+        headers=context["owner_headers"],
+        json={"campaign_id": voucher_campaign.json()["id"]},
+    )
+    assert issued_voucher.status_code == 200
+    voucher_id = issued_voucher.json()["id"]
+
+    preview = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-price-preview",
+        headers=context["cashier_headers"],
+        json={
+            "customer_profile_id": customer_profile_id,
+            "customer_name": "Acme Traders",
+            "customer_gstin": "29AAEPM0111C1Z3",
+            "customer_voucher_id": voucher_id,
+            "lines": [{"product_id": context["product_id"], "quantity": 4}],
+        },
+    )
+    assert preview.status_code == 200
+
+    create_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            customer_profile_id=customer_profile_id,
+            customer_voucher_id=voucher_id,
+        ),
+    )
+    assert create_response.status_code == 200
+    assert create_response.json()["customer_voucher_id"] == voucher_id
+    assert create_response.json()["customer_voucher_name"] == "Customer welcome voucher"
+    assert create_response.json()["customer_voucher_discount_total"] == 50.0
+    assert create_response.json()["order_amount"] == preview.json()["summary"]["final_payable_amount"]
+
+    provider_order_id = create_response.json()["provider_order_id"]
+    webhook_payload = _cashfree_success_webhook(provider_order_id=provider_order_id)
+    webhook_bytes = json.dumps(webhook_payload).encode("utf-8")
+    timestamp = "1713179403"
+    signature = _cashfree_signature(secret, webhook_bytes, timestamp)
+    webhook_response = client.post(
+        "/v1/billing/webhooks/cashfree/payments",
+        content=webhook_bytes,
+        headers={
+            "x-webhook-signature": signature,
+            "x-webhook-timestamp": timestamp,
+            "content-type": "application/json",
+        },
+    )
+    assert webhook_response.status_code == 200
+
+    finalized = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions/{create_response.json()['id']}/finalize",
+        headers=context["cashier_headers"],
+    )
+    assert finalized.status_code == 200
+    assert finalized.json()["sale"]["customer_voucher_id"] == voucher_id
+    assert finalized.json()["sale"]["customer_voucher_discount_total"] == 50.0
+
+    vouchers = client.get(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/vouchers",
+        headers=context["owner_headers"],
+    )
+    assert vouchers.status_code == 200
+    assert vouchers.json()["records"][0]["id"] == voucher_id
+    assert vouchers.json()["records"][0]["status"] == "REDEEMED"
+    assert vouchers.json()["records"][0]["redeemed_sale_id"] == finalized.json()["sale"]["sale_id"]
+
+
+def test_checkout_payment_session_cancel_keeps_customer_voucher_active(monkeypatch) -> None:
+    monkeypatch.setenv("STORE_CONTROL_PLANE_CASHFREE_PAYMENT_WEBHOOK_SECRET", "cashfree-secret")
+    database_url = sqlite_test_database_url("checkout-payment-session-customer-voucher-cancel")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_checkout_context(client)
+
+    customer_profile = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles",
+        headers=context["owner_headers"],
+        json={"full_name": "Acme Traders"},
+    )
+    assert customer_profile.status_code == 200
+    customer_profile_id = customer_profile.json()["id"]
+
+    voucher_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Customer welcome voucher",
+            "status": "ACTIVE",
+            "trigger_mode": "ASSIGNED_VOUCHER",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 50.0,
+            "minimum_order_amount": 100.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert voucher_campaign.status_code == 200
+
+    issued_voucher = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/vouchers",
+        headers=context["owner_headers"],
+        json={"campaign_id": voucher_campaign.json()["id"]},
+    )
+    assert issued_voucher.status_code == 200
+
+    create_response = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
+        headers=context["cashier_headers"],
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            customer_profile_id=customer_profile_id,
+            customer_voucher_id=issued_voucher.json()["id"],
+        ),
+    )
+    assert create_response.status_code == 200
+
+    canceled = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions/{create_response.json()['id']}/cancel",
+        headers=context["cashier_headers"],
+    )
+    assert canceled.status_code == 200
+    assert canceled.json()["lifecycle_status"] == "CANCELED"
+
+    vouchers = client.get(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles/{customer_profile_id}/vouchers",
+        headers=context["owner_headers"],
+    )
+    assert vouchers.status_code == 200
+    assert vouchers.json()["records"][0]["status"] == "ACTIVE"
 
 
 def test_confirmed_checkout_payment_session_can_be_recovered_and_history_lists_recent_records(monkeypatch) -> None:

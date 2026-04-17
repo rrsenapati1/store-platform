@@ -258,3 +258,142 @@ def test_automatic_item_category_campaign_requires_targets_and_rejects_shared_co
     )
     assert shared_code.status_code == 400
     assert shared_code.json()["detail"] == "Automatic campaigns do not support shared promotion codes"
+
+
+def test_assigned_voucher_campaign_requires_cart_flat_amount_and_rejects_shared_codes() -> None:
+    client, tenant_id, owner_headers = _create_owner_context(slug="promotion-campaign-assigned-voucher")
+
+    invalid_scope = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Customer tea voucher",
+            "status": "ACTIVE",
+            "trigger_mode": "ASSIGNED_VOUCHER",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 25.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert invalid_scope.status_code == 400
+    assert invalid_scope.json()["detail"] == "Assigned voucher campaigns must use cart scope"
+
+    invalid_discount_type = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Customer percentage voucher",
+            "status": "ACTIVE",
+            "trigger_mode": "ASSIGNED_VOUCHER",
+            "scope": "CART",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert invalid_discount_type.status_code == 400
+    assert invalid_discount_type.json()["detail"] == "Assigned voucher campaigns must use flat amount discounts"
+
+    assigned_voucher_campaign = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Customer welcome voucher",
+            "status": "ACTIVE",
+            "trigger_mode": "ASSIGNED_VOUCHER",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 25.0,
+            "minimum_order_amount": 50.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert assigned_voucher_campaign.status_code == 200
+    campaign_id = assigned_voucher_campaign.json()["id"]
+    assert assigned_voucher_campaign.json()["trigger_mode"] == "ASSIGNED_VOUCHER"
+
+    shared_code = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns/{campaign_id}/codes",
+        headers=owner_headers,
+        json={
+            "code": "WELCOME25",
+            "status": "ACTIVE",
+            "redemption_limit_per_code": 100,
+        },
+    )
+    assert shared_code.status_code == 400
+    assert shared_code.json()["detail"] == "Assigned voucher campaigns do not support shared promotion codes"
+
+
+def test_customer_vouchers_can_be_issued_listed_and_canceled() -> None:
+    client, tenant_id, owner_headers = _create_owner_context(slug="customer-voucher-issue")
+
+    campaign = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "VIP voucher",
+            "status": "ACTIVE",
+            "trigger_mode": "ASSIGNED_VOUCHER",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 50.0,
+            "minimum_order_amount": 100.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+        },
+    )
+    assert campaign.status_code == 200
+    campaign_id = campaign.json()["id"]
+
+    customer_profile = client.post(
+        f"/v1/tenants/{tenant_id}/customer-profiles",
+        headers=owner_headers,
+        json={
+            "full_name": "Acme Traders",
+            "phone": "+919999999999",
+            "email": "billing@acme.example",
+            "gstin": "29AAEPM0111C1Z3",
+            "default_note": "Wholesale customer",
+            "tags": ["wholesale"],
+        },
+    )
+    assert customer_profile.status_code == 200
+    customer_profile_id = customer_profile.json()["id"]
+
+    issued = client.post(
+        f"/v1/tenants/{tenant_id}/customer-profiles/{customer_profile_id}/vouchers",
+        headers=owner_headers,
+        json={
+            "campaign_id": campaign_id,
+            "note": "Owner goodwill voucher",
+        },
+    )
+    assert issued.status_code == 200
+    assert issued.json()["campaign_id"] == campaign_id
+    assert issued.json()["customer_profile_id"] == customer_profile_id
+    assert issued.json()["voucher_amount"] == 50.0
+    assert issued.json()["status"] == "ACTIVE"
+    assert issued.json()["voucher_code"]
+    voucher_id = issued.json()["id"]
+
+    listed = client.get(
+        f"/v1/tenants/{tenant_id}/customer-profiles/{customer_profile_id}/vouchers",
+        headers=owner_headers,
+    )
+    assert listed.status_code == 200
+    assert [record["id"] for record in listed.json()["records"]] == [voucher_id]
+
+    canceled = client.post(
+        f"/v1/tenants/{tenant_id}/customer-profiles/{customer_profile_id}/vouchers/{voucher_id}/cancel",
+        headers=owner_headers,
+        json={"note": "Voucher voided before checkout"},
+    )
+    assert canceled.status_code == 200
+    assert canceled.json()["status"] == "CANCELED"

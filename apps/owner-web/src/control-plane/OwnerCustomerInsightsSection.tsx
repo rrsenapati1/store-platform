@@ -7,7 +7,9 @@ import type {
   ControlPlaneCustomerLoyalty,
   ControlPlaneCustomerProfile,
   ControlPlaneCustomerStoreCredit,
+  ControlPlaneCustomerVoucher,
   ControlPlaneLoyaltyProgram,
+  ControlPlanePromotionCampaign,
 } from '@store/types';
 import { ownerControlPlaneClient } from './client';
 
@@ -81,6 +83,9 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<ControlPlaneCustomerProfile | null>(null);
+  const [voucherCampaigns, setVoucherCampaigns] = useState<ControlPlanePromotionCampaign[]>([]);
+  const [selectedCustomerVouchers, setSelectedCustomerVouchers] = useState<ControlPlaneCustomerVoucher[]>([]);
+  const [selectedVoucherCampaignId, setSelectedVoucherCampaignId] = useState('');
   const [selectedStoreCredit, setSelectedStoreCredit] = useState<ControlPlaneCustomerStoreCredit | null>(null);
   const [selectedCustomerLoyalty, setSelectedCustomerLoyalty] = useState<ControlPlaneCustomerLoyalty | null>(null);
   const [loyaltyProgram, setLoyaltyProgram] = useState<ControlPlaneLoyaltyProgram | null>(null);
@@ -95,6 +100,8 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
   });
   const [loyaltyAdjustmentDelta, setLoyaltyAdjustmentDelta] = useState('');
   const [loyaltyAdjustmentNote, setLoyaltyAdjustmentNote] = useState('');
+  const [voucherIssueNote, setVoucherIssueNote] = useState('');
+  const [voucherCancelNote, setVoucherCancelNote] = useState('');
   const [issueAmount, setIssueAmount] = useState('');
   const [issueNote, setIssueNote] = useState('');
   const [adjustmentDelta, setAdjustmentDelta] = useState('');
@@ -115,13 +122,20 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setLoyaltyAdjustmentNote('');
   }
 
+  function clearVoucherDrafts() {
+    setVoucherIssueNote('');
+    setVoucherCancelNote('');
+  }
+
   function applySelectedProfile(profile: ControlPlaneCustomerProfile | null) {
     setSelectedProfile(profile);
     setSelectedCustomerId(profile?.id ?? '');
+    setSelectedCustomerVouchers([]);
     setSelectedStoreCredit(null);
     setSelectedCustomerLoyalty(null);
     clearStoreCreditDrafts();
     clearLoyaltyDrafts();
+    clearVoucherDrafts();
     setProfileDraft(
       profile
         ? buildProfileDraft(profile)
@@ -143,15 +157,19 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const [profilesResponse, directoryResponse, reportResponse] = await Promise.all([
+      const [profilesResponse, directoryResponse, reportResponse, campaignsResponse] = await Promise.all([
         ownerControlPlaneClient.listCustomerProfiles(accessToken, tenantId, profileSearchQuery),
         ownerControlPlaneClient.listCustomers(accessToken, tenantId),
         branchId ? ownerControlPlaneClient.getBranchCustomerReport(accessToken, tenantId, branchId) : Promise.resolve(null),
+        ownerControlPlaneClient.listPromotionCampaigns(accessToken, tenantId),
       ]);
+      const voucherCampaignRecords = campaignsResponse.records.filter((campaign) => campaign.trigger_mode === 'ASSIGNED_VOUCHER');
+      const nextVoucherCampaignId = voucherCampaignRecords[0]?.id ?? '';
       const nextProfileId = profilesResponse.records[0]?.id ?? '';
-      const [profile, history, storeCredit, customerLoyalty, tenantLoyaltyProgram] = await Promise.all([
+      const [profile, history, vouchers, storeCredit, customerLoyalty, tenantLoyaltyProgram] = await Promise.all([
         nextProfileId ? ownerControlPlaneClient.getCustomerProfile(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
         nextProfileId ? ownerControlPlaneClient.getCustomerHistory(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
+        nextProfileId ? ownerControlPlaneClient.listCustomerVouchers(accessToken, tenantId, nextProfileId) : Promise.resolve({ records: [] }),
         nextProfileId ? ownerControlPlaneClient.getCustomerStoreCredit(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
         nextProfileId ? ownerControlPlaneClient.getCustomerLoyalty(accessToken, tenantId, nextProfileId) : Promise.resolve(null),
         ownerControlPlaneClient.getLoyaltyProgram(accessToken, tenantId),
@@ -160,8 +178,11 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
         setCustomerProfiles(profilesResponse.records);
         setDirectory(directoryResponse.records);
         setBranchReport(reportResponse);
+        setVoucherCampaigns(voucherCampaignRecords);
+        setSelectedVoucherCampaignId(nextVoucherCampaignId);
         applySelectedProfile(profile);
         setCustomerHistory(history);
+        setSelectedCustomerVouchers(vouchers.records);
         setSelectedStoreCredit(storeCredit);
         setSelectedCustomerLoyalty(customerLoyalty);
         setLoyaltyProgram(tenantLoyaltyProgram);
@@ -181,15 +202,17 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const [profile, history, storeCredit, customerLoyalty] = await Promise.all([
+      const [profile, history, vouchers, storeCredit, customerLoyalty] = await Promise.all([
         ownerControlPlaneClient.getCustomerProfile(accessToken, tenantId, customerProfileId),
         ownerControlPlaneClient.getCustomerHistory(accessToken, tenantId, customerProfileId),
+        ownerControlPlaneClient.listCustomerVouchers(accessToken, tenantId, customerProfileId),
         ownerControlPlaneClient.getCustomerStoreCredit(accessToken, tenantId, customerProfileId),
         ownerControlPlaneClient.getCustomerLoyalty(accessToken, tenantId, customerProfileId),
       ]);
       startTransition(() => {
         applySelectedProfile(profile);
         setCustomerHistory(history);
+        setSelectedCustomerVouchers(vouchers.records);
         setSelectedStoreCredit(storeCredit);
         setSelectedCustomerLoyalty(customerLoyalty);
       });
@@ -394,6 +417,55 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     }
   }
 
+  async function issueSelectedCustomerVoucher() {
+    if (!accessToken || !tenantId || !selectedProfile || !selectedVoucherCampaignId) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const issuedVoucher = await ownerControlPlaneClient.issueCustomerVoucher(accessToken, tenantId, selectedProfile.id, {
+        campaign_id: selectedVoucherCampaignId,
+        note: voucherIssueNote || null,
+      });
+      startTransition(() => {
+        setSelectedCustomerVouchers((current) => [issuedVoucher, ...current.filter((record) => record.id !== issuedVoucher.id)]);
+        clearVoucherDrafts();
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to issue customer voucher');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function cancelSelectedCustomerVoucher(voucherId: string) {
+    if (!accessToken || !tenantId || !selectedProfile) {
+      return;
+    }
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      const canceledVoucher = await ownerControlPlaneClient.cancelCustomerVoucher(
+        accessToken,
+        tenantId,
+        selectedProfile.id,
+        voucherId,
+        { note: voucherCancelNote || null },
+      );
+      startTransition(() => {
+        setSelectedCustomerVouchers((current) => current.map((record) => (
+          record.id === canceledVoucher.id ? canceledVoucher : record
+        )));
+        clearVoucherDrafts();
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to cancel customer voucher');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function loadSelectedCustomerHistory() {
     if (!accessToken || !tenantId || !selectedCustomerId) {
       return;
@@ -569,6 +641,68 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
               <ActionButton onClick={() => void reactivateSelectedCustomerProfile()} disabled={isBusy}>
                 Reactivate customer profile
               </ActionButton>
+            )}
+          </div>
+
+          <div style={{ marginTop: '20px' }}>
+            <h3 style={{ marginBottom: '10px' }}>Customer vouchers</h3>
+            {voucherCampaigns.length ? (
+              <>
+                <DetailList
+                  items={[
+                    {
+                      label: 'Voucher template campaigns',
+                      value: String(voucherCampaigns.length),
+                    },
+                    {
+                      label: 'Selected voucher template',
+                      value: voucherCampaigns.find((campaign) => campaign.id === selectedVoucherCampaignId)?.name ?? 'None',
+                    },
+                  ]}
+                />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '12px' }}>
+                  {voucherCampaigns.map((campaign) => (
+                    <ActionButton
+                      key={campaign.id}
+                      onClick={() => setSelectedVoucherCampaignId(campaign.id)}
+                      disabled={isBusy}
+                    >
+                      {`Use voucher campaign ${campaign.name}`}
+                    </ActionButton>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
+                  <FormField id="issue-customer-voucher-note" label="Issue voucher note" value={voucherIssueNote} onChange={setVoucherIssueNote} />
+                  <ActionButton onClick={() => void issueSelectedCustomerVoucher()} disabled={isBusy || !selectedVoucherCampaignId}>
+                    Issue customer voucher
+                  </ActionButton>
+                </div>
+              </>
+            ) : (
+              <p style={{ color: '#4e5871' }}>No assigned voucher campaigns are available yet.</p>
+            )}
+
+            <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
+              <FormField id="cancel-customer-voucher-note" label="Cancel voucher note" value={voucherCancelNote} onChange={setVoucherCancelNote} />
+            </div>
+
+            {selectedCustomerVouchers.length ? (
+              <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
+                {selectedCustomerVouchers.map((voucher) => (
+                  <li key={voucher.id}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                      <span>{voucher.voucher_name} {voucher.voucher_code} {voucher.status} {voucher.voucher_amount}</span>
+                      {voucher.status === 'ACTIVE' ? (
+                        <ActionButton onClick={() => void cancelSelectedCustomerVoucher(voucher.id)} disabled={isBusy}>
+                          {`Cancel voucher ${voucher.voucher_code}`}
+                        </ActionButton>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ color: '#4e5871' }}>No customer vouchers issued yet.</p>
             )}
           </div>
 

@@ -59,7 +59,7 @@ from .platform_observability import (
     PlatformObservabilitySummaryResponse,
 )
 from .procurement_finance import PurchaseInvoiceCreateRequest, PurchaseInvoiceLineResponse, PurchaseInvoiceListResponse, PurchaseInvoiceRecord, PurchaseInvoiceResponse, SupplierPayablesReportRecord, SupplierPayablesReportResponse, SupplierPaymentCreateRequest, SupplierPaymentResponse, SupplierReturnCreateRequest, SupplierReturnLineCreateRequest, SupplierReturnLineResponse, SupplierReturnResponse
-from .promotions import PromotionCampaignCreateRequest, PromotionCampaignListResponse, PromotionCampaignResponse, PromotionCampaignUpdateRequest, PromotionCodeCreateRequest, PromotionCodeResponse
+from .promotions import CustomerVoucherCancelRequest, CustomerVoucherIssueRequest, CustomerVoucherListResponse, CustomerVoucherResponse, PromotionCampaignCreateRequest, PromotionCampaignListResponse, PromotionCampaignResponse, PromotionCampaignUpdateRequest, PromotionCodeCreateRequest, PromotionCodeResponse
 from .purchasing import PurchaseApprovalReportRecord, PurchaseApprovalReportResponse, PurchaseOrderApprovalRequest, PurchaseOrderCreateRequest, PurchaseOrderLineCreateRequest, PurchaseOrderLineResponse, PurchaseOrderListResponse, PurchaseOrderRecord, PurchaseOrderResponse, SupplierCreateRequest, SupplierListResponse, SupplierRecord, SupplierResponse
 from .runtime import PrintJobCompletionRequest, PrintJobListResponse, PrintJobPayload, PrintJobQueueRequest, PrintJobResponse, RuntimeDeviceHeartbeatResponse
 from .sync_runtime import (
@@ -163,6 +163,10 @@ __all__ = [
     "CustomerStoreCreditLedgerEntryResponse",
     "CustomerStoreCreditLotResponse",
     "CustomerStoreCreditResponse",
+    "CustomerVoucherCancelRequest",
+    "CustomerVoucherIssueRequest",
+    "CustomerVoucherListResponse",
+    "CustomerVoucherResponse",
     "LoyaltyProgramResponse",
     "LoyaltyProgramUpsertRequest",
     "DeviceClaimApprovalResponse",

@@ -700,6 +700,9 @@ describe('store runtime billing foundation flow', () => {
           ],
         }) as never;
       }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/vouchers') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
       if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/loyalty') && method === 'GET') {
         return jsonResponse(buildCustomerLoyaltyResponse('profile-1')) as never;
       }
@@ -932,6 +935,9 @@ describe('store runtime billing foundation flow', () => {
           lots: [],
           ledger_entries: [],
         }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/vouchers') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles/profile-1/loyalty') && method === 'GET') {
         return jsonResponse(buildCustomerLoyaltyResponse('profile-1')) as never;
