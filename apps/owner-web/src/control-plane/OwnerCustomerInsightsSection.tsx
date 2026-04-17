@@ -9,6 +9,7 @@ import type {
   ControlPlaneCustomerStoreCredit,
   ControlPlaneCustomerVoucher,
   ControlPlaneLoyaltyProgram,
+  ControlPlanePriceTier,
   ControlPlanePromotionCampaign,
 } from '@store/types';
 import { ownerControlPlaneClient } from './client';
@@ -25,6 +26,7 @@ type CustomerProfileDraft = {
   email: string;
   gstin: string;
   defaultNote: string;
+  defaultPriceTierId: string;
   tags: string;
 };
 
@@ -53,6 +55,7 @@ function buildProfileDraft(profile: ControlPlaneCustomerProfile): CustomerProfil
     email: profile.email ?? '',
     gstin: profile.gstin ?? '',
     defaultNote: profile.default_note ?? '',
+    defaultPriceTierId: profile.default_price_tier_id ?? '',
     tags: profile.tags.join(', '),
   };
 }
@@ -84,6 +87,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<ControlPlaneCustomerProfile | null>(null);
   const [voucherCampaigns, setVoucherCampaigns] = useState<ControlPlanePromotionCampaign[]>([]);
+  const [priceTiers, setPriceTiers] = useState<ControlPlanePriceTier[]>([]);
   const [selectedCustomerVouchers, setSelectedCustomerVouchers] = useState<ControlPlaneCustomerVoucher[]>([]);
   const [selectedVoucherCampaignId, setSelectedVoucherCampaignId] = useState('');
   const [selectedStoreCredit, setSelectedStoreCredit] = useState<ControlPlaneCustomerStoreCredit | null>(null);
@@ -96,6 +100,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     email: '',
     gstin: '',
     defaultNote: '',
+    defaultPriceTierId: '',
     tags: '',
   });
   const [loyaltyAdjustmentDelta, setLoyaltyAdjustmentDelta] = useState('');
@@ -145,6 +150,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
             email: '',
             gstin: '',
             defaultNote: '',
+            defaultPriceTierId: '',
             tags: '',
           },
     );
@@ -157,11 +163,12 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const [profilesResponse, directoryResponse, reportResponse, campaignsResponse] = await Promise.all([
+      const [profilesResponse, directoryResponse, reportResponse, campaignsResponse, priceTiersResponse] = await Promise.all([
         ownerControlPlaneClient.listCustomerProfiles(accessToken, tenantId, profileSearchQuery),
         ownerControlPlaneClient.listCustomers(accessToken, tenantId),
         branchId ? ownerControlPlaneClient.getBranchCustomerReport(accessToken, tenantId, branchId) : Promise.resolve(null),
         ownerControlPlaneClient.listPromotionCampaigns(accessToken, tenantId),
+        ownerControlPlaneClient.listPriceTiers(accessToken, tenantId),
       ]);
       const voucherCampaignRecords = campaignsResponse.records.filter((campaign) => campaign.trigger_mode === 'ASSIGNED_VOUCHER');
       const nextVoucherCampaignId = voucherCampaignRecords[0]?.id ?? '';
@@ -179,6 +186,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
         setDirectory(directoryResponse.records);
         setBranchReport(reportResponse);
         setVoucherCampaigns(voucherCampaignRecords);
+        setPriceTiers(priceTiersResponse.records);
         setSelectedVoucherCampaignId(nextVoucherCampaignId);
         applySelectedProfile(profile);
         setCustomerHistory(history);
@@ -238,6 +246,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
         email: profileDraft.email || null,
         gstin: profileDraft.gstin || null,
         default_note: profileDraft.defaultNote || null,
+        default_price_tier_id: profileDraft.defaultPriceTierId || null,
         tags: profileDraft.tags
           .split(',')
           .map((tag) => tag.trim())
@@ -590,6 +599,7 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
 
       {selectedProfile ? (
         <div style={{ marginTop: '16px' }}>
+          <h3 style={{ marginBottom: '10px' }}>Customer profile management</h3>
           <p style={{ color: '#75809b', fontSize: '12px', letterSpacing: '0.12em', marginBottom: '12px', textTransform: 'uppercase' }}>
             {selectedProfile.status}
           </p>
@@ -623,6 +633,32 @@ export function OwnerCustomerInsightsSection({ accessToken, tenantId, branchId }
             value={profileDraft.defaultNote}
             onChange={(value) => setProfileDraft((current) => ({ ...current, defaultNote: value }))}
           />
+          <DetailList
+            items={[
+              {
+                label: 'Default price tier',
+                value: selectedProfile.default_price_tier_display_name ?? 'None',
+              },
+            ]}
+          />
+          {priceTiers.length ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '12px' }}>
+              {priceTiers.map((priceTier) => (
+                <ActionButton
+                  key={priceTier.id}
+                  onClick={() => setProfileDraft((current) => ({ ...current, defaultPriceTierId: priceTier.id }))}
+                  disabled={isBusy || priceTier.status !== 'ACTIVE'}
+                >
+                  {`Use price tier ${priceTier.display_name}`}
+                </ActionButton>
+              ))}
+              {profileDraft.defaultPriceTierId ? (
+                <ActionButton onClick={() => setProfileDraft((current) => ({ ...current, defaultPriceTierId: '' }))} disabled={isBusy}>
+                  Clear default price tier
+                </ActionButton>
+              ) : null}
+            </div>
+          ) : null}
           <FormField
             id="profile-tags"
             label="Profile tags"

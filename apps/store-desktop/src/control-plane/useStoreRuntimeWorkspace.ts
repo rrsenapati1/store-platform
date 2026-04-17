@@ -69,11 +69,9 @@ import {
   runCreateCheckoutCustomerProfile,
   runLoadCustomerProfiles,
 } from './storeCustomerProfileActions';
-import { runLoadCustomerStoreCredit } from './storeCreditActions';
-import { runLoadCustomerLoyalty, runLoadLoyaltyProgram } from './storeLoyaltyActions';
+import { runLoadSelectedCustomerCommercialState } from './storeCustomerCommercialActions';
 import { normalizePromotionCodeInput, resolvePromotionCodePayload } from './storePromotionActions';
 import { runLoadCheckoutPricePreview } from './storePricingPreviewActions';
-import { runLoadCustomerVouchers } from './storeVoucherActions';
 import {
   runApproveStockCountSession,
   runCancelStockCountSession,
@@ -486,49 +484,6 @@ export function useStoreRuntimeWorkspace() {
     });
   }
 
-  async function loadCustomerStoreCredit(customerProfileId: string) {
-    if (!accessToken || !tenantId || !customerProfileId) {
-      return null;
-    }
-    return runLoadCustomerStoreCredit({
-      accessToken,
-      tenantId,
-      customerProfileId,
-    });
-  }
-
-  async function loadLoyaltyProgram() {
-    if (!accessToken || !tenantId) {
-      return null;
-    }
-    return runLoadLoyaltyProgram({
-      accessToken,
-      tenantId,
-    });
-  }
-
-  async function loadCustomerVouchers(customerProfileId: string) {
-    if (!accessToken || !tenantId || !customerProfileId) {
-      return [];
-    }
-    return runLoadCustomerVouchers({
-      accessToken,
-      tenantId,
-      customerProfileId,
-    });
-  }
-
-  async function loadCustomerLoyalty(customerProfileId: string) {
-    if (!accessToken || !tenantId || !customerProfileId) {
-      return null;
-    }
-    return runLoadCustomerLoyalty({
-      accessToken,
-      tenantId,
-      customerProfileId,
-    });
-  }
-
   function clearSelectedCustomerProfile() {
     applySelectedCustomerProfile(null);
   }
@@ -578,18 +533,17 @@ export function useStoreRuntimeWorkspace() {
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const [vouchers, storeCredit, nextLoyaltyProgram, customerLoyalty] = await Promise.all([
-        loadCustomerVouchers(profile.id),
-        loadCustomerStoreCredit(profile.id),
-        loadLoyaltyProgram(),
-        loadCustomerLoyalty(profile.id),
-      ]);
+      const commercialState = await runLoadSelectedCustomerCommercialState({
+        accessToken,
+        tenantId,
+        customerProfileId: profile.id,
+      });
       applySelectedCustomerProfile(profile);
       applyStateTransition(() => {
-        setSelectedCustomerVouchers(vouchers);
-        setSelectedCustomerStoreCredit(storeCredit);
-        setLoyaltyProgram(nextLoyaltyProgram);
-        setSelectedCustomerLoyalty(customerLoyalty);
+        setSelectedCustomerVouchers(commercialState.vouchers);
+        setSelectedCustomerStoreCredit(commercialState.storeCredit);
+        setLoyaltyProgram(commercialState.loyaltyProgram);
+        setSelectedCustomerLoyalty(commercialState.customerLoyalty);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer loyalty posture');
@@ -616,12 +570,11 @@ export function useStoreRuntimeWorkspace() {
         fullName,
         gstin: customerGstin.trim() || null,
       });
-      const [vouchers, storeCredit, nextLoyaltyProgram, customerLoyalty] = await Promise.all([
-        loadCustomerVouchers(profile.id),
-        loadCustomerStoreCredit(profile.id),
-        loadLoyaltyProgram(),
-        loadCustomerLoyalty(profile.id),
-      ]);
+      const commercialState = await runLoadSelectedCustomerCommercialState({
+        accessToken,
+        tenantId,
+        customerProfileId: profile.id,
+      });
       applyStateTransition(() => {
         setCustomerProfiles((current) => {
           const next = current.filter((record) => record.id !== profile.id);
@@ -631,10 +584,10 @@ export function useStoreRuntimeWorkspace() {
       });
       applySelectedCustomerProfile(profile);
       applyStateTransition(() => {
-        setSelectedCustomerVouchers(vouchers);
-        setSelectedCustomerStoreCredit(storeCredit);
-        setLoyaltyProgram(nextLoyaltyProgram);
-        setSelectedCustomerLoyalty(customerLoyalty);
+        setSelectedCustomerVouchers(commercialState.vouchers);
+        setSelectedCustomerStoreCredit(commercialState.storeCredit);
+        setLoyaltyProgram(commercialState.loyaltyProgram);
+        setSelectedCustomerLoyalty(commercialState.customerLoyalty);
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create customer profile');

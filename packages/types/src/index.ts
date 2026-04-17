@@ -658,6 +658,33 @@ export interface ControlPlaneBranchCatalogItem {
   target_stock?: number | null;
 }
 
+export interface ControlPlanePriceTier {
+  id: string;
+  tenant_id: string;
+  code: string;
+  display_name: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ControlPlaneBranchPriceTierPrice {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  product_id: string;
+  product_name: string;
+  sku_code: string;
+  price_tier_id: string;
+  price_tier_code: string;
+  price_tier_display_name: string;
+  base_selling_price: number;
+  effective_base_selling_price: number;
+  selling_price: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ControlPlaneReplenishmentBoardRecord {
   product_id: string;
   product_name: string;
@@ -1577,6 +1604,8 @@ export interface ControlPlanePromotionCampaign {
   scope: string;
   discount_type: string;
   discount_value: number;
+  priority: number;
+  stacking_rule: string;
   minimum_order_amount?: number | null;
   maximum_discount_amount?: number | null;
   redemption_limit_total?: number | null;
@@ -1599,6 +1628,8 @@ export interface ControlPlaneCheckoutPricePreviewCampaign {
   scope: string;
   discount_type: string;
   discount_value: number;
+  priority?: number;
+  stacking_rule?: string;
 }
 
 export interface ControlPlaneCheckoutPricePreviewCodeCampaign extends ControlPlaneCheckoutPricePreviewCampaign {
@@ -1680,6 +1711,9 @@ export interface ControlPlaneCustomerProfile {
   email?: string | null;
   gstin?: string | null;
   default_note?: string | null;
+  default_price_tier_id?: string | null;
+  default_price_tier_code?: string | null;
+  default_price_tier_display_name?: string | null;
   tags: string[];
   status: string;
   created_at: string;

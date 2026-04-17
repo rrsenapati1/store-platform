@@ -15,6 +15,8 @@ type PromotionCampaignDraft = {
   scope: string;
   discountType: string;
   discountValue: string;
+  priority: string;
+  stackingRule: string;
   minimumOrderAmount: string;
   maximumDiscountAmount: string;
   redemptionLimitTotal: string;
@@ -30,6 +32,8 @@ function defaultCampaignDraft(): PromotionCampaignDraft {
     scope: 'CART',
     discountType: 'FLAT_AMOUNT',
     discountValue: '0',
+    priority: '100',
+    stackingRule: 'STACKABLE',
     minimumOrderAmount: '',
     maximumDiscountAmount: '',
     redemptionLimitTotal: '',
@@ -46,6 +50,8 @@ function buildCampaignDraft(campaign: ControlPlanePromotionCampaign): PromotionC
     scope: campaign.scope ?? 'CART',
     discountType: campaign.discount_type,
     discountValue: String(campaign.discount_value),
+    priority: String(campaign.priority ?? 100),
+    stackingRule: campaign.stacking_rule ?? 'STACKABLE',
     minimumOrderAmount: campaign.minimum_order_amount == null ? '' : String(campaign.minimum_order_amount),
     maximumDiscountAmount: campaign.maximum_discount_amount == null ? '' : String(campaign.maximum_discount_amount),
     redemptionLimitTotal: campaign.redemption_limit_total == null ? '' : String(campaign.redemption_limit_total),
@@ -138,6 +144,8 @@ export function OwnerPromotionCampaignSection({
         scope: campaignDraft.scope,
         discount_type: campaignDraft.discountType,
         discount_value: Number(campaignDraft.discountValue || 0),
+        priority: Number(campaignDraft.priority || 100),
+        stacking_rule: campaignDraft.stackingRule,
         minimum_order_amount: parseOptionalNumber(campaignDraft.minimumOrderAmount),
         maximum_discount_amount: parseOptionalNumber(campaignDraft.maximumDiscountAmount),
         redemption_limit_total: parseOptionalNumber(campaignDraft.redemptionLimitTotal),
@@ -166,6 +174,8 @@ export function OwnerPromotionCampaignSection({
         scope: campaignDraft.scope,
         discount_type: campaignDraft.discountType,
         discount_value: Number(campaignDraft.discountValue || 0),
+        priority: Number(campaignDraft.priority || 100),
+        stacking_rule: campaignDraft.stackingRule,
         minimum_order_amount: parseOptionalNumber(campaignDraft.minimumOrderAmount),
         maximum_discount_amount: parseOptionalNumber(campaignDraft.maximumDiscountAmount),
         redemption_limit_total: parseOptionalNumber(campaignDraft.redemptionLimitTotal),
@@ -227,6 +237,8 @@ export function OwnerPromotionCampaignSection({
         <FormField id="promotion-campaign-scope" label="Scope" value={campaignDraft.scope} onChange={(value) => setCampaignDraft((current) => ({ ...current, scope: value }))} />
         <FormField id="promotion-campaign-discount-type" label="Discount type" value={campaignDraft.discountType} onChange={(value) => setCampaignDraft((current) => ({ ...current, discountType: value }))} />
         <FormField id="promotion-campaign-discount-value" label="Discount value" value={campaignDraft.discountValue} onChange={(value) => setCampaignDraft((current) => ({ ...current, discountValue: value }))} />
+        <FormField id="promotion-campaign-priority" label="Priority" value={campaignDraft.priority} onChange={(value) => setCampaignDraft((current) => ({ ...current, priority: value }))} />
+        <FormField id="promotion-campaign-stacking-rule" label="Stacking rule" value={campaignDraft.stackingRule} onChange={(value) => setCampaignDraft((current) => ({ ...current, stackingRule: value }))} />
         <FormField id="promotion-campaign-minimum-order" label="Minimum order amount" value={campaignDraft.minimumOrderAmount} onChange={(value) => setCampaignDraft((current) => ({ ...current, minimumOrderAmount: value }))} />
         <FormField id="promotion-campaign-maximum-discount" label="Maximum discount amount" value={campaignDraft.maximumDiscountAmount} onChange={(value) => setCampaignDraft((current) => ({ ...current, maximumDiscountAmount: value }))} />
         <FormField id="promotion-campaign-redemption-limit" label="Total redemption limit" value={campaignDraft.redemptionLimitTotal} onChange={(value) => setCampaignDraft((current) => ({ ...current, redemptionLimitTotal: value }))} />
@@ -277,6 +289,8 @@ export function OwnerPromotionCampaignSection({
               { label: 'Trigger', value: selectedCampaign.trigger_mode ?? 'CODE' },
               { label: 'Scope', value: selectedCampaign.scope ?? 'CART' },
               { label: 'Discount rule', value: `${selectedCampaign.discount_type} ${selectedCampaign.discount_value}` },
+              { label: 'Priority', value: String(selectedCampaign.priority ?? 100) },
+              { label: 'Stacking rule', value: selectedCampaign.stacking_rule ?? 'STACKABLE' },
               { label: 'Minimum order', value: selectedCampaign.minimum_order_amount == null ? 'None' : String(selectedCampaign.minimum_order_amount) },
               { label: 'Maximum discount', value: selectedCampaign.maximum_discount_amount == null ? 'None' : String(selectedCampaign.maximum_discount_amount) },
               {

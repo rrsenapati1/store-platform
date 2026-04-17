@@ -12,6 +12,8 @@ class PromotionCampaignCreateRequest(BaseModel):
     scope: str = "CART"
     discount_type: str
     discount_value: float = Field(ge=0)
+    priority: int = Field(default=100, ge=0)
+    stacking_rule: str = "STACKABLE"
     minimum_order_amount: float | None = Field(default=None, ge=0)
     maximum_discount_amount: float | None = Field(default=None, ge=0)
     redemption_limit_total: int | None = Field(default=None, ge=0)
@@ -26,6 +28,8 @@ class PromotionCampaignUpdateRequest(BaseModel):
     scope: str | None = None
     discount_type: str | None = None
     discount_value: float | None = Field(default=None, ge=0)
+    priority: int | None = Field(default=None, ge=0)
+    stacking_rule: str | None = None
     minimum_order_amount: float | None = Field(default=None, ge=0)
     maximum_discount_amount: float | None = Field(default=None, ge=0)
     redemption_limit_total: int | None = Field(default=None, ge=0)
@@ -89,6 +93,8 @@ class PromotionCampaignResponse(BaseModel):
     scope: str
     discount_type: str
     discount_value: float
+    priority: int
+    stacking_rule: str
     minimum_order_amount: float | None = None
     maximum_discount_amount: float | None = None
     redemption_limit_total: int | None = None

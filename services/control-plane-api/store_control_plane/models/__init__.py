@@ -1,7 +1,7 @@
 from .audit import AuditEvent
 from .batches import BatchExpiryReviewSession, BatchExpiryWriteOff, BatchLot
 from .billing import CheckoutPaymentSession, CreditNote, CreditNoteTaxLine, ExchangeOrder, InvoiceTaxLine, Payment, Sale, SaleLine, SaleReturn, SaleReturnLine, SalesInvoice
-from .catalog import BranchCatalogItem, CatalogProduct
+from .catalog import BranchCatalogItem, BranchPriceTierPrice, CatalogProduct, PriceTier
 from .compliance import BranchIrpProfile, GstExportJob, IrnAttachment
 from .commerce import BillingPlan, SubscriptionWebhookEvent, TenantBillingOverride, TenantEntitlement, TenantSubscription
 from .customers import (
@@ -40,6 +40,7 @@ __all__ = [
     "BranchIrpProfile",
     "Branch",
     "BranchCatalogItem",
+    "BranchPriceTierPrice",
     "BranchMembership",
     "CatalogProduct",
     "CheckoutPaymentSession",
@@ -71,6 +72,7 @@ __all__ = [
     "Payment",
     "PlatformAdminAccount",
     "PrintJob",
+    "PriceTier",
     "CustomerVoucherAssignment",
     "PromotionCampaign",
     "PromotionCode",

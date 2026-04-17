@@ -73,6 +73,8 @@ def test_promotion_campaign_can_be_created_updated_and_listed() -> None:
     assert created.json()["discount_type"] == "FLAT_AMOUNT"
     assert created.json()["discount_value"] == 20.0
     assert created.json()["status"] == "ACTIVE"
+    assert created.json()["priority"] == 100
+    assert created.json()["stacking_rule"] == "STACKABLE"
 
     updated = client.patch(
         f"/v1/tenants/{tenant_id}/promotion-campaigns/{campaign_id}",
@@ -81,12 +83,16 @@ def test_promotion_campaign_can_be_created_updated_and_listed() -> None:
             "name": "Diwali Welcome Updated",
             "minimum_order_amount": 150.0,
             "redemption_limit_total": 750,
+            "priority": 250,
+            "stacking_rule": "EXCLUSIVE",
         },
     )
     assert updated.status_code == 200
     assert updated.json()["name"] == "Diwali Welcome Updated"
     assert updated.json()["minimum_order_amount"] == 150.0
     assert updated.json()["redemption_limit_total"] == 750
+    assert updated.json()["priority"] == 250
+    assert updated.json()["stacking_rule"] == "EXCLUSIVE"
 
     listed = client.get(
         f"/v1/tenants/{tenant_id}/promotion-campaigns",
@@ -95,6 +101,27 @@ def test_promotion_campaign_can_be_created_updated_and_listed() -> None:
     assert listed.status_code == 200
     assert [record["id"] for record in listed.json()["records"]] == [campaign_id]
     assert listed.json()["records"][0]["name"] == "Diwali Welcome Updated"
+    assert listed.json()["records"][0]["priority"] == 250
+    assert listed.json()["records"][0]["stacking_rule"] == "EXCLUSIVE"
+
+
+def test_promotion_campaign_rejects_invalid_stacking_rule() -> None:
+    client, tenant_id, owner_headers = _create_owner_context(slug="promotion-campaign-invalid-stacking")
+
+    created = client.post(
+        f"/v1/tenants/{tenant_id}/promotion-campaigns",
+        headers=owner_headers,
+        json={
+            "name": "Broken stacking campaign",
+            "status": "ACTIVE",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 20.0,
+            "priority": 100,
+            "stacking_rule": "BROKEN",
+        },
+    )
+    assert created.status_code == 400
+    assert created.json()["detail"] == "Unsupported stacking rule"
 
 
 def test_shared_promotion_codes_track_duplicates_and_campaign_status() -> None:

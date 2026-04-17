@@ -593,6 +593,7 @@ export const storeControlPlaneClient = {
       email?: string | null;
       gstin?: string | null;
       default_note?: string | null;
+      default_price_tier_id?: string | null;
       tags?: string[];
     },
   ) {

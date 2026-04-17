@@ -4,8 +4,26 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_actor, get_session
-from ..schemas import BranchCatalogItemListResponse, BranchCatalogItemRecord, BranchCatalogItemResponse, BranchCatalogItemUpsertRequest, CatalogProductCreateRequest, CatalogProductListResponse, CatalogProductRecord, CatalogProductResponse
-from ..services import ActorContext, CatalogService, assert_branch_any_capability, assert_tenant_capability
+from ..schemas import (
+    BranchCatalogItemListResponse,
+    BranchCatalogItemRecord,
+    BranchCatalogItemResponse,
+    BranchCatalogItemUpsertRequest,
+    BranchPriceTierPriceListResponse,
+    BranchPriceTierPriceRecord,
+    BranchPriceTierPriceResponse,
+    BranchPriceTierPriceUpsertRequest,
+    CatalogProductCreateRequest,
+    CatalogProductListResponse,
+    CatalogProductRecord,
+    CatalogProductResponse,
+    PriceTierCreateRequest,
+    PriceTierListResponse,
+    PriceTierRecord,
+    PriceTierResponse,
+    PriceTierUpdateRequest,
+)
+from ..services import ActorContext, CatalogService, PriceTierService, assert_branch_any_capability, assert_tenant_capability
 
 router = APIRouter(prefix="/v1/tenants", tags=["catalog"])
 
@@ -80,3 +98,90 @@ async def list_branch_catalog_items(
     service = CatalogService(session)
     records = await service.list_branch_catalog_items(tenant_id=tenant_id, branch_id=branch_id)
     return BranchCatalogItemListResponse(records=[BranchCatalogItemRecord(**record) for record in records])
+
+
+@router.post("/{tenant_id}/price-tiers", response_model=PriceTierResponse)
+async def create_price_tier(
+    tenant_id: str,
+    payload: PriceTierCreateRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> PriceTierResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="catalog.manage")
+    service = PriceTierService(session)
+    record = await service.create_price_tier(
+        tenant_id=tenant_id,
+        actor_user_id=actor.user_id,
+        code=payload.code,
+        display_name=payload.display_name,
+        status_value=payload.status,
+    )
+    return PriceTierResponse(**record)
+
+
+@router.patch("/{tenant_id}/price-tiers/{price_tier_id}", response_model=PriceTierResponse)
+async def update_price_tier(
+    tenant_id: str,
+    price_tier_id: str,
+    payload: PriceTierUpdateRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> PriceTierResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="catalog.manage")
+    service = PriceTierService(session)
+    record = await service.update_price_tier(
+        tenant_id=tenant_id,
+        price_tier_id=price_tier_id,
+        actor_user_id=actor.user_id,
+        display_name=payload.display_name,
+        status_value=payload.status,
+    )
+    return PriceTierResponse(**record)
+
+
+@router.get("/{tenant_id}/price-tiers", response_model=PriceTierListResponse)
+async def list_price_tiers(
+    tenant_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> PriceTierListResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="catalog.manage")
+    service = PriceTierService(session)
+    records = await service.list_price_tiers(tenant_id=tenant_id)
+    return PriceTierListResponse(records=[PriceTierRecord(**record) for record in records["records"]])
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/price-tier-prices", response_model=BranchPriceTierPriceResponse)
+async def upsert_branch_price_tier_price(
+    tenant_id: str,
+    branch_id: str,
+    payload: BranchPriceTierPriceUpsertRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> BranchPriceTierPriceResponse:
+    assert_tenant_capability(actor, tenant_id=tenant_id, capability="catalog.manage")
+    service = PriceTierService(session)
+    record = await service.upsert_branch_price_tier_price(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        actor_user_id=actor.user_id,
+        product_id=payload.product_id,
+        price_tier_id=payload.price_tier_id,
+        selling_price=payload.selling_price,
+    )
+    return BranchPriceTierPriceResponse(**record)
+
+
+@router.get("/{tenant_id}/branches/{branch_id}/price-tier-prices", response_model=BranchPriceTierPriceListResponse)
+async def list_branch_price_tier_prices(
+    tenant_id: str,
+    branch_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> BranchPriceTierPriceListResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("catalog.manage", "sales.bill"))
+    service = PriceTierService(session)
+    records = await service.list_branch_price_tier_prices(tenant_id=tenant_id, branch_id=branch_id)
+    return BranchPriceTierPriceListResponse(
+        records=[BranchPriceTierPriceRecord(**record) for record in records["records"]]
+    )

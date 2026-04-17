@@ -33,6 +33,9 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
       phone: '+919999999999',
       email: 'accounts@acme.example',
       gstin: '29AAEPM0111C1Z3',
+      default_price_tier_id: 'tier-1',
+      default_price_tier_code: 'WHOLESALE',
+      default_price_tier_display_name: 'Wholesale',
       status: 'ACTIVE',
       created_at: '2026-04-16T09:00:00Z',
       updated_at: '2026-04-16T09:00:00Z',
@@ -218,6 +221,7 @@ describe('store billing section pricing preview', () => {
     expect(pricingQueries.getByText('Tea Auto')).toBeInTheDocument();
     expect(pricingQueries.getByText('WELCOME20')).toBeInTheDocument();
     expect(pricingQueries.getByText('VCH-0001')).toBeInTheDocument();
+    expect(screen.getByText(/Wholesale price tier/)).toBeInTheDocument();
     expect(pricingQueries.getByText('MRP total')).toBeInTheDocument();
     expect(pricingQueries.getByText('120')).toBeInTheDocument();
     expect(pricingQueries.getByText('Automatic discount')).toBeInTheDocument();

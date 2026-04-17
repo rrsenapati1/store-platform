@@ -83,6 +83,9 @@ describe('owner customer insights section', () => {
     updated_at: string;
     redeemed_at?: string | null;
   }>;
+  let profileDefaultPriceTierId: string | null;
+  let profileDefaultPriceTierCode: string | null;
+  let profileDefaultPriceTierDisplayName: string | null;
 
   function buildStoreCreditResponse() {
     return {
@@ -159,6 +162,9 @@ describe('owner customer insights section', () => {
     loyaltyEarnedTotal = 120;
     loyaltyRedeemedTotal = 20;
     loyaltyAdjustedTotal = 200;
+    profileDefaultPriceTierId = null;
+    profileDefaultPriceTierCode = null;
+    profileDefaultPriceTierDisplayName = null;
     loyaltyLedgerEntries = [
       {
         id: 'loyalty-ledger-1',
@@ -223,9 +229,27 @@ describe('owner customer insights section', () => {
               gstin: '29AAEPM0111C1Z3',
               default_note: 'Preferred wholesale buyer',
               tags: ['wholesale', 'priority'],
+              default_price_tier_id: profileDefaultPriceTierId,
+              default_price_tier_code: profileDefaultPriceTierCode,
+              default_price_tier_display_name: profileDefaultPriceTierDisplayName,
               status: profileStatus,
               created_at: '2026-04-16T09:00:00Z',
               updated_at: '2026-04-16T09:00:00Z',
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/price-tiers') && method === 'GET') {
+        return jsonResponse({
+          records: [
+            {
+              id: 'tier-1',
+              tenant_id: 'tenant-acme',
+              code: 'WHOLESALE',
+              display_name: 'Wholesale',
+              status: 'ACTIVE',
+              created_at: '2026-04-17T08:00:00Z',
+              updated_at: '2026-04-17T08:00:00Z',
             },
           ],
         }) as never;
@@ -240,6 +264,9 @@ describe('owner customer insights section', () => {
           gstin: '29AAEPM0111C1Z3',
           default_note: 'Preferred wholesale buyer',
           tags: ['wholesale', 'priority'],
+          default_price_tier_id: profileDefaultPriceTierId,
+          default_price_tier_code: profileDefaultPriceTierCode,
+          default_price_tier_display_name: profileDefaultPriceTierDisplayName,
           status: profileStatus,
           created_at: '2026-04-16T09:00:00Z',
           updated_at: '2026-04-16T09:00:00Z',
@@ -248,6 +275,9 @@ describe('owner customer insights section', () => {
       if (url.endsWith('/customer-profiles/profile-1') && method === 'PATCH') {
         const payload = JSON.parse(String(init?.body ?? '{}'));
         profileName = payload.full_name ?? profileName;
+        profileDefaultPriceTierId = payload.default_price_tier_id ?? null;
+        profileDefaultPriceTierCode = profileDefaultPriceTierId ? 'WHOLESALE' : null;
+        profileDefaultPriceTierDisplayName = profileDefaultPriceTierId ? 'Wholesale' : null;
         return jsonResponse({
           id: 'profile-1',
           tenant_id: 'tenant-acme',
@@ -257,6 +287,9 @@ describe('owner customer insights section', () => {
           gstin: payload.gstin ?? '29AAEPM0111C1Z3',
           default_note: payload.default_note ?? 'Preferred wholesale buyer',
           tags: payload.tags ?? ['wholesale', 'priority'],
+          default_price_tier_id: profileDefaultPriceTierId,
+          default_price_tier_code: profileDefaultPriceTierCode,
+          default_price_tier_display_name: profileDefaultPriceTierDisplayName,
           status: profileStatus,
           created_at: '2026-04-16T09:00:00Z',
           updated_at: '2026-04-16T09:05:00Z',
@@ -720,6 +753,36 @@ describe('owner customer insights section', () => {
     });
 
     expect(await screen.findByText(/Customer welcome voucher VCH-0001 CANCELED 50/)).toBeInTheDocument();
+  });
+
+  test('assigns a default price tier to the selected customer profile', async () => {
+    render(
+      <OwnerCustomerInsightsSection
+        accessToken="session-owner"
+        tenantId="tenant-acme"
+        branchId="branch-1"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load customer insights' }));
+    await screen.findByText('Customer profile management');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use price tier Wholesale' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save customer profile' }));
+
+    await waitFor(() => {
+      const saveCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) =>
+          String(url).includes('/v1/tenants/tenant-acme/customer-profiles/profile-1')
+          && init?.method === 'PATCH',
+      );
+      expect(saveCall).toBeDefined();
+      expect(JSON.parse(String(saveCall?.[1]?.body ?? '{}'))).toMatchObject({
+        default_price_tier_id: 'tier-1',
+      });
+    });
+
+    expect(await screen.findByText('Wholesale')).toBeInTheDocument();
   });
 
   test('loads and manages loyalty program and customer loyalty points', async () => {

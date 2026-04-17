@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import BranchCatalogItem, CatalogProduct
+from ..models import BranchCatalogItem, BranchPriceTierPrice, CatalogProduct, PriceTier
 from ..utils import new_id
 
 
@@ -101,5 +101,103 @@ class CatalogRepository:
                 BranchCatalogItem.branch_id == branch_id,
             )
             .order_by(BranchCatalogItem.created_at.asc(), BranchCatalogItem.id.asc())
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def create_price_tier(
+        self,
+        *,
+        tenant_id: str,
+        code: str,
+        display_name: str,
+        status: str,
+    ) -> PriceTier:
+        record = PriceTier(
+            id=new_id(),
+            tenant_id=tenant_id,
+            code=code,
+            display_name=display_name,
+            status=status,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def get_price_tier(self, *, tenant_id: str, price_tier_id: str) -> PriceTier | None:
+        statement = select(PriceTier).where(
+            PriceTier.tenant_id == tenant_id,
+            PriceTier.id == price_tier_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def get_price_tier_by_code(self, *, tenant_id: str, code: str) -> PriceTier | None:
+        statement = select(PriceTier).where(
+            PriceTier.tenant_id == tenant_id,
+            PriceTier.code == code,
+        )
+        return await self._session.scalar(statement)
+
+    async def list_price_tiers(self, *, tenant_id: str) -> list[PriceTier]:
+        statement = (
+            select(PriceTier)
+            .where(PriceTier.tenant_id == tenant_id)
+            .order_by(PriceTier.created_at.asc(), PriceTier.id.asc())
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def list_price_tiers_by_ids(self, *, tenant_id: str, price_tier_ids: list[str]) -> dict[str, PriceTier]:
+        if not price_tier_ids:
+            return {}
+        statement = select(PriceTier).where(
+            PriceTier.tenant_id == tenant_id,
+            PriceTier.id.in_(price_tier_ids),
+        )
+        records = list((await self._session.scalars(statement)).all())
+        return {record.id: record for record in records}
+
+    async def upsert_branch_price_tier_price(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        product_id: str,
+        price_tier_id: str,
+        selling_price: float,
+    ) -> BranchPriceTierPrice:
+        statement = select(BranchPriceTierPrice).where(
+            BranchPriceTierPrice.tenant_id == tenant_id,
+            BranchPriceTierPrice.branch_id == branch_id,
+            BranchPriceTierPrice.product_id == product_id,
+            BranchPriceTierPrice.price_tier_id == price_tier_id,
+        )
+        record = await self._session.scalar(statement)
+        if record is None:
+            record = BranchPriceTierPrice(
+                id=new_id(),
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                product_id=product_id,
+                price_tier_id=price_tier_id,
+                selling_price=selling_price,
+            )
+            self._session.add(record)
+        else:
+            record.selling_price = selling_price
+        await self._session.flush()
+        return record
+
+    async def list_branch_price_tier_prices(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+    ) -> list[BranchPriceTierPrice]:
+        statement = (
+            select(BranchPriceTierPrice)
+            .where(
+                BranchPriceTierPrice.tenant_id == tenant_id,
+                BranchPriceTierPrice.branch_id == branch_id,
+            )
+            .order_by(BranchPriceTierPrice.created_at.asc(), BranchPriceTierPrice.id.asc())
         )
         return list((await self._session.scalars(statement)).all())

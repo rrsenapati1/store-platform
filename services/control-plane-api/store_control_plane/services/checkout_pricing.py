@@ -22,6 +22,16 @@ class _AutomaticCampaignEvaluation:
     line_allocations: list[float]
 
 
+@dataclass(slots=True)
+class _ManualCampaignEvaluation:
+    kind: str
+    campaign: object
+    discount_total: float
+    line_allocations: list[float]
+    promotion_code_campaign: dict[str, object] | None = None
+    customer_voucher: dict[str, object] | None = None
+
+
 class CheckoutPricingService:
     def __init__(self, session: AsyncSession):
         self._session = session
@@ -56,6 +66,7 @@ class CheckoutPricingService:
 
         resolved_customer_name = customer_name
         resolved_customer_gstin = customer_gstin
+        customer_price_tier_id: str | None = None
         if customer_profile_id is not None:
             profile = await self._customer_profile_service.require_active_profile(
                 tenant_id=tenant_id,
@@ -63,17 +74,33 @@ class CheckoutPricingService:
             )
             resolved_customer_name = profile.full_name
             resolved_customer_gstin = profile.gstin
+            customer_price_tier_id = profile.default_price_tier_id
 
         products = {product.id: product for product in await self._catalog_repo.list_products(tenant_id=tenant_id)}
         branch_catalog_items = await self._catalog_repo.list_branch_catalog_items(tenant_id=tenant_id, branch_id=branch_id)
+        branch_price_tier_prices: dict[str, float] = {}
+        if customer_price_tier_id is not None:
+            price_tier = await self._catalog_repo.get_price_tier(tenant_id=tenant_id, price_tier_id=customer_price_tier_id)
+            if price_tier is not None and price_tier.status == "ACTIVE":
+                tier_records = await self._catalog_repo.list_branch_price_tier_prices(tenant_id=tenant_id, branch_id=branch_id)
+                branch_price_tier_prices = {
+                    record.product_id: float(record.selling_price)
+                    for record in tier_records
+                    if record.price_tier_id == customer_price_tier_id
+                }
         branch_catalog_by_product_id: dict[str, dict[str, object]] = {}
         for item in branch_catalog_items:
             product = products.get(item.product_id)
             if product is None:
                 continue
+            tier_selling_price = branch_price_tier_prices.get(item.product_id)
             branch_catalog_by_product_id[item.product_id] = {
                 "availability_status": item.availability_status,
-                "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,
+                "effective_selling_price": (
+                    tier_selling_price
+                    if tier_selling_price is not None
+                    else item.selling_price_override if item.selling_price_override is not None else product.selling_price
+                ),
             }
 
         try:
@@ -105,6 +132,35 @@ class CheckoutPricingService:
             draft=draft,
             products=products,
         )
+        if promotion_code and customer_voucher_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Shared promotion codes and customer vouchers cannot be combined",
+            )
+        base_line_subtotals = [money(line.line_subtotal) for line in draft.lines]
+        base_subtotal = money(sum(base_line_subtotals))
+        manual_evaluation = await self._resolve_manual_campaign(
+            tenant_id=tenant_id,
+            customer_profile_id=customer_profile_id,
+            promotion_code=promotion_code,
+            customer_voucher_id=customer_voucher_id,
+            sale_total=base_subtotal,
+            weights=base_line_subtotals,
+        )
+        if automatic_evaluation is not None and manual_evaluation is not None:
+            if not self._campaigns_may_stack(
+                automatic_campaign=automatic_evaluation.campaign,
+                manual_campaign=manual_evaluation.campaign,
+            ):
+                preferred_source = self._select_preferred_campaign_source(
+                    automatic_evaluation=automatic_evaluation,
+                    manual_evaluation=manual_evaluation,
+                )
+                if preferred_source == "AUTOMATIC":
+                    manual_evaluation = None
+                else:
+                    automatic_evaluation = None
+
         automatic_line_discounts = automatic_evaluation.line_allocations if automatic_evaluation is not None else [0.0] * len(draft.lines)
         automatic_discount_total = money(sum(automatic_line_discounts))
 
@@ -114,51 +170,38 @@ class CheckoutPricingService:
         ]
         post_automatic_subtotal = money(sum(post_automatic_line_subtotals))
 
+        if (
+            automatic_evaluation is not None
+            and manual_evaluation is not None
+            and self._campaigns_may_stack(
+                automatic_campaign=automatic_evaluation.campaign,
+                manual_campaign=manual_evaluation.campaign,
+            )
+        ):
+            manual_evaluation = await self._resolve_manual_campaign(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+                promotion_code=promotion_code,
+                customer_voucher_id=customer_voucher_id,
+                sale_total=post_automatic_subtotal,
+                weights=post_automatic_line_subtotals,
+            )
+
         promotion_code_campaign = None
         promotion_code_discount_total = 0.0
         promotion_code_line_discounts = [0.0] * len(draft.lines)
         customer_voucher = None
         customer_voucher_discount_total = 0.0
         customer_voucher_line_discounts = [0.0] * len(draft.lines)
-        if promotion_code and customer_voucher_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Shared promotion codes and customer vouchers cannot be combined",
-            )
-        if promotion_code:
-            validated = await self._promotion_service.validate_promotion_code(
-                tenant_id=tenant_id,
-                promotion_code=promotion_code,
-                sale_total=post_automatic_subtotal,
-            )
-            promotion_code_campaign = {
-                **self._promotion_service.serialize_campaign_snapshot(validated["campaign"]),
-                "code_id": validated["code"].id,
-                "code": validated["code"].code,
-            }
-            promotion_code_discount_total = money(float(validated["discount_amount"]))
-            promotion_code_line_discounts = self._allocate_discount(
-                total_discount=promotion_code_discount_total,
-                weights=post_automatic_line_subtotals,
-            )
-        elif customer_voucher_id:
-            if customer_profile_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Customer profile is required for customer vouchers",
-                )
-            validated = await self._promotion_service.validate_customer_voucher(
-                tenant_id=tenant_id,
-                customer_profile_id=customer_profile_id,
-                voucher_id=customer_voucher_id,
-                sale_total=post_automatic_subtotal,
-            )
-            customer_voucher = self._promotion_service.serialize_customer_voucher_snapshot(validated["voucher"])
-            customer_voucher_discount_total = money(float(validated["discount_amount"]))
-            customer_voucher_line_discounts = self._allocate_discount(
-                total_discount=customer_voucher_discount_total,
-                weights=post_automatic_line_subtotals,
-            )
+        if manual_evaluation is not None:
+            if manual_evaluation.kind == "CODE":
+                promotion_code_campaign = manual_evaluation.promotion_code_campaign
+                promotion_code_discount_total = money(manual_evaluation.discount_total)
+                promotion_code_line_discounts = list(manual_evaluation.line_allocations)
+            else:
+                customer_voucher = manual_evaluation.customer_voucher
+                customer_voucher_discount_total = money(manual_evaluation.discount_total)
+                customer_voucher_line_discounts = list(manual_evaluation.line_allocations)
 
         is_inter_state = any(tax_line.tax_type == "IGST" for tax_line in draft.tax_lines)
         preview_lines: list[dict[str, object]] = []
@@ -354,7 +397,14 @@ class CheckoutPricingService:
                 maximum_discount_amount=campaign.maximum_discount_amount,
                 base_total=money(unit_selling_price),
             )
-            if discount_amount > best_discount:
+            if (
+                best_campaign is None
+                or self._campaign_priority(campaign) > self._campaign_priority(best_campaign)
+                or (
+                    self._campaign_priority(campaign) == self._campaign_priority(best_campaign)
+                    and discount_amount > best_discount
+                )
+            ):
                 best_campaign = campaign
                 best_discount = discount_amount
         if best_campaign is None:
@@ -369,7 +419,6 @@ class CheckoutPricingService:
     async def _select_best_automatic_campaign(self, *, tenant_id: str, draft, products: dict[str, object]) -> _AutomaticCampaignEvaluation | None:
         campaigns = await self._promotion_service.list_active_automatic_campaigns(tenant_id=tenant_id)
         best_evaluation: _AutomaticCampaignEvaluation | None = None
-        best_discount = 0.0
         for campaign in campaigns:
             evaluation = self._evaluate_automatic_campaign(
                 campaign=campaign,
@@ -378,10 +427,107 @@ class CheckoutPricingService:
             )
             if evaluation is None:
                 continue
-            if evaluation.discount_total > best_discount:
+            if best_evaluation is None or self._automatic_campaign_outranks(
+                candidate=evaluation,
+                incumbent=best_evaluation,
+            ):
                 best_evaluation = evaluation
-                best_discount = evaluation.discount_total
         return best_evaluation
+
+    async def _resolve_manual_campaign(
+        self,
+        *,
+        tenant_id: str,
+        customer_profile_id: str | None,
+        promotion_code: str | None,
+        customer_voucher_id: str | None,
+        sale_total: float,
+        weights: list[float],
+    ) -> _ManualCampaignEvaluation | None:
+        if promotion_code:
+            validated = await self._promotion_service.validate_promotion_code(
+                tenant_id=tenant_id,
+                promotion_code=promotion_code,
+                sale_total=sale_total,
+            )
+            discount_total = money(float(validated["discount_amount"]))
+            return _ManualCampaignEvaluation(
+                kind="CODE",
+                campaign=validated["campaign"],
+                discount_total=discount_total,
+                line_allocations=self._allocate_discount(total_discount=discount_total, weights=weights),
+                promotion_code_campaign={
+                    **self._promotion_service.serialize_campaign_snapshot(validated["campaign"]),
+                    "code_id": validated["code"].id,
+                    "code": validated["code"].code,
+                },
+            )
+        if customer_voucher_id:
+            if customer_profile_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Customer profile is required for customer vouchers",
+                )
+            validated = await self._promotion_service.validate_customer_voucher(
+                tenant_id=tenant_id,
+                customer_profile_id=customer_profile_id,
+                voucher_id=customer_voucher_id,
+                sale_total=sale_total,
+            )
+            discount_total = money(float(validated["discount_amount"]))
+            return _ManualCampaignEvaluation(
+                kind="ASSIGNED_VOUCHER",
+                campaign=validated["campaign"],
+                discount_total=discount_total,
+                line_allocations=self._allocate_discount(total_discount=discount_total, weights=weights),
+                customer_voucher=self._promotion_service.serialize_customer_voucher_snapshot(validated["voucher"]),
+            )
+        return None
+
+    @staticmethod
+    def _campaigns_may_stack(*, automatic_campaign, manual_campaign) -> bool:
+        return (
+            getattr(automatic_campaign, "stacking_rule", "STACKABLE") == "STACKABLE"
+            and getattr(manual_campaign, "stacking_rule", "STACKABLE") == "STACKABLE"
+        )
+
+    def _select_preferred_campaign_source(
+        self,
+        *,
+        automatic_evaluation: _AutomaticCampaignEvaluation,
+        manual_evaluation: _ManualCampaignEvaluation,
+    ) -> str:
+        automatic_rank = (
+            self._campaign_priority(automatic_evaluation.campaign),
+            automatic_evaluation.discount_total,
+            1,
+        )
+        manual_rank = (
+            self._campaign_priority(manual_evaluation.campaign),
+            manual_evaluation.discount_total,
+            0,
+        )
+        return "AUTOMATIC" if automatic_rank >= manual_rank else "MANUAL"
+
+    def _automatic_campaign_outranks(
+        self,
+        *,
+        candidate: _AutomaticCampaignEvaluation,
+        incumbent: _AutomaticCampaignEvaluation,
+    ) -> bool:
+        candidate_rank = (
+            self._campaign_priority(candidate.campaign),
+            candidate.discount_total,
+        )
+        incumbent_rank = (
+            self._campaign_priority(incumbent.campaign),
+            incumbent.discount_total,
+        )
+        return candidate_rank > incumbent_rank
+
+    @staticmethod
+    def _campaign_priority(campaign) -> int:
+        return int(getattr(campaign, "priority", 100) or 0)
 
     def _evaluate_automatic_campaign(self, *, campaign, draft, products: dict[str, object]) -> _AutomaticCampaignEvaluation | None:
         cart_subtotal = money(sum(line.line_subtotal for line in draft.lines))

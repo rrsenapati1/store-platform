@@ -24,6 +24,11 @@ class CustomerProfile(Base, TimestampMixin):
     email: Mapped[str | None] = mapped_column(String(255), default=None)
     gstin: Mapped[str | None] = mapped_column(String(32), default=None, index=True)
     default_note: Mapped[str | None] = mapped_column(String(1024), default=None)
+    default_price_tier_id: Mapped[str | None] = mapped_column(
+        ForeignKey("price_tiers.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(32), default="ACTIVE", index=True)
 

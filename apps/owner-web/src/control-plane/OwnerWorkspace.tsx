@@ -12,6 +12,7 @@ import type { WorkspaceMetric } from '@store/types';
 import { OwnerInventoryControlSection } from './OwnerInventoryControlSection';
 import { OwnerProcurementFinanceSection } from './OwnerProcurementFinanceSection';
 import { OwnerProcurementSection } from './OwnerProcurementSection';
+import { OwnerPriceTierSection } from './OwnerPriceTierSection';
 import { OwnerPromotionCampaignSection } from './OwnerPromotionCampaignSection';
 import { OwnerReplenishmentSection } from './OwnerReplenishmentSection';
 import { OwnerRestockSection } from './OwnerRestockSection';
@@ -283,6 +284,7 @@ export function OwnerWorkspace() {
         </ul>
       </SectionCard>
 
+      <OwnerPriceTierSection workspace={workspace} />
       <OwnerBarcodeSection workspace={workspace} />
       <OwnerBarcodePrintRuntimeSection
         accessToken={workspace.accessToken}

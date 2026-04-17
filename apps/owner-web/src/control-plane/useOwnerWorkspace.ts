@@ -9,6 +9,7 @@ import type {
   ControlPlaneGoodsReceiptBatchLotIntake,
   ControlPlaneBarcodeAllocation, ControlPlaneBarcodeLabelPreview,
   ControlPlaneBranchCatalogItem,
+  ControlPlaneBranchPriceTierPrice,
   ControlPlaneBranchRecord,
   ControlPlaneCatalogProduct,
   ControlPlaneCatalogProductRecord,
@@ -25,6 +26,7 @@ import type {
   ControlPlanePurchaseInvoiceRecord,
   ControlPlanePurchaseOrder,
   ControlPlanePurchaseOrderRecord,
+  ControlPlanePriceTier,
   ControlPlaneReplenishmentBoard,
   ControlPlaneRestockBoard,
   ControlPlaneRestockTask,
@@ -45,6 +47,7 @@ import type {
 import { ownerControlPlaneClient } from './client';
 import { runApproveBatchExpirySession, runCancelBatchExpirySession, runCreateBatchExpirySession, runLoadBatchExpiryReport, runRecordBatchExpirySession, runRecordBatchLotsOnLatestGoodsReceipt } from './batchExpiryActions';
 import { runAllocateCatalogBarcode, runAssignFirstProductToBranch, runCreateCatalogProduct, runPreviewBarcodeLabel } from './catalogBarcodeActions';
+import { runCreatePriceTier, runLoadPriceTiers, runUpsertBranchPriceTierPrice } from './catalogPriceTierActions';
 import { runApproveStockCountSession, runCancelStockCountSession, runCreateBranchTransfer, runCreateGoodsReceipt, runCreateStockAdjustment, runCreateStockCountSession, runRecordStockCountSession } from './inventoryActions';
 import { runAssignBranchRole, runAssignTenantRole } from './membershipActions';
 import { runCreateFirstBranch, runRegisterBranchDevice } from './onboardingActions';
@@ -67,6 +70,8 @@ export function useOwnerWorkspace() {
   const [branches, setBranches] = useState<ControlPlaneBranchRecord[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<ControlPlaneCatalogProductRecord[]>([]);
   const [branchCatalogItems, setBranchCatalogItems] = useState<ControlPlaneBranchCatalogItem[]>([]);
+  const [priceTiers, setPriceTiers] = useState<ControlPlanePriceTier[]>([]);
+  const [branchPriceTierPrices, setBranchPriceTierPrices] = useState<ControlPlaneBranchPriceTierPrice[]>([]);
   const [staffProfiles, setStaffProfiles] = useState<ControlPlaneStaffProfileRecord[]>([]);
   const [devices, setDevices] = useState<ControlPlaneDeviceRecord[]>([]);
   const [suppliers, setSuppliers] = useState<ControlPlaneSupplierRecord[]>([]);
@@ -98,6 +103,10 @@ export function useOwnerWorkspace() {
   const [productCategoryCode, setProductCategoryCode] = useState('');
   const [productSellingPrice, setProductSellingPrice] = useState('');
   const [branchCatalogPriceOverride, setBranchCatalogPriceOverride] = useState('');
+  const [priceTierCode, setPriceTierCode] = useState('');
+  const [priceTierDisplayName, setPriceTierDisplayName] = useState('');
+  const [priceTierStatus, setPriceTierStatus] = useState('ACTIVE');
+  const [branchPriceTierSellingPrice, setBranchPriceTierSellingPrice] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [supplierGstin, setSupplierGstin] = useState('');
   const [supplierPaymentTermsDays, setSupplierPaymentTermsDays] = useState('14');
@@ -149,6 +158,8 @@ export function useOwnerWorkspace() {
   const [latestBarcodeAllocation, setLatestBarcodeAllocation] = useState<ControlPlaneBarcodeAllocation | null>(null);
   const [latestBarcodeLabelPreview, setLatestBarcodeLabelPreview] = useState<ControlPlaneBarcodeLabelPreview | null>(null);
   const [latestBranchCatalogItem, setLatestBranchCatalogItem] = useState<ControlPlaneBranchCatalogItem | null>(null);
+  const [latestPriceTier, setLatestPriceTier] = useState<ControlPlanePriceTier | null>(null);
+  const [latestBranchPriceTierPrice, setLatestBranchPriceTierPrice] = useState<ControlPlaneBranchPriceTierPrice | null>(null);
   const [latestSupplier, setLatestSupplier] = useState<ControlPlaneSupplier | null>(null);
   const [latestPurchaseOrder, setLatestPurchaseOrder] = useState<ControlPlanePurchaseOrder | null>(null);
   const [latestApprovalState, setLatestApprovalState] = useState<ControlPlanePurchaseApprovalReportRecord | null>(null);
@@ -390,6 +401,66 @@ export function useOwnerWorkspace() {
       setLatestBranchCatalogItem,
       setBranchCatalogItems,
       setBranchCatalogPriceOverride,
+    });
+  }
+
+  async function loadPriceTiers() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    await runLoadPriceTiers({
+      accessToken,
+      tenantId,
+      branchId,
+      setIsBusy,
+      setErrorMessage,
+      setPriceTiers,
+      setBranchPriceTierPrices,
+    });
+  }
+
+  async function createPriceTier() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    await runCreatePriceTier({
+      accessToken,
+      tenantId,
+      branchId,
+      code: priceTierCode,
+      displayName: priceTierDisplayName,
+      status: priceTierStatus,
+      setIsBusy,
+      setErrorMessage,
+      setLatestPriceTier,
+      setPriceTiers,
+      setBranchPriceTierPrices,
+      resetForm: () => {
+        setPriceTierCode('');
+        setPriceTierDisplayName('');
+        setPriceTierStatus('ACTIVE');
+      },
+    });
+  }
+
+  async function upsertFirstBranchPriceTierPrice() {
+    if (!accessToken || !tenantId || !branchId || !catalogProducts[0] || !priceTiers[0]) {
+      return;
+    }
+    await runUpsertBranchPriceTierPrice({
+      accessToken,
+      tenantId,
+      branchId,
+      productId: catalogProducts[0].product_id,
+      priceTierId: priceTiers[0].id,
+      sellingPrice: Number(branchPriceTierSellingPrice),
+      setIsBusy,
+      setErrorMessage,
+      setLatestBranchPriceTierPrice,
+      setBranchPriceTierPrices,
+      resetForm: () => {
+        setBranchPriceTierSellingPrice('');
+      },
     });
   }
 
@@ -1042,9 +1113,12 @@ export function useOwnerWorkspace() {
     branches,
     barcodeManualValue,
     branchCatalogItems,
+    branchPriceTierPrices,
     branchCatalogPriceOverride,
+    branchPriceTierSellingPrice,
     createStaffProfile,
     createCatalogProduct,
+    createPriceTier,
     createSupplier,
     createPurchaseOrder,
     createGoodsReceipt,
@@ -1094,11 +1168,14 @@ export function useOwnerWorkspace() {
     latestBatchLotIntake,
     latestCatalogProduct,
     latestBranchCatalogItem,
+    latestBranchPriceTierPrice,
+    latestPriceTier,
     latestDevice,
     latestGoodsReceipt,
     latestPurchaseInvoice,
     latestPurchaseOrder,
     latestRestockTask,
+    loadPriceTiers,
     loadReplenishmentBoard,
     loadRestockBoard,
     latestStockAdjustment,
@@ -1145,6 +1222,7 @@ export function useOwnerWorkspace() {
     setDeviceCode,
     setDeviceName,
     setBranchCatalogPriceOverride,
+    setBranchPriceTierSellingPrice,
     setDecisionNote,
     setCountedQuantity,
     setCountNote,
@@ -1170,6 +1248,9 @@ export function useOwnerWorkspace() {
     setProductName,
     setProductSellingPrice,
     setProductSkuCode,
+    setPriceTierCode,
+    setPriceTierDisplayName,
+    setPriceTierStatus,
     setReplenishmentReorderPoint,
     setReplenishmentTargetStock,
     setRestockCompletionNote,
@@ -1203,6 +1284,10 @@ export function useOwnerWorkspace() {
     suppliers,
     tenant,
     tenantId,
+    priceTierCode,
+    priceTierDisplayName,
+    priceTierStatus,
+    priceTiers,
     transferBoard,
     transferDestinationBranchId,
     transferQuantity,
@@ -1210,6 +1295,7 @@ export function useOwnerWorkspace() {
     pickRestockTask,
     completeRestockTask,
     cancelRestockTask,
+    upsertFirstBranchPriceTierPrice,
     updateFirstBranchReplenishmentPolicy,
     productBarcode,
     productGstRate,

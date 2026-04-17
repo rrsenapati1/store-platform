@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -80,3 +82,63 @@ class BranchCatalogItemRecord(BranchCatalogItemResponse):
 
 class BranchCatalogItemListResponse(BaseModel):
     records: list[BranchCatalogItemRecord]
+
+
+class PriceTierCreateRequest(BaseModel):
+    code: str
+    display_name: str
+    status: str = "ACTIVE"
+
+
+class PriceTierUpdateRequest(BaseModel):
+    display_name: str | None = None
+    status: str | None = None
+
+
+class PriceTierResponse(BaseModel):
+    id: str
+    tenant_id: str
+    code: str
+    display_name: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class PriceTierRecord(PriceTierResponse):
+    pass
+
+
+class PriceTierListResponse(BaseModel):
+    records: list[PriceTierRecord]
+
+
+class BranchPriceTierPriceUpsertRequest(BaseModel):
+    product_id: str
+    price_tier_id: str
+    selling_price: float = Field(gt=0)
+
+
+class BranchPriceTierPriceResponse(BaseModel):
+    id: str
+    tenant_id: str
+    branch_id: str
+    product_id: str
+    product_name: str
+    sku_code: str
+    price_tier_id: str
+    price_tier_code: str
+    price_tier_display_name: str
+    base_selling_price: float
+    effective_base_selling_price: float
+    selling_price: float
+    created_at: datetime
+    updated_at: datetime
+
+
+class BranchPriceTierPriceRecord(BranchPriceTierPriceResponse):
+    pass
+
+
+class BranchPriceTierPriceListResponse(BaseModel):
+    records: list[BranchPriceTierPriceRecord]

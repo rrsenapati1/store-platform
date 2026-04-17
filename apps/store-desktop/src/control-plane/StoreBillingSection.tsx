@@ -205,6 +205,11 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
             Linked customer profile: <strong>{workspace.selectedCustomerProfile?.full_name}</strong>
           </p>
         ) : null}
+        {hasSelectedCustomerProfile && workspace.selectedCustomerProfile?.default_price_tier_display_name ? (
+          <p style={{ marginTop: 0, marginBottom: '14px', color: '#4e5871' }}>
+            {`${workspace.selectedCustomerProfile.default_price_tier_display_name} price tier`}
+          </p>
+        ) : null}
         {hasSelectedCustomerProfile ? (
           <div style={{ marginBottom: '14px' }}>
             <DetailList

@@ -10,6 +10,7 @@ import type {
   ControlPlaneBarcodeAllocation,
   ControlPlaneBarcodeLabelPreview,
   ControlPlaneBranchCatalogItem,
+  ControlPlaneBranchPriceTierPrice,
   ControlPlaneBranch,
   ControlPlaneBranchRecord,
   ControlPlaneBranchCustomerReport,
@@ -35,6 +36,7 @@ import type {
   ControlPlaneInventoryLedgerRecord,
   ControlPlaneInventorySnapshotRecord,
   ControlPlaneMembership,
+  ControlPlanePriceTier,
   ControlPlanePrintJob,
   ControlPlanePromotionCampaign,
   ControlPlanePromotionCampaignListResponse,
@@ -278,6 +280,45 @@ export const ownerControlPlaneClient = {
     return request<{ records: ControlPlaneBranchCatalogItem[] }>(
       `/v1/tenants/${tenantId}/branches/${branchId}/catalog-items`,
       undefined,
+      accessToken,
+    );
+  },
+  listPriceTiers(accessToken: string, tenantId: string) {
+    return request<{ records: ControlPlanePriceTier[] }>(`/v1/tenants/${tenantId}/price-tiers`, undefined, accessToken);
+  },
+  createPriceTier(
+    accessToken: string,
+    tenantId: string,
+    payload: { code: string; display_name: string; status: string },
+  ) {
+    return request<ControlPlanePriceTier>(
+      `/v1/tenants/${tenantId}/price-tiers`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  listBranchPriceTierPrices(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneBranchPriceTierPrice[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/price-tier-prices`,
+      undefined,
+      accessToken,
+    );
+  },
+  upsertBranchPriceTierPrice(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: { product_id: string; price_tier_id: string; selling_price: number },
+  ) {
+    return request<ControlPlaneBranchPriceTierPrice>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/price-tier-prices`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
       accessToken,
     );
   },
@@ -772,6 +813,7 @@ export const ownerControlPlaneClient = {
       email?: string | null;
       gstin?: string | null;
       default_note?: string | null;
+      default_price_tier_id?: string | null;
       tags?: string[];
     },
   ) {
@@ -867,6 +909,8 @@ export const ownerControlPlaneClient = {
       scope?: string;
       discount_type: string;
       discount_value: number;
+      priority?: number;
+      stacking_rule?: string;
       minimum_order_amount?: number | null;
       maximum_discount_amount?: number | null;
       redemption_limit_total?: number | null;
@@ -894,6 +938,8 @@ export const ownerControlPlaneClient = {
       scope?: string | null;
       discount_type?: string | null;
       discount_value?: number | null;
+      priority?: number | null;
+      stacking_rule?: string | null;
       minimum_order_amount?: number | null;
       maximum_discount_amount?: number | null;
       redemption_limit_total?: number | null;

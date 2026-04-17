@@ -33,6 +33,8 @@ describe('owner promotion campaign section', () => {
     maximum_discount_amount: number | null;
     redemption_limit_total: number | null;
     redemption_count: number;
+    priority: number;
+    stacking_rule: string;
     target_product_ids: string[];
     target_category_codes: string[];
     created_at: string;
@@ -65,6 +67,8 @@ describe('owner promotion campaign section', () => {
         maximum_discount_amount: 40,
         redemption_limit_total: 500,
         redemption_count: 2,
+        priority: 100,
+        stacking_rule: 'STACKABLE',
         target_product_ids: [],
         target_category_codes: [],
         created_at: '2026-04-17T09:00:00Z',
@@ -95,6 +99,8 @@ describe('owner promotion campaign section', () => {
           maximum_discount_amount: payload.maximum_discount_amount,
           redemption_limit_total: payload.redemption_limit_total,
           redemption_count: 0,
+          priority: Number(payload.priority ?? 100),
+          stacking_rule: payload.stacking_rule ?? 'STACKABLE',
           target_product_ids: payload.target_product_ids ?? [],
           target_category_codes: payload.target_category_codes ?? [],
           created_at: '2026-04-17T09:30:00Z',
@@ -181,9 +187,13 @@ describe('owner promotion campaign section', () => {
     fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Welcome Flat' } });
     fireEvent.change(screen.getByLabelText('Discount type'), { target: { value: 'FLAT_AMOUNT' } });
     fireEvent.change(screen.getByLabelText('Discount value'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Priority'), { target: { value: '250' } });
+    fireEvent.change(screen.getByLabelText('Stacking rule'), { target: { value: 'EXCLUSIVE' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create promotion campaign' }));
 
     expect(await screen.findByText('Welcome Flat')).toBeInTheDocument();
+    expect(screen.getByText('250')).toBeInTheDocument();
+    expect(screen.getByText('EXCLUSIVE')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Disable selected campaign' }));
     expect(await screen.findByText('DISABLED')).toBeInTheDocument();
 
@@ -226,6 +236,8 @@ describe('owner promotion campaign section', () => {
       expect(JSON.parse(String(createCampaignCall?.[1]?.body ?? '{}'))).toMatchObject({
         trigger_mode: 'AUTOMATIC',
         scope: 'ITEM_CATEGORY',
+        priority: 100,
+        stacking_rule: 'STACKABLE',
         target_product_ids: ['product-1', 'product-2'],
         target_category_codes: ['TEA', 'SNACKS'],
       });
@@ -263,6 +275,8 @@ describe('owner promotion campaign section', () => {
         scope: 'CART',
         discount_type: 'FLAT_AMOUNT',
         discount_value: 50,
+        priority: 100,
+        stacking_rule: 'STACKABLE',
       });
     });
   });

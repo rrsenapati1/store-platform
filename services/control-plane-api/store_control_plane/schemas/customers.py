@@ -11,6 +11,7 @@ class CustomerProfileCreateRequest(BaseModel):
     email: str | None = None
     gstin: str | None = None
     default_note: str | None = None
+    default_price_tier_id: str | None = None
     tags: list[str] = Field(default_factory=list)
 
 
@@ -20,6 +21,7 @@ class CustomerProfileUpdateRequest(BaseModel):
     email: str | None = None
     gstin: str | None = None
     default_note: str | None = None
+    default_price_tier_id: str | None = None
     tags: list[str] | None = None
 
 
@@ -31,6 +33,9 @@ class CustomerProfileResponse(BaseModel):
     email: str | None = None
     gstin: str | None = None
     default_note: str | None = None
+    default_price_tier_id: str | None = None
+    default_price_tier_code: str | None = None
+    default_price_tier_display_name: str | None = None
     tags: list[str]
     status: str
     created_at: datetime

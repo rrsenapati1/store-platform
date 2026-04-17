@@ -213,6 +213,149 @@ def test_checkout_price_preview_applies_best_automatic_item_discount_before_code
     ]
 
 
+def test_checkout_price_preview_prefers_higher_priority_automatic_campaign_over_larger_discount() -> None:
+    database_url = sqlite_test_database_url("checkout-price-preview-priority-automatic")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_pricing_context(client, slug="checkout-price-preview-priority-automatic")
+
+    higher_discount_lower_priority = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Bigger discount lower priority",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "CART",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 20.0,
+            "minimum_order_amount": 50.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "priority": 100,
+            "stacking_rule": "STACKABLE",
+        },
+    )
+    assert higher_discount_lower_priority.status_code == 200
+
+    lower_discount_higher_priority = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Smaller discount higher priority",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_category_codes": ["TEA"],
+            "priority": 500,
+            "stacking_rule": "STACKABLE",
+        },
+    )
+    assert lower_discount_higher_priority.status_code == 200
+
+    preview = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-price-preview",
+        headers=context["owner_headers"],
+        json={
+            "customer_name": "Acme Traders",
+            "customer_gstin": "29AAEPM0111C1Z3",
+            "lines": [{"product_id": context["tea_product_id"], "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200
+    assert preview.json()["automatic_campaign"]["name"] == "Smaller discount higher priority"
+    assert preview.json()["summary"]["automatic_discount_total"] == 9.25
+
+
+def test_checkout_price_preview_drops_automatic_discount_when_manual_campaign_is_exclusive_and_higher_priority() -> None:
+    database_url = sqlite_test_database_url("checkout-price-preview-exclusive-manual")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_pricing_context(client, slug="checkout-price-preview-exclusive-manual")
+
+    automatic_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "Tea automatic discount",
+            "status": "ACTIVE",
+            "trigger_mode": "AUTOMATIC",
+            "scope": "ITEM_CATEGORY",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10.0,
+            "minimum_order_amount": None,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "target_category_codes": ["TEA"],
+            "priority": 100,
+            "stacking_rule": "STACKABLE",
+        },
+    )
+    assert automatic_campaign.status_code == 200
+
+    code_campaign = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns",
+        headers=context["owner_headers"],
+        json={
+            "name": "WELCOME flat discount",
+            "status": "ACTIVE",
+            "trigger_mode": "CODE",
+            "scope": "CART",
+            "discount_type": "FLAT_AMOUNT",
+            "discount_value": 20.0,
+            "minimum_order_amount": 50.0,
+            "maximum_discount_amount": None,
+            "redemption_limit_total": None,
+            "priority": 500,
+            "stacking_rule": "EXCLUSIVE",
+        },
+    )
+    assert code_campaign.status_code == 200
+
+    code = client.post(
+        f"/v1/tenants/{context['tenant_id']}/promotion-campaigns/{code_campaign.json()['id']}/codes",
+        headers=context["owner_headers"],
+        json={"code": "WELCOME20", "status": "ACTIVE", "redemption_limit_per_code": None},
+    )
+    assert code.status_code == 200
+
+    preview = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-price-preview",
+        headers=context["owner_headers"],
+        json={
+            "customer_name": "Acme Traders",
+            "customer_gstin": "29AAEPM0111C1Z3",
+            "promotion_code": "WELCOME20",
+            "lines": [{"product_id": context["tea_product_id"], "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200
+    assert preview.json().get("automatic_campaign") is None
+    assert preview.json()["promotion_code_campaign"]["name"] == "WELCOME flat discount"
+    assert preview.json()["summary"]["automatic_discount_total"] == 0.0
+    assert preview.json()["summary"]["promotion_code_discount_total"] == 20.0
+    assert preview.json()["lines"][0]["promotion_discount_source"] == "CODE"
+
+
 def test_checkout_price_preview_applies_category_targets_only_to_matching_lines() -> None:
     database_url = sqlite_test_database_url("checkout-price-preview-category-targets")
     client = TestClient(
@@ -454,3 +597,68 @@ def test_checkout_price_preview_rejects_code_and_customer_voucher_together() -> 
     )
     assert preview.status_code == 400
     assert preview.json()["detail"] == "Shared promotion codes and customer vouchers cannot be combined"
+
+
+def test_checkout_price_preview_uses_customer_default_price_tier_when_available() -> None:
+    database_url = sqlite_test_database_url("checkout-price-preview-customer-tier")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _seed_pricing_context(client, slug="checkout-price-preview-customer-tier")
+
+    price_tier = client.post(
+        f"/v1/tenants/{context['tenant_id']}/price-tiers",
+        headers=context["owner_headers"],
+        json={"code": "WHOLESALE", "display_name": "Wholesale", "status": "ACTIVE"},
+    )
+    assert price_tier.status_code == 200
+    price_tier_id = price_tier.json()["id"]
+
+    branch_tier_price = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/price-tier-prices",
+        headers=context["owner_headers"],
+        json={
+            "product_id": context["tea_product_id"],
+            "price_tier_id": price_tier_id,
+            "selling_price": 80.0,
+        },
+    )
+    assert branch_tier_price.status_code == 200
+
+    customer_profile = client.post(
+        f"/v1/tenants/{context['tenant_id']}/customer-profiles",
+        headers=context["owner_headers"],
+        json={
+            "full_name": "Acme Traders",
+            "phone": None,
+            "email": None,
+            "gstin": "29AAEPM0111C1Z3",
+            "default_note": None,
+            "tags": [],
+            "default_price_tier_id": price_tier_id,
+        },
+    )
+    assert customer_profile.status_code == 200
+
+    preview = client.post(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-price-preview",
+        headers=context["owner_headers"],
+        json={
+            "customer_profile_id": customer_profile.json()["id"],
+            "customer_name": "Ignored because profile is selected",
+            "customer_gstin": None,
+            "lines": [{"product_id": context["tea_product_id"], "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200
+    assert preview.json()["customer_profile_id"] == customer_profile.json()["id"]
+    assert preview.json()["summary"]["selling_price_subtotal"] == 80.0
+    assert preview.json()["summary"]["invoice_total"] == 84.0
+    assert preview.json()["lines"][0]["unit_selling_price"] == 80.0
+    assert preview.json()["lines"][0]["line_total"] == 84.0

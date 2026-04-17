@@ -40,3 +40,35 @@ class BranchCatalogItem(Base, TimestampMixin):
     availability_status: Mapped[str] = mapped_column(String(32), default="ACTIVE")
     reorder_point: Mapped[float | None] = mapped_column(Float(), default=None)
     target_stock: Mapped[float | None] = mapped_column(Float(), default=None)
+
+
+class PriceTier(Base, TimestampMixin):
+    __tablename__ = "price_tiers"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "code", name="uq_price_tiers_tenant_code"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    code: Mapped[str] = mapped_column(String(64))
+    display_name: Mapped[str] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), default="ACTIVE")
+
+
+class BranchPriceTierPrice(Base, TimestampMixin):
+    __tablename__ = "branch_price_tier_prices"
+    __table_args__ = (
+        UniqueConstraint(
+            "branch_id",
+            "product_id",
+            "price_tier_id",
+            name="uq_branch_price_tier_prices_branch_product_tier",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    price_tier_id: Mapped[str] = mapped_column(ForeignKey("price_tiers.id", ondelete="CASCADE"), index=True)
+    selling_price: Mapped[float] = mapped_column(Float())

@@ -76,6 +76,7 @@ class CustomerProfileRepository:
         email: str | None,
         gstin: str | None,
         default_note: str | None,
+        default_price_tier_id: str | None,
         tags: list[str],
         status: str = "ACTIVE",
     ) -> CustomerProfile:
@@ -87,6 +88,7 @@ class CustomerProfileRepository:
             email=email,
             gstin=gstin,
             default_note=default_note,
+            default_price_tier_id=default_price_tier_id,
             tags=tags,
             status=status,
         )

@@ -351,6 +351,7 @@ describe('store runtime checkout customer profiles', () => {
         gstin: '29AAEPM0111C1Z3',
       });
     });
+    expect(await screen.findByRole('button', { name: 'Use manual customer details' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'UPI' } });

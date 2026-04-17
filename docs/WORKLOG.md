@@ -2,6 +2,21 @@
 
 ## 2026-04-17
 
+- Expanded `V2-005` with the next three commercial-control slices as one coordinated stack:
+  - added promotion arbitration controls so automatic and manual campaigns now obey explicit `priority` and `stacking_rule` authority instead of implicit discount ordering, with owner-web campaign management exposing those controls
+  - added price-tier foundation with control-plane-owned tier master data, branch tier prices, owner-web tier management, and shared contracts for non-default commercial pricing
+  - linked customer profiles to default price tiers and applied those tiers in authoritative checkout pricing so Store Desktop and owner-web customer management now honor customer-specific selling posture without manual cashier overrides
+  - hardened owner-web and store-desktop integration tests with route-aware mocks and extracted customer-commercial loading seams so the expanded commercial workspace remains full-suite stable
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_promotions_flow.py services/control-plane-api/tests/test_checkout_price_preview_flow.py services/control-plane-api/tests/test_price_tier_flow.py services/control-plane-api/tests/test_customer_profile_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 - Expanded `V2-005` with automatic discount foundation and authoritative checkout pricing preview:
   - extended control-plane catalog and promotion authority with `mrp`, optional `category_code`, automatic campaign trigger modes and scopes, item/category targeting, and a dedicated checkout-pricing engine that computes line-level and header-level pricing posture for preview, direct sales, and provider-backed checkout sessions
   - persisted commercial sale snapshots for MRP, selling subtotal, automatic discounts, promotion-code discounts, tax, invoice totals, and per-line discount sources so finalized invoices preserve the exact pricing truth used at checkout

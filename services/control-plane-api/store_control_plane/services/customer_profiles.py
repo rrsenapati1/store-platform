@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..repositories import CustomerProfileRepository, TenantRepository
+from ..repositories import CatalogRepository, CustomerProfileRepository, TenantRepository
 from ..utils import new_id
 from .purchase_policy import normalize_gstin
 
@@ -43,6 +43,7 @@ class CustomerProfileService:
     def __init__(self, session: AsyncSession):
         self._session = session
         self._tenant_repo = TenantRepository(session)
+        self._catalog_repo = CatalogRepository(session)
         self._profile_repo = CustomerProfileRepository(session)
 
     async def list_customer_profiles(
@@ -59,7 +60,11 @@ class CustomerProfileService:
             query=_normalize_optional(query),
             status=normalized_status,
         )
-        return {"records": [self._serialize_profile(record) for record in records]}
+        price_tiers = await self._list_price_tier_records(
+            tenant_id=tenant_id,
+            price_tier_ids=[record.default_price_tier_id for record in records if record.default_price_tier_id],
+        )
+        return {"records": [self._serialize_profile(record, price_tiers.get(record.default_price_tier_id)) for record in records]}
 
     async def create_customer_profile(
         self,
@@ -70,6 +75,7 @@ class CustomerProfileService:
         email: str | None,
         gstin: str | None,
         default_note: str | None,
+        default_price_tier_id: str | None,
         tags: list[str] | None,
     ) -> dict[str, object]:
         await self._require_tenant(tenant_id)
@@ -77,6 +83,7 @@ class CustomerProfileService:
         if normalized_name is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Customer full name is required")
         normalized_gstin = normalize_gstin(gstin)
+        price_tier = await self._resolve_assignable_price_tier(tenant_id=tenant_id, price_tier_id=default_price_tier_id)
         if normalized_gstin is not None:
             existing = await self._profile_repo.get_profile_by_gstin(tenant_id=tenant_id, gstin=normalized_gstin)
             if existing is not None:
@@ -89,14 +96,16 @@ class CustomerProfileService:
             email=_normalize_optional(email),
             gstin=normalized_gstin,
             default_note=_normalize_optional(default_note),
+            default_price_tier_id=price_tier.id if price_tier is not None else None,
             tags=_normalize_tags(tags),
         )
-        return self._serialize_profile(record)
+        return self._serialize_profile(record, price_tier)
 
     async def get_customer_profile(self, *, tenant_id: str, customer_profile_id: str) -> dict[str, object]:
         await self._require_tenant(tenant_id)
         record = await self._require_profile(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
-        return self._serialize_profile(record)
+        price_tier = await self._get_price_tier_record(tenant_id=tenant_id, price_tier_id=record.default_price_tier_id)
+        return self._serialize_profile(record, price_tier)
 
     async def update_customer_profile(
         self,
@@ -128,23 +137,33 @@ class CustomerProfileService:
                 if existing is not None and existing.id != record.id:
                     raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Customer GSTIN already exists")
             record.gstin = normalized_gstin
+        if "default_price_tier_id" in updates:
+            price_tier = await self._resolve_assignable_price_tier(
+                tenant_id=tenant_id,
+                price_tier_id=updates.get("default_price_tier_id"),
+            )
+            record.default_price_tier_id = price_tier.id if price_tier is not None else None
+        else:
+            price_tier = await self._get_price_tier_record(tenant_id=tenant_id, price_tier_id=record.default_price_tier_id)
 
         await self._session.flush()
-        return self._serialize_profile(record)
+        return self._serialize_profile(record, price_tier)
 
     async def archive_customer_profile(self, *, tenant_id: str, customer_profile_id: str) -> dict[str, object]:
         await self._require_tenant(tenant_id)
         record = await self._require_profile(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
         record.status = "ARCHIVED"
         await self._session.flush()
-        return self._serialize_profile(record)
+        price_tier = await self._get_price_tier_record(tenant_id=tenant_id, price_tier_id=record.default_price_tier_id)
+        return self._serialize_profile(record, price_tier)
 
     async def reactivate_customer_profile(self, *, tenant_id: str, customer_profile_id: str) -> dict[str, object]:
         await self._require_tenant(tenant_id)
         record = await self._require_profile(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
         record.status = "ACTIVE"
         await self._session.flush()
-        return self._serialize_profile(record)
+        price_tier = await self._get_price_tier_record(tenant_id=tenant_id, price_tier_id=record.default_price_tier_id)
+        return self._serialize_profile(record, price_tier)
 
     async def require_active_profile(self, *, tenant_id: str, customer_profile_id: str):
         record = await self._require_profile(tenant_id=tenant_id, customer_profile_id=customer_profile_id)
@@ -173,8 +192,29 @@ class CustomerProfileService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported customer profile status")
         return upper
 
+    async def _resolve_assignable_price_tier(self, *, tenant_id: str, price_tier_id: str | None):
+        if price_tier_id is None:
+            return None
+        record = await self._catalog_repo.get_price_tier(tenant_id=tenant_id, price_tier_id=price_tier_id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Price tier not found")
+        if record.status != "ACTIVE":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Customer default price tier must be active")
+        return record
+
+    async def _get_price_tier_record(self, *, tenant_id: str, price_tier_id: str | None):
+        if price_tier_id is None:
+            return None
+        return await self._catalog_repo.get_price_tier(tenant_id=tenant_id, price_tier_id=price_tier_id)
+
+    async def _list_price_tier_records(self, *, tenant_id: str, price_tier_ids: list[str]) -> dict[str, object]:
+        unique_ids = sorted({price_tier_id for price_tier_id in price_tier_ids if price_tier_id})
+        if not unique_ids:
+            return {}
+        return await self._catalog_repo.list_price_tiers_by_ids(tenant_id=tenant_id, price_tier_ids=unique_ids)
+
     @staticmethod
-    def _serialize_profile(record) -> dict[str, object]:
+    def _serialize_profile(record, price_tier=None) -> dict[str, object]:
         return {
             "id": record.id,
             "tenant_id": record.tenant_id,
@@ -183,6 +223,9 @@ class CustomerProfileService:
             "email": record.email,
             "gstin": record.gstin,
             "default_note": record.default_note,
+            "default_price_tier_id": record.default_price_tier_id,
+            "default_price_tier_code": price_tier.code if price_tier is not None else None,
+            "default_price_tier_display_name": price_tier.display_name if price_tier is not None else None,
             "tags": list(record.tags or []),
             "status": record.status,
             "created_at": record.created_at,

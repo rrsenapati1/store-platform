@@ -25,6 +25,22 @@ def _normalize_status(value: str | None, *, allowed: set[str], field_name: str) 
     return upper
 
 
+def _normalize_priority(value: object, *, field_name: str = "Priority") -> int:
+    if value is None:
+        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=f"{field_name} is required")
+    try:
+        priority = int(value)
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=f"{field_name} must be a whole number") from error
+    if priority < 0:
+        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=f"{field_name} must be zero or greater")
+    return priority
+
+
+def _normalize_stacking_rule(value: str | None) -> str:
+    return _normalize_status(value, allowed={"STACKABLE", "EXCLUSIVE"}, field_name="Stacking rule")
+
+
 class PromotionService:
     def __init__(self, session: AsyncSession):
         self._session = session
@@ -61,6 +77,8 @@ class PromotionService:
         scope: str,
         discount_type: str,
         discount_value: float,
+        priority: int,
+        stacking_rule: str,
         minimum_order_amount: float | None,
         maximum_discount_amount: float | None,
         redemption_limit_total: int | None,
@@ -103,6 +121,8 @@ class PromotionService:
             scope=normalized_scope,
             discount_type=normalized_discount_type,
             discount_value=self._normalize_discount_value(discount_value),
+            priority=_normalize_priority(priority),
+            stacking_rule=_normalize_stacking_rule(stacking_rule),
             minimum_order_amount=self._normalize_amount(minimum_order_amount, field_name="Minimum order amount"),
             maximum_discount_amount=self._normalize_amount(maximum_discount_amount, field_name="Maximum discount amount"),
             redemption_limit_total=self._normalize_limit(redemption_limit_total, field_name="Redemption limit total"),
@@ -117,6 +137,8 @@ class PromotionService:
         next_trigger_mode = record.trigger_mode
         next_scope = record.scope
         next_discount_type = record.discount_type
+        next_priority = int(record.priority)
+        next_stacking_rule = record.stacking_rule
         next_target_product_ids = list(record.target_product_ids or [])
         next_target_category_codes = list(record.target_category_codes or [])
         if "name" in updates:
@@ -139,6 +161,10 @@ class PromotionService:
             )
         if "discount_value" in updates:
             record.discount_value = self._normalize_discount_value(updates.get("discount_value"))
+        if "priority" in updates:
+            next_priority = _normalize_priority(updates.get("priority"))
+        if "stacking_rule" in updates:
+            next_stacking_rule = _normalize_stacking_rule(updates.get("stacking_rule"))
         if "minimum_order_amount" in updates:
             record.minimum_order_amount = self._normalize_amount(updates.get("minimum_order_amount"), field_name="Minimum order amount")
         if "maximum_discount_amount" in updates:
@@ -163,6 +189,8 @@ class PromotionService:
         record.trigger_mode = next_trigger_mode
         record.scope = next_scope
         record.discount_type = next_discount_type
+        record.priority = next_priority
+        record.stacking_rule = next_stacking_rule
         record.target_product_ids = normalized_targets["target_product_ids"]
         record.target_category_codes = normalized_targets["target_category_codes"]
         await self._session.flush()
@@ -405,6 +433,8 @@ class PromotionService:
             "scope": record.scope,
             "discount_type": record.discount_type,
             "discount_value": record.discount_value,
+            "priority": int(record.priority),
+            "stacking_rule": record.stacking_rule,
             "minimum_order_amount": record.minimum_order_amount,
             "maximum_discount_amount": record.maximum_discount_amount,
             "redemption_limit_total": record.redemption_limit_total,
@@ -425,6 +455,8 @@ class PromotionService:
             "scope": record.scope,
             "discount_type": record.discount_type,
             "discount_value": float(record.discount_value),
+            "priority": int(record.priority),
+            "stacking_rule": record.stacking_rule,
         }
 
     @staticmethod

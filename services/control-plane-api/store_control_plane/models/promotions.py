@@ -19,6 +19,8 @@ class PromotionCampaign(Base, TimestampMixin):
     scope: Mapped[str] = mapped_column(String(32), default="CART")
     discount_type: Mapped[str] = mapped_column(String(32))
     discount_value: Mapped[float] = mapped_column(Float(), default=0.0)
+    priority: Mapped[int] = mapped_column(Integer(), default=100)
+    stacking_rule: Mapped[str] = mapped_column(String(32), default="STACKABLE")
     minimum_order_amount: Mapped[float | None] = mapped_column(Float(), default=None)
     maximum_discount_amount: Mapped[float | None] = mapped_column(Float(), default=None)
     redemption_limit_total: Mapped[int | None] = mapped_column(Integer(), default=None)
