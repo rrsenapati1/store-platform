@@ -18,6 +18,7 @@ import type {
   ControlPlaneGoodsReceiptRecord,
   ControlPlaneInventorySnapshotRecord,
   ControlPlaneCheckoutPricePreview,
+  ControlPlaneCashierSession,
   ControlPlanePrintJob,
   ControlPlanePurchaseOrder,
   ControlPlaneReplenishmentBoard,
@@ -57,6 +58,11 @@ import {
   saveStoreRuntimeSession,
   type StoreRuntimeSessionRecord,
 } from './storeRuntimeSessionStore';
+import {
+  runCloseCashierSession,
+  runLoadCashierSessions,
+  runOpenCashierSession,
+} from './storeCashierSessionActions';
 import { resolveStoreRuntimeSessionRestorePolicy } from './storeRuntimeSessionRestorePolicy';
 import {
   runCancelRestockTask,
@@ -147,6 +153,8 @@ export function useStoreRuntimeWorkspace() {
   const [runtimeDevices, setRuntimeDevices] = useState<ControlPlaneDeviceRecord[]>([]);
   const [selectedRuntimeDeviceId, setSelectedRuntimeDeviceId] = useState('');
   const [runtimeDeviceClaim, setRuntimeDeviceClaim] = useState<ControlPlaneRuntimeDeviceClaimResolution | null>(null);
+  const [cashierSessions, setCashierSessions] = useState<ControlPlaneCashierSession[]>([]);
+  const [activeCashierSession, setActiveCashierSession] = useState<ControlPlaneCashierSession | null>(null);
   const [runtimeHeartbeat, setRuntimeHeartbeat] = useState<ControlPlaneRuntimeHeartbeat | null>(null);
   const [printJobs, setPrintJobs] = useState<ControlPlanePrintJob[]>([]);
   const [latestPrintJob, setLatestPrintJob] = useState<ControlPlanePrintJob | null>(null);
@@ -211,6 +219,9 @@ export function useStoreRuntimeWorkspace() {
   const [blindCountedQuantity, setBlindCountedQuantity] = useState('');
   const [stockCountReviewNote, setStockCountReviewNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [cashierOpeningFloatAmount, setCashierOpeningFloatAmount] = useState('');
+  const [cashierOpeningNote, setCashierOpeningNote] = useState('');
+  const [cashierClosingNote, setCashierClosingNote] = useState('');
   const [returnQuantity, setReturnQuantity] = useState('1');
   const [refundAmount, setRefundAmount] = useState('');
   const [refundMethod, setRefundMethod] = useState('Cash');
@@ -240,6 +251,7 @@ export function useStoreRuntimeWorkspace() {
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? actor?.branch_memberships[0]?.tenant_id ?? '';
   const branchId = actor?.branch_memberships[0]?.branch_id ?? branches[0]?.branch_id ?? '';
   const selectedCatalogItem = branchCatalogItems[0] ?? null;
+  const selectedRuntimeDevice = runtimeDevices.find((device) => device.id === selectedRuntimeDeviceId) ?? runtimeDevices[0] ?? null;
   const parsedGiftCardAmount = Number(giftCardAmount || 0);
   const parsedStoreCreditAmount = selectedCustomerProfile ? Number(storeCreditAmount || 0) : 0;
   const parsedLoyaltyPointsToRedeem = selectedCustomerProfile ? Number(loyaltyPointsToRedeem || 0) : 0;
@@ -312,6 +324,7 @@ export function useStoreRuntimeWorkspace() {
     accessToken,
     tenantId,
     branchId,
+    cashierSessionId: activeCashierSession?.id ?? null,
     selectedCatalogItem,
     customerProfileId: selectedCustomerProfile?.id ?? null,
     customerVoucherId: selectedCustomerVoucherId || null,
@@ -395,6 +408,7 @@ export function useStoreRuntimeWorkspace() {
     setCheckoutPricePreviewError('');
   }, [
     accessToken,
+    activeCashierSession?.id,
     branchId,
     customerGstin,
     customerName,
@@ -407,6 +421,31 @@ export function useStoreRuntimeWorkspace() {
     selectedCustomerProfile?.id,
     selectedCustomerVoucherId,
     storeCreditAmount,
+    tenantId,
+  ]);
+
+  useEffect(() => {
+    if (!accessToken || !tenantId || !branchId || !actor?.user_id || !selectedRuntimeDeviceId) {
+      applyStateTransition(() => {
+        setCashierSessions([]);
+        setActiveCashierSession(null);
+      });
+      return;
+    }
+    if (!selectedRuntimeDevice?.assigned_staff_profile_id) {
+      applyStateTransition(() => {
+        setCashierSessions([]);
+        setActiveCashierSession(null);
+      });
+      return;
+    }
+    void loadCashierSessions();
+  }, [
+    accessToken,
+    actor?.user_id,
+    branchId,
+    selectedRuntimeDevice?.assigned_staff_profile_id,
+    selectedRuntimeDeviceId,
     tenantId,
   ]);
 
@@ -431,6 +470,8 @@ export function useStoreRuntimeWorkspace() {
       setRuntimeDevices([]);
       setSelectedRuntimeDeviceId('');
       setRuntimeDeviceClaim(null);
+      setCashierSessions([]);
+      setActiveCashierSession(null);
       setRuntimeHeartbeat(null);
       setPrintJobs([]);
       setLatestPrintJob(null);
@@ -470,6 +511,9 @@ export function useStoreRuntimeWorkspace() {
       setGiftCardAmountState('');
       setStoreCreditAmount('');
       setLoyaltyPointsToRedeem('');
+      setCashierOpeningFloatAmount('');
+      setCashierOpeningNote('');
+      setCashierClosingNote('');
       setRestockRequestedQuantity('');
       setRestockPickedQuantity('');
       setRestockSourcePosture('BACKROOM_AVAILABLE');
@@ -614,6 +658,85 @@ export function useStoreRuntimeWorkspace() {
     }
   }
 
+  async function loadCashierSessions() {
+    if (!accessToken || !tenantId || !branchId || !actor?.user_id || !selectedRuntimeDeviceId) {
+      return;
+    }
+    if (!selectedRuntimeDevice?.assigned_staff_profile_id) {
+      applyStateTransition(() => {
+        setCashierSessions([]);
+        setActiveCashierSession(null);
+      });
+      return;
+    }
+    await runLoadCashierSessions({
+      accessToken,
+      tenantId,
+      branchId,
+      actorUserId: actor.user_id,
+      selectedRuntimeDeviceId,
+      setIsBusy,
+      setErrorMessage,
+      setCashierSessions,
+      setActiveCashierSession,
+    });
+  }
+
+  async function openCashierSession() {
+    if (!accessToken || !tenantId || !branchId || !actor?.user_id) {
+      return;
+    }
+    if (!selectedRuntimeDeviceId || !selectedRuntimeDevice) {
+      setErrorMessage('Select an assigned runtime device before opening a cashier session.');
+      return;
+    }
+    if (!selectedRuntimeDevice.assigned_staff_profile_id) {
+      setErrorMessage('The selected runtime device must be assigned to a staff profile before opening a cashier session.');
+      return;
+    }
+    const parsedOpeningFloatAmount = Number(cashierOpeningFloatAmount || 0);
+    if (!Number.isFinite(parsedOpeningFloatAmount) || parsedOpeningFloatAmount < 0) {
+      setErrorMessage('Opening float amount must be zero or greater.');
+      return;
+    }
+    await runOpenCashierSession({
+      accessToken,
+      tenantId,
+      branchId,
+      deviceRegistrationId: selectedRuntimeDeviceId,
+      staffProfileId: selectedRuntimeDevice.assigned_staff_profile_id,
+      openingFloatAmount: parsedOpeningFloatAmount,
+      openingNote: cashierOpeningNote,
+      actorUserId: actor.user_id,
+      setIsBusy,
+      setErrorMessage,
+      setCashierSessions,
+      setActiveCashierSession,
+      setCashierOpeningFloatAmount,
+      setCashierOpeningNote,
+    });
+  }
+
+  async function closeCashierSession() {
+    if (!accessToken || !tenantId || !branchId || !actor?.user_id || !activeCashierSession) {
+      return;
+    }
+    await runCloseCashierSession({
+      accessToken,
+      tenantId,
+      branchId,
+      cashierSessionId: activeCashierSession.id,
+      actorUserId: actor.user_id,
+      selectedRuntimeDeviceId,
+      closingNote: cashierClosingNote,
+      setIsBusy,
+      setErrorMessage,
+      setCashierSessions,
+      setActiveCashierSession,
+      setCashierClosingNote,
+    });
+  }
+
   function resetRestockForm() {
     applyStateTransition(() => {
       setRestockRequestedQuantity('');
@@ -678,6 +801,8 @@ export function useStoreRuntimeWorkspace() {
       setSales(cachedSnapshot.sales);
       setRuntimeDevices(cachedSnapshot.runtime_devices);
       setSelectedRuntimeDeviceId(cachedSnapshot.selected_runtime_device_id || (cachedSnapshot.runtime_devices[0]?.id ?? ''));
+      setCashierSessions([]);
+      setActiveCashierSession(null);
       setRuntimeHeartbeat(cachedSnapshot.runtime_heartbeat);
       setPrintJobs(cachedSnapshot.print_jobs);
       setLatestPrintJob(cachedSnapshot.latest_print_job);
@@ -752,6 +877,8 @@ export function useStoreRuntimeWorkspace() {
       setRuntimeDevices(devicesResponse.records);
       setSelectedRuntimeDeviceId(runtimeDeviceBinding.selectedRuntimeDeviceId);
       setRuntimeDeviceClaim(runtimeDeviceBinding.runtimeDeviceClaim);
+      setCashierSessions([]);
+      setActiveCashierSession(null);
       setHubIdentityRecord(nextHubIdentity);
       setCacheStatus('SYNCED');
       setActivationCode('');
@@ -1307,6 +1434,10 @@ export function useStoreRuntimeWorkspace() {
     if (!catalogItem || !actor) {
       return;
     }
+    if (!activeCashierSession) {
+      setErrorMessage('Open a cashier session before billing.');
+      return;
+    }
     if (paymentMethod === 'CASHFREE_UPI_QR'
       || paymentMethod === 'CASHFREE_HOSTED_TERMINAL'
       || paymentMethod === 'CASHFREE_HOSTED_PHONE') {
@@ -1320,6 +1451,7 @@ export function useStoreRuntimeWorkspace() {
     setErrorMessage('');
     try {
         const draftPayload = {
+          cashierSessionId: activeCashierSession.id,
           customerProfileId: selectedCustomerProfile?.id ?? null,
           customerName,
           customerGstin: customerGstin || null,
@@ -1379,6 +1511,7 @@ export function useStoreRuntimeWorkspace() {
 
       try {
         const sale = await storeControlPlaneClient.createSale(accessToken, tenantId, branchId, {
+          cashier_session_id: activeCashierSession.id,
           customer_profile_id: selectedCustomerProfile?.id ?? undefined,
           customer_name: customerName,
           customer_gstin: customerGstin || null,
@@ -1529,11 +1662,11 @@ export function useStoreRuntimeWorkspace() {
   }
 
   async function refreshCheckoutPricePreview() {
-    if (!accessToken || !tenantId || !branchId) {
+    if (!accessToken || !tenantId || !branchId || !activeCashierSession) {
       applyStateTransition(() => {
         setCheckoutPricePreview(null);
-        setCheckoutPricePreviewError('Checkout pricing preview requires a live online runtime session.');
-        setErrorMessage('Checkout pricing preview requires a live online runtime session.');
+        setCheckoutPricePreviewError('Open a cashier session before refreshing checkout pricing.');
+        setErrorMessage('Open a cashier session before refreshing checkout pricing.');
       });
       return;
     }
@@ -1545,6 +1678,7 @@ export function useStoreRuntimeWorkspace() {
           accessToken,
           tenantId,
           branchId,
+          cashierSessionId: activeCashierSession.id,
           selectedCatalogItem,
           customerProfileId: selectedCustomerProfile?.id ?? null,
           customerVoucherId: selectedCustomerVoucherId || null,
@@ -1853,10 +1987,15 @@ export function useStoreRuntimeWorkspace() {
     if (!accessToken || !tenantId || !branchId || !sale || !saleLine) {
       return;
     }
+    if (!activeCashierSession) {
+      setErrorMessage('Open a cashier session before processing returns.');
+      return;
+    }
     setIsBusy(true);
     setErrorMessage('');
     try {
       const saleReturn = await storeControlPlaneClient.createSaleReturn(accessToken, tenantId, branchId, sale.id, {
+        cashier_session_id: activeCashierSession.id,
         refund_amount: Number(refundAmount),
         refund_method: refundMethod,
         lines: [{ product_id: saleLine.product_id, quantity: Number(returnQuantity) }],
@@ -2245,6 +2384,7 @@ export function useStoreRuntimeWorkspace() {
   return {
     accessToken,
     activeBatchExpirySession,
+    activeCashierSession,
     activeStockCountSession,
     actor,
     approveStockCountSession,
@@ -2254,6 +2394,10 @@ export function useStoreRuntimeWorkspace() {
     branchCatalogItems,
     branchId,
     branches,
+    cashierSessions,
+    cashierOpeningFloatAmount,
+    cashierOpeningNote,
+    cashierClosingNote,
     cacheBackendDetail: cachePersistence.detail,
     cacheBackendKind: cachePersistence.backend_kind,
     cacheBackendLabel: cachePersistence.backend_label,
@@ -2267,6 +2411,7 @@ export function useStoreRuntimeWorkspace() {
     createExchange,
     createBatchExpirySession,
     createBatchExpiryWriteOff,
+    closeCashierSession,
     createStockCountSession,
     createSaleReturn,
     createSalesInvoice,
@@ -2331,6 +2476,7 @@ export function useStoreRuntimeWorkspace() {
     printJobs,
     loadBatchExpiryBoard,
     loadBatchExpiryReport,
+    loadCashierSessions,
     loadCustomerProfiles,
     loadReceivingBoard,
     loadRestockBoard,
@@ -2346,6 +2492,7 @@ export function useStoreRuntimeWorkspace() {
     assignRuntimePreferredScanner: runtimeHardware.assignPreferredScanner,
     assignRuntimeReceiptPrinter: runtimeHardware.assignReceiptPrinter,
     openRuntimeCashDrawer,
+    openCashierSession,
     readRuntimeScaleWeight,
     recordBatchExpirySession,
     recordStockCountSession,
@@ -2468,8 +2615,11 @@ export function useStoreRuntimeWorkspace() {
       setNewPin,
       setPaymentMethod,
       setPromotionCode,
-      setGiftCardAmount,
-      setGiftCardCode,
+    setGiftCardAmount,
+    setGiftCardCode,
+    setCashierOpeningFloatAmount,
+    setCashierOpeningNote,
+    setCashierClosingNote,
     setRestockRequestedQuantity,
     setRestockPickedQuantity,
     setRestockSourcePosture,

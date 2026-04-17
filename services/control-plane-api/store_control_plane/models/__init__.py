@@ -30,7 +30,7 @@ from .runtime import PrintJob
 from .sync_runtime import HubSpokeObservation, HubSyncStatus, SyncConflict, SyncEnvelope, SyncMutationLog
 from .supplier_reporting import SupplierReportSnapshot, VendorDispute
 from .tenant import Branch, OwnerInvite, Tenant
-from .workforce import DeviceClaim, DeviceRegistration, SpokeRuntimeActivation, StaffProfile, StoreDesktopActivation
+from .workforce import BranchCashierSession, DeviceClaim, DeviceRegistration, SpokeRuntimeActivation, StaffProfile, StoreDesktopActivation
 
 __all__ = [
     "AppSession",
@@ -41,6 +41,7 @@ __all__ = [
     "BillingPlan",
     "BranchIrpProfile",
     "Branch",
+    "BranchCashierSession",
     "BranchCatalogItem",
     "BranchPriceTierPrice",
     "BranchMembership",

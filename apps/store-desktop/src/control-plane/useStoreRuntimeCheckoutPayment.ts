@@ -16,6 +16,7 @@ interface UseStoreRuntimeCheckoutPaymentArgs {
   accessToken: string;
   tenantId: string;
   branchId: string;
+  cashierSessionId: string | null;
   selectedCatalogItem: ControlPlaneBranchCatalogItem | null;
   customerProfileId: string | null;
   customerVoucherId: string | null;
@@ -81,6 +82,7 @@ export function useStoreRuntimeCheckoutPayment({
   accessToken,
   tenantId,
   branchId,
+  cashierSessionId,
   selectedCatalogItem,
   customerProfileId,
   customerVoucherId,
@@ -164,6 +166,10 @@ export function useStoreRuntimeCheckoutPayment({
       onError('Selected payment method is not backed by Cashfree checkout.');
       return;
     }
+    if (!cashierSessionId) {
+      onError('Open a cashier session before billing.');
+      return;
+    }
     const quantity = Number(saleQuantity);
     if (!Number.isFinite(quantity) || quantity <= 0) {
       onError('Sale quantity must be a positive number.');
@@ -176,6 +182,7 @@ export function useStoreRuntimeCheckoutPayment({
       const session = await storeControlPlaneClient.createCheckoutPaymentSession(accessToken, tenantId, branchId, {
         provider_name: 'cashfree',
         payment_method: paymentMethod,
+        cashier_session_id: cashierSessionId,
         handoff_surface: methodConfiguration.handoffSurface,
         provider_payment_mode: methodConfiguration.providerPaymentMode,
         customer_profile_id: customerProfileId,

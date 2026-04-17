@@ -124,8 +124,46 @@ def _seed_checkout_context(client: TestClient) -> dict[str, object]:
     )
     assert branch_membership.status_code == 200
 
+    staff_profile = client.post(
+        f"/v1/tenants/{tenant_id}/staff-profiles",
+        headers=owner_headers,
+        json={
+            "email": "cashier@acme.local",
+            "full_name": "Counter Cashier",
+            "phone_number": "9876543210",
+            "primary_branch_id": branch_id,
+        },
+    )
+    assert staff_profile.status_code == 200
+    staff_profile_id = staff_profile.json()["id"]
+
+    device = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/devices",
+        headers=owner_headers,
+        json={
+            "device_name": "Counter Desktop 1",
+            "device_code": "BLR-POS-01",
+            "session_surface": "store_desktop",
+            "assigned_staff_profile_id": staff_profile_id,
+        },
+    )
+    assert device.status_code == 200
+    device_id = device.json()["id"]
+
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+
+    open_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/cashier-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": device_id,
+            "staff_profile_id": staff_profile_id,
+            "opening_float_amount": 500.0,
+            "opening_note": "Morning shift",
+        },
+    )
+    assert open_session.status_code == 200
 
     return {
         "tenant_id": tenant_id,
@@ -133,12 +171,14 @@ def _seed_checkout_context(client: TestClient) -> dict[str, object]:
         "product_id": product_id,
         "owner_headers": owner_headers,
         "cashier_headers": cashier_headers,
+        "cashier_session_id": open_session.json()["id"],
     }
 
 
 def _payment_session_payload(
     *,
     product_id: str,
+    cashier_session_id: str | None = None,
     payment_method: str = "CASHFREE_UPI_QR",
     handoff_surface: str | None = None,
     provider_payment_mode: str | None = None,
@@ -150,6 +190,7 @@ def _payment_session_payload(
 ) -> dict[str, object]:
     return {
         "provider_name": "cashfree",
+        "cashier_session_id": cashier_session_id,
         "payment_method": payment_method,
         "handoff_surface": handoff_surface,
         "provider_payment_mode": provider_payment_mode,
@@ -262,7 +303,10 @@ def test_cashier_creates_checkout_payment_session_and_receives_qr_ready_state(mo
     response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"])),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+        ),
     )
 
     assert response.status_code == 200
@@ -308,7 +352,9 @@ def test_checkout_payment_session_rejects_missing_cashier_session_id(monkeypatch
     response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"])),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+        ),
     )
 
     assert response.status_code == 422
@@ -331,7 +377,11 @@ def test_cashier_can_create_hosted_terminal_and_phone_checkout_payment_sessions(
     terminal_response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"]), payment_method="CASHFREE_HOSTED_TERMINAL"),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+            payment_method="CASHFREE_HOSTED_TERMINAL",
+        ),
     )
     assert terminal_response.status_code == 200
     assert terminal_response.json()["handoff_surface"] == "HOSTED_TERMINAL"
@@ -344,7 +394,11 @@ def test_cashier_can_create_hosted_terminal_and_phone_checkout_payment_sessions(
     phone_response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"]), payment_method="CASHFREE_HOSTED_PHONE"),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+            payment_method="CASHFREE_HOSTED_PHONE",
+        ),
     )
     assert phone_response.status_code == 200
     assert phone_response.json()["handoff_surface"] == "HOSTED_PHONE"
@@ -373,7 +427,10 @@ def test_confirmed_cashfree_checkout_session_finalizes_single_sale_and_decrement
     create_response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"])),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+        ),
     )
     assert create_response.status_code == 200
     session_id = create_response.json()["id"]
@@ -487,6 +544,7 @@ def test_checkout_payment_session_applies_loyalty_redemption_before_provider_fin
         headers=context["cashier_headers"],
         json=_payment_session_payload(
             product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
             customer_profile_id=customer_profile_id,
             loyalty_points_to_redeem=200,
         ),
@@ -572,6 +630,7 @@ def test_checkout_payment_session_applies_promotion_code_to_order_amount(monkeyp
         headers=context["cashier_headers"],
         json=_payment_session_payload(
             product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
             promotion_code="CHECKOUT20",
         ),
     )
@@ -597,6 +656,7 @@ def test_checkout_payment_session_rejects_invalid_promotion_code(monkeypatch) ->
         headers=context["cashier_headers"],
         json=_payment_session_payload(
             product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
             promotion_code="UNKNOWN20",
         ),
     )
@@ -706,6 +766,7 @@ def test_checkout_payment_session_amount_matches_price_preview_with_automatic_di
         headers=context["cashier_headers"],
         json=_payment_session_payload(
             product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
             customer_profile_id=customer_profile_id,
             promotion_code="CHECKOUT20",
             store_credit_amount=10.0,
@@ -808,6 +869,7 @@ def test_checkout_payment_session_snapshots_customer_voucher_and_redeems_it_on_f
         headers=context["cashier_headers"],
         json=_payment_session_payload(
             product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
             customer_profile_id=customer_profile_id,
             customer_voucher_id=voucher_id,
         ),
@@ -903,6 +965,7 @@ def test_checkout_payment_session_cancel_keeps_customer_voucher_active(monkeypat
         headers=context["cashier_headers"],
         json=_payment_session_payload(
             product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
             customer_profile_id=customer_profile_id,
             customer_voucher_id=issued_voucher.json()["id"],
         ),
@@ -941,7 +1004,10 @@ def test_confirmed_checkout_payment_session_can_be_recovered_and_history_lists_r
     create_response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"])),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+        ),
     )
     assert create_response.status_code == 200
     session_id = create_response.json()["id"]
@@ -1020,7 +1086,11 @@ def test_failed_checkout_payment_session_can_be_retried_into_a_fresh_session(mon
     create_response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"]), payment_method="CASHFREE_HOSTED_PHONE"),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+            payment_method="CASHFREE_HOSTED_PHONE",
+        ),
     )
     assert create_response.status_code == 200
     original_session_id = create_response.json()["id"]
@@ -1084,7 +1154,10 @@ def test_failed_or_expired_checkout_payment_sessions_never_create_sales(monkeypa
     first_session = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"])),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+        ),
     )
     assert first_session.status_code == 200
     first_payload = _cashfree_failure_webhook(
@@ -1110,7 +1183,10 @@ def test_failed_or_expired_checkout_payment_sessions_never_create_sales(monkeypa
     second_session = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"])),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+        ),
     )
     assert second_session.status_code == 200
     second_payload = _cashfree_failure_webhook(
@@ -1171,7 +1247,10 @@ def test_cashfree_checkout_webhook_rejects_bad_signature(monkeypatch) -> None:
     create_response = client.post(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/checkout-payment-sessions",
         headers=context["cashier_headers"],
-        json=_payment_session_payload(product_id=str(context["product_id"])),
+        json=_payment_session_payload(
+            product_id=str(context["product_id"]),
+            cashier_session_id=str(context["cashier_session_id"]),
+        ),
     )
     assert create_response.status_code == 200
 

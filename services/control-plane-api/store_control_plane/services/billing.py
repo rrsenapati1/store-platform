@@ -14,6 +14,7 @@ from .loyalty import LoyaltyService
 from .promotions import PromotionService
 from .returns_policy import build_sale_return_draft, credit_note_number, ensure_refund_amount_allowed
 from .store_credit import StoreCreditService
+from .workforce import WorkforceService
 
 
 class BillingService:
@@ -30,6 +31,7 @@ class BillingService:
         self._promotion_service = PromotionService(session)
         self._gift_card_service = GiftCardService(session)
         self._store_credit_service = StoreCreditService(session)
+        self._workforce_service = WorkforceService(session)
 
     async def create_sale(
         self,
@@ -49,11 +51,20 @@ class BillingService:
         store_credit_amount: float = 0.0,
         loyalty_points_to_redeem: int = 0,
         lines: list[dict[str, float | str]],
+        cashier_session_id: str | None = None,
         auto_commit: bool = True,
     ) -> dict[str, object]:
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
         if branch is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        if cashier_session_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cashier session is required")
+        cashier_session = await self._workforce_service.require_open_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+            actor_user_id=actor_user_id,
+        )
 
         preview = pricing_snapshot
         if preview is None:
@@ -101,6 +112,7 @@ class BillingService:
         persisted = await self._billing_repo.create_sale(
             tenant_id=tenant_id,
             branch_id=branch_id,
+            cashier_session_id=cashier_session.id,
             customer_profile_id=customer_profile_id,
             customer_name=str(preview["customer_name"]),
             customer_gstin=preview.get("customer_gstin"),
@@ -221,6 +233,7 @@ class BillingService:
             entity_id=persisted.sale.id,
             payload={"invoice_number": persisted.invoice.invoice_number, "grand_total": persisted.sale.grand_total},
         )
+        await self._workforce_service.touch_cashier_session_activity(cashier_session=cashier_session)
         if auto_commit:
             await self._session.commit()
         products = {
@@ -261,6 +274,7 @@ class BillingService:
         return [
             {
                 "sale_id": sale.id,
+                "cashier_session_id": sale.cashier_session_id,
                 "customer_profile_id": sale.customer_profile_id,
                 "invoice_number": invoice.invoice_number,
                 "customer_name": sale.customer_name,
@@ -301,6 +315,7 @@ class BillingService:
         branch_id: str,
         sale_id: str,
         actor_user_id: str,
+        cashier_session_id: str | None,
         refund_amount: float,
         refund_method: str,
         lines: list[dict[str, float | str]],
@@ -309,6 +324,14 @@ class BillingService:
         branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
         if branch is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        if cashier_session_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cashier session is required")
+        cashier_session = await self._workforce_service.require_open_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+            actor_user_id=actor_user_id,
+        )
 
         sale_bundle = await self._billing_repo.get_sale_bundle(tenant_id=tenant_id, branch_id=branch_id, sale_id=sale_id)
         if sale_bundle is None:
@@ -374,6 +397,7 @@ class BillingService:
         persisted = await self._billing_repo.create_sale_return(
             tenant_id=tenant_id,
             branch_id=branch_id,
+            cashier_session_id=cashier_session.id,
             sale_id=sale_id,
             status="REFUND_APPROVED" if can_approve_refund else "REFUND_PENDING_APPROVAL",
             refund_amount=refund_amount,
@@ -434,6 +458,7 @@ class BillingService:
                 "status": persisted.sale_return.status,
             },
         )
+        await self._workforce_service.touch_cashier_session_activity(cashier_session=cashier_session)
         if can_approve_refund:
             if persisted.sale_return.refund_method == "STORE_CREDIT" and persisted.sale_return.refund_amount > 0:
                 await self._store_credit_service.issue_customer_store_credit(
@@ -777,6 +802,7 @@ class BillingService:
         return [
             {
                 "sale_return_id": sale_return.id,
+                "cashier_session_id": sale_return.cashier_session_id,
                 "sale_id": sale.id,
                 "invoice_number": invoice.invoice_number,
                 "customer_name": sale.customer_name,
@@ -875,6 +901,7 @@ class BillingService:
             "sale_id": sale.id,
             "tenant_id": sale.tenant_id,
             "branch_id": sale.branch_id,
+            "cashier_session_id": sale.cashier_session_id,
             "customer_profile_id": sale.customer_profile_id,
             "customer_name": sale.customer_name,
             "customer_gstin": sale.customer_gstin,
@@ -1018,6 +1045,7 @@ class BillingService:
             "id": sale_return.id,
             "tenant_id": sale_return.tenant_id,
             "branch_id": sale_return.branch_id,
+            "cashier_session_id": sale_return.cashier_session_id,
             "sale_id": sale_return.sale_id,
             "status": sale_return.status,
             "refund_amount": sale_return.refund_amount,

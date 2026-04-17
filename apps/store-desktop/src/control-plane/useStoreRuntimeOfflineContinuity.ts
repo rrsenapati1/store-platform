@@ -37,6 +37,7 @@ type UseStoreRuntimeOfflineContinuityArgs = {
 };
 
 type CreateOfflineSaleArgs = {
+  cashierSessionId: string;
   customerName: string;
   customerGstin?: string | null;
   paymentMethod: string;
@@ -131,6 +132,7 @@ function serializeReplayPayload(sale: StoreRuntimeOfflineSaleRecord): ControlPla
     continuity_invoice_number: sale.continuity_invoice_number,
     idempotency_key: sale.idempotency_key,
     issued_offline_at: sale.issued_offline_at,
+    cashier_session_id: sale.cashier_session_id ?? null,
     staff_actor_id: sale.staff_actor_id,
     customer_name: sale.customer_name,
     customer_gstin: sale.customer_gstin ?? null,
@@ -311,6 +313,7 @@ export function useStoreRuntimeOfflineContinuity({
       tenantId,
       branchId,
       branchCode: selectedBranch.code,
+      cashierSessionId: args.cashierSessionId,
       hubDeviceId: hubIdentityRecord?.device_id ?? selectedRuntimeDevice?.id ?? '',
       staffActorId,
       branchGstin: selectedBranch.gstin ?? null,

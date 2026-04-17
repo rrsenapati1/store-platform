@@ -94,6 +94,40 @@ def build_runtime_user_subject(*, session_surface: str, staff_profile_id: str) -
     return f"{session_surface}-activation:{staff_profile_id}"
 
 
+def cashier_session_number(*, branch_code: str, sequence_number: int) -> str:
+    normalized_branch_code = "".join(character for character in branch_code.upper() if character.isalnum())
+    return f"CSES-{normalized_branch_code}-{sequence_number:04d}"
+
+
+def serialize_cashier_session(record, *, device, staff_profile, summary: dict[str, object] | None = None) -> dict[str, object]:
+    resolved_summary = summary or {}
+    return {
+        "id": record.id,
+        "tenant_id": record.tenant_id,
+        "branch_id": record.branch_id,
+        "device_registration_id": record.device_registration_id,
+        "device_name": device.device_name if device is not None else None,
+        "device_code": device.device_code if device is not None else None,
+        "staff_profile_id": record.staff_profile_id,
+        "staff_full_name": staff_profile.full_name if staff_profile is not None else None,
+        "runtime_user_id": record.runtime_user_id,
+        "opened_by_user_id": record.opened_by_user_id,
+        "closed_by_user_id": record.closed_by_user_id,
+        "status": record.status,
+        "session_number": record.session_number,
+        "opening_float_amount": record.opening_float_amount,
+        "opening_note": record.opening_note,
+        "closing_note": record.closing_note,
+        "force_close_reason": record.force_close_reason,
+        "opened_at": record.opened_at,
+        "closed_at": record.closed_at,
+        "last_activity_at": record.last_activity_at,
+        "linked_sales_count": int(resolved_summary.get("linked_sales_count", 0)),
+        "linked_returns_count": int(resolved_summary.get("linked_returns_count", 0)),
+        "gross_billed_amount": round(float(resolved_summary.get("gross_billed_amount", 0.0)), 2),
+    }
+
+
 class WorkforceService:
     def __init__(self, session: AsyncSession):
         self._session = session
@@ -335,6 +369,272 @@ class WorkforceService:
             }
             for device in devices
         ]
+
+    async def create_cashier_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        actor_user_id: str,
+        device_registration_id: str,
+        staff_profile_id: str,
+        opening_float_amount: float,
+        opening_note: str | None,
+    ) -> dict[str, object]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        device = await self._workforce_repo.get_device_registration(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_id=device_registration_id,
+        )
+        if device is None or device.status != "ACTIVE" or device.session_surface != "store_desktop":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device registration not found")
+        profile = await self._workforce_repo.get_staff_profile_by_id(
+            tenant_id=tenant_id,
+            staff_profile_id=staff_profile_id,
+        )
+        if profile is None or profile.status != "ACTIVE":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff profile not found")
+        actor_user = await self._identity_repo.get_user_by_id(actor_user_id)
+        if actor_user is None or actor_user.email != profile.email:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cashier session must match the active staff profile")
+        if profile.user_id is None:
+            await self._workforce_repo.bind_profiles_for_user(
+                email=profile.email,
+                user_id=actor_user.id,
+                full_name=profile.full_name,
+            )
+        elif profile.user_id != actor_user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cashier session must match the active staff profile")
+        if device.assigned_staff_profile_id != staff_profile_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Device registration is not assigned to this staff profile")
+
+        existing_device_session = await self._workforce_repo.get_open_cashier_session_by_device(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_registration_id=device_registration_id,
+        )
+        if existing_device_session is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A cashier session is already open for this device")
+        existing_staff_session = await self._workforce_repo.get_open_cashier_session_by_staff_profile(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            staff_profile_id=staff_profile_id,
+        )
+        if existing_staff_session is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A cashier session is already open for this staff profile")
+
+        opened_at = utc_now()
+        sequence_number = await self._workforce_repo.next_branch_cashier_session_sequence(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+        )
+        record = await self._workforce_repo.create_branch_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_registration_id=device_registration_id,
+            staff_profile_id=staff_profile_id,
+            runtime_user_id=actor_user_id,
+            opened_by_user_id=actor_user_id,
+            session_number=cashier_session_number(branch_code=branch.code, sequence_number=sequence_number),
+            opening_float_amount=round(float(opening_float_amount), 2),
+            opening_note=opening_note,
+            opened_at=opened_at,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="cashier_session.opened",
+            entity_type="branch_cashier_session",
+            entity_id=record.id,
+            payload={
+                "device_registration_id": device_registration_id,
+                "staff_profile_id": staff_profile_id,
+                "session_number": record.session_number,
+            },
+        )
+        await self._session.commit()
+        return serialize_cashier_session(record, device=device, staff_profile=profile)
+
+    async def list_branch_cashier_sessions(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        status: str | None = None,
+    ) -> list[dict[str, object]]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        records = await self._workforce_repo.list_branch_cashier_sessions(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            status=status,
+        )
+        devices_by_id = {
+            device.id: device
+            for device in await self._workforce_repo.list_branch_devices(tenant_id=tenant_id, branch_id=branch_id)
+        }
+        staff_profiles_by_id = {
+            profile.id: profile
+            for profile in await self._workforce_repo.list_staff_profiles(tenant_id=tenant_id)
+        }
+        summaries = await self._workforce_repo.summarize_cashier_sessions(
+            cashier_session_ids=[record.id for record in records]
+        )
+        return [
+            serialize_cashier_session(
+                record,
+                device=devices_by_id.get(record.device_registration_id),
+                staff_profile=staff_profiles_by_id.get(record.staff_profile_id),
+                summary=summaries.get(record.id),
+            )
+            for record in records
+        ]
+
+    async def get_cashier_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        cashier_session_id: str,
+    ) -> dict[str, object]:
+        record = await self._workforce_repo.get_branch_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+        )
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cashier session not found")
+        device = await self._workforce_repo.get_device_registration(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_id=record.device_registration_id,
+        )
+        profile = await self._workforce_repo.get_staff_profile_by_id(
+            tenant_id=tenant_id,
+            staff_profile_id=record.staff_profile_id,
+        )
+        summary = (await self._workforce_repo.summarize_cashier_sessions(cashier_session_ids=[record.id])).get(record.id)
+        return serialize_cashier_session(record, device=device, staff_profile=profile, summary=summary)
+
+    async def close_cashier_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        cashier_session_id: str,
+        actor_user_id: str,
+        closing_note: str | None,
+    ) -> dict[str, object]:
+        record = await self._workforce_repo.get_branch_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+        )
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cashier session not found")
+        if record.status != "OPEN":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only open cashier sessions can be closed")
+        if record.runtime_user_id != actor_user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the active cashier can close this session")
+        closed_at = utc_now()
+        await self._workforce_repo.close_branch_cashier_session(
+            cashier_session=record,
+            closed_by_user_id=actor_user_id,
+            status="CLOSED",
+            closing_note=closing_note,
+            force_close_reason=None,
+            closed_at=closed_at,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="cashier_session.closed",
+            entity_type="branch_cashier_session",
+            entity_id=record.id,
+            payload={"session_number": record.session_number},
+        )
+        await self._session.commit()
+        return await self.get_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+        )
+
+    async def force_close_cashier_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        cashier_session_id: str,
+        actor_user_id: str,
+        reason: str,
+    ) -> dict[str, object]:
+        record = await self._workforce_repo.get_branch_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+        )
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cashier session not found")
+        if record.status != "OPEN":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only open cashier sessions can be force-closed")
+        closed_at = utc_now()
+        await self._workforce_repo.close_branch_cashier_session(
+            cashier_session=record,
+            closed_by_user_id=actor_user_id,
+            status="FORCED_CLOSED",
+            closing_note=record.closing_note,
+            force_close_reason=reason,
+            closed_at=closed_at,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="cashier_session.force_closed",
+            entity_type="branch_cashier_session",
+            entity_id=record.id,
+            payload={"session_number": record.session_number, "reason": reason},
+        )
+        await self._session.commit()
+        return await self.get_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+        )
+
+    async def require_open_cashier_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        cashier_session_id: str,
+        actor_user_id: str | None,
+    ):
+        record = await self._workforce_repo.get_branch_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+        )
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cashier session not found")
+        if record.status != "OPEN":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cashier session is not open")
+        if actor_user_id is not None and record.runtime_user_id != actor_user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cashier session does not belong to the active actor")
+        return record
+
+    async def touch_cashier_session_activity(self, *, cashier_session, activity_at=None) -> None:
+        await self._workforce_repo.touch_branch_cashier_session_activity(
+            cashier_session=cashier_session,
+            activity_at=activity_at or utc_now(),
+        )
 
     async def resolve_runtime_device_claim(
         self,

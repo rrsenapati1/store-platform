@@ -68,6 +68,7 @@ describe('store runtime continuity policy', () => {
       tenantId: 'tenant-acme',
       branchId: 'branch-1',
       branchCode: 'blrflagship',
+      cashierSessionId: 'cashier-session-1',
       hubDeviceId: 'device-hub-1',
       staffActorId: 'user-cashier',
       branchGstin: '29ABCDE1234F1Z5',

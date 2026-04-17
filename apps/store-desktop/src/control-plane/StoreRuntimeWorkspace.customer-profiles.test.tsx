@@ -139,6 +139,48 @@ function buildCustomerVouchers(customerProfileId: string) {
   ];
 }
 
+function buildAssignedRuntimeDevice() {
+  return {
+    id: 'device-1',
+    tenant_id: 'tenant-acme',
+    branch_id: 'branch-1',
+    device_name: 'Counter Desktop 1',
+    device_code: 'counter-1',
+    session_surface: 'store_desktop',
+    status: 'ACTIVE',
+    assigned_staff_profile_id: 'staff-1',
+    assigned_staff_full_name: 'Counter Cashier',
+  };
+}
+
+function buildActiveCashierSession() {
+  return {
+    id: 'cashier-session-1',
+    tenant_id: 'tenant-acme',
+    branch_id: 'branch-1',
+    device_registration_id: 'device-1',
+    device_name: 'Counter Desktop 1',
+    device_code: 'counter-1',
+    staff_profile_id: 'staff-1',
+    staff_full_name: 'Counter Cashier',
+    runtime_user_id: 'user-cashier',
+    opened_by_user_id: 'user-cashier',
+    closed_by_user_id: null,
+    status: 'OPEN',
+    session_number: 'CS-BLRFLAGSHIP-0001',
+    opening_float_amount: 150,
+    opening_note: null,
+    closing_note: null,
+    force_close_reason: null,
+    opened_at: '2026-04-16T10:00:00Z',
+    closed_at: null,
+    last_activity_at: '2026-04-16T10:00:00Z',
+    linked_sales_count: 0,
+    linked_returns_count: 0,
+    gross_billed_amount: 0,
+  };
+}
+
 describe('store runtime checkout customer profiles', () => {
   const originalFetch = globalThis.fetch;
 
@@ -227,20 +269,11 @@ describe('store runtime checkout customer profiles', () => {
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
         return jsonResponse({
-          records: [
-            {
-              id: 'device-1',
-              tenant_id: 'tenant-acme',
-              branch_id: 'branch-1',
-              device_name: 'Counter Desktop 1',
-              device_code: 'counter-1',
-              session_surface: 'store_desktop',
-              status: 'ACTIVE',
-              assigned_staff_profile_id: null,
-              assigned_staff_full_name: null,
-            },
-          ],
+          records: [buildAssignedRuntimeDevice()],
         }) as never;
+      }
+      if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && url.includes('status=OPEN') && method === 'GET') {
+        return jsonResponse({ records: [buildActiveCashierSession()] }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
@@ -338,7 +371,7 @@ describe('store runtime checkout customer profiles', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -441,20 +474,11 @@ describe('store runtime checkout customer profiles', () => {
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
         return jsonResponse({
-          records: [
-            {
-              id: 'device-1',
-              tenant_id: 'tenant-acme',
-              branch_id: 'branch-1',
-              device_name: 'Counter Desktop 1',
-              device_code: 'counter-1',
-              session_surface: 'store_desktop',
-              status: 'ACTIVE',
-              assigned_staff_profile_id: null,
-              assigned_staff_full_name: null,
-            },
-          ],
+          records: [buildAssignedRuntimeDevice()],
         }) as never;
+      }
+      if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && url.includes('status=OPEN') && method === 'GET') {
+        return jsonResponse({ records: [buildActiveCashierSession()] }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
@@ -497,7 +521,7 @@ describe('store runtime checkout customer profiles', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
@@ -589,20 +613,11 @@ describe('store runtime checkout customer profiles', () => {
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
         return jsonResponse({
-          records: [
-            {
-              id: 'device-1',
-              tenant_id: 'tenant-acme',
-              branch_id: 'branch-1',
-              device_name: 'Counter Desktop 1',
-              device_code: 'counter-1',
-              session_surface: 'store_desktop',
-              status: 'ACTIVE',
-              assigned_staff_profile_id: null,
-              assigned_staff_full_name: null,
-            },
-          ],
+          records: [buildAssignedRuntimeDevice()],
         }) as never;
+      }
+      if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && url.includes('status=OPEN') && method === 'GET') {
+        return jsonResponse({ records: [buildActiveCashierSession()] }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
@@ -635,7 +650,7 @@ describe('store runtime checkout customer profiles', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
@@ -719,20 +734,11 @@ describe('store runtime checkout customer profiles', () => {
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
         return jsonResponse({
-          records: [
-            {
-              id: 'device-1',
-              tenant_id: 'tenant-acme',
-              branch_id: 'branch-1',
-              device_name: 'Counter Desktop 1',
-              device_code: 'counter-1',
-              session_surface: 'store_desktop',
-              status: 'ACTIVE',
-              assigned_staff_profile_id: null,
-              assigned_staff_full_name: null,
-            },
-          ],
+          records: [buildAssignedRuntimeDevice()],
         }) as never;
+      }
+      if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && url.includes('status=OPEN') && method === 'GET') {
+        return jsonResponse({ records: [buildActiveCashierSession()] }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
@@ -804,7 +810,7 @@ describe('store runtime checkout customer profiles', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
@@ -815,7 +821,7 @@ describe('store runtime checkout customer profiles', () => {
     expect(await screen.findByText('Welcome voucher (15)')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Promotion code'), { target: { value: 'WELCOME20' } });
-    expect(await screen.findByText('None')).toBeInTheDocument();
+    expect((await screen.findAllByText('None')).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply voucher VCH-0001' }));
     expect(await screen.findByText('Welcome voucher (15)')).toBeInTheDocument();
@@ -906,20 +912,11 @@ describe('store runtime checkout customer profiles', () => {
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
         return jsonResponse({
-          records: [
-            {
-              id: 'device-1',
-              tenant_id: 'tenant-acme',
-              branch_id: 'branch-1',
-              device_name: 'Counter Desktop 1',
-              device_code: 'counter-1',
-              session_surface: 'store_desktop',
-              status: 'ACTIVE',
-              assigned_staff_profile_id: null,
-              assigned_staff_full_name: null,
-            },
-          ],
+          records: [buildAssignedRuntimeDevice()],
         }) as never;
+      }
+      if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && url.includes('status=OPEN') && method === 'GET') {
+        return jsonResponse({ records: [buildActiveCashierSession()] }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
@@ -986,7 +983,7 @@ describe('store runtime checkout customer profiles', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));

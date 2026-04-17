@@ -101,6 +101,7 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
     vi.mocked(globalThis.fetch).mockResolvedValueOnce(jsonResponse(preview) as never);
 
     await storeControlPlaneClient.getCheckoutPricePreview('access-token', 'tenant-1', 'branch-1', {
+      cashier_session_id: 'cashier-session-1',
       customer_profile_id: 'profile-1',
       customer_name: 'Acme Traders',
       customer_gstin: '29AAEPM0111C1Z3',
@@ -118,6 +119,7 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
+          cashier_session_id: 'cashier-session-1',
           customer_profile_id: 'profile-1',
           customer_name: 'Acme Traders',
           customer_gstin: '29AAEPM0111C1Z3',
@@ -176,6 +178,7 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
     await storeControlPlaneClient.createCheckoutPaymentSession('access-token', 'tenant-1', 'branch-1', {
       provider_name: 'cashfree',
       payment_method: 'CASHFREE_UPI_QR',
+      cashier_session_id: 'cashier-session-1',
       handoff_surface: 'BRANDED_UPI_QR',
       provider_payment_mode: 'cashfree_upi',
       customer_profile_id: 'profile-1',
@@ -197,6 +200,7 @@ describe('storeControlPlaneClient pricing preview payloads', () => {
         body: JSON.stringify({
           provider_name: 'cashfree',
           payment_method: 'CASHFREE_UPI_QR',
+          cashier_session_id: 'cashier-session-1',
           handoff_surface: 'BRANDED_UPI_QR',
           provider_payment_mode: 'cashfree_upi',
           customer_profile_id: 'profile-1',

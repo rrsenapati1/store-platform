@@ -47,6 +47,19 @@ def _bootstrap_replay_context(client: TestClient) -> dict[str, str]:
     assert branch.status_code == 200
     branch_id = branch.json()["id"]
 
+    staff_profile = client.post(
+        f"/v1/tenants/{tenant_id}/staff-profiles",
+        headers=owner_headers,
+        json={
+            "email": "cashier@acme.local",
+            "full_name": "Counter Cashier",
+            "phone_number": "9876543210",
+            "primary_branch_id": branch_id,
+        },
+    )
+    assert staff_profile.status_code == 200
+    staff_profile_id = staff_profile.json()["id"]
+
     product = client.post(
         f"/v1/tenants/{tenant_id}/catalog/products",
         headers=owner_headers,
@@ -123,18 +136,33 @@ def _bootstrap_replay_context(client: TestClient) -> dict[str, str]:
             "device_code": "BLR-HUB-01",
             "session_surface": "store_desktop",
             "is_branch_hub": True,
+            "assigned_staff_profile_id": staff_profile_id,
         },
     )
     assert hub.status_code == 200
     hub_payload = hub.json()
 
+    cashier_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/cashier-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": hub_payload["id"],
+            "staff_profile_id": staff_profile_id,
+            "opening_float_amount": 150.0,
+            "opening_note": "Branch hub opening float",
+        },
+    )
+    assert cashier_session.status_code == 200
+
     return {
-      "tenant_id": tenant_id,
-      "branch_id": branch_id,
-      "product_id": product_id,
-      "cashier_user_id": cashier_actor.json()["user_id"],
-      "hub_device_id": hub_payload["id"],
-      "hub_device_secret": hub_payload["sync_access_secret"],
+        "tenant_id": tenant_id,
+        "branch_id": branch_id,
+        "product_id": product_id,
+        "owner_access_token": owner_session["access_token"],
+        "cashier_user_id": cashier_actor.json()["user_id"],
+        "cashier_session_id": cashier_session.json()["id"],
+        "hub_device_id": hub_payload["id"],
+        "hub_device_secret": hub_payload["sync_access_secret"],
     }
 
 
@@ -144,6 +172,7 @@ def _offline_sale_payload(context: dict[str, str], *, quantity: float) -> dict[s
         "continuity_invoice_number": "OFF-BLRFLAGSHIP-0001",
         "idempotency_key": "offline-replay-offline-sale-1",
         "issued_offline_at": "2026-04-14T18:00:00.000Z",
+        "cashier_session_id": context["cashier_session_id"],
         "staff_actor_id": context["cashier_user_id"],
         "customer_name": "Acme Traders",
         "customer_gstin": "29AAEPM0111C1Z3",
@@ -186,6 +215,13 @@ def test_branch_hub_replays_offline_sale_once_and_returns_duplicate_result() -> 
     assert accepted.json()["duplicate"] is False
     assert accepted.json()["sale_id"]
     assert accepted.json()["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
+
+    sales = client.get(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/sales",
+        headers={"authorization": f"Bearer {context['owner_access_token']}"},
+    )
+    assert sales.status_code == 200
+    assert sales.json()["records"][0]["cashier_session_id"] == context["cashier_session_id"]
 
     duplicate = client.post("/v1/sync/offline-sales/replay", headers=device_headers, json=payload)
     assert duplicate.status_code == 200

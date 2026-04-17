@@ -9,6 +9,7 @@ import type {
   ControlPlaneBranchCatalogItem,
   ControlPlaneBranchRecord,
   ControlPlaneBranchCustomerReport,
+  ControlPlaneCashierSession,
   ControlPlaneCheckoutPaymentSession,
   ControlPlaneCheckoutPricePreview,
   ControlPlaneCheckoutPaymentSessionListResponse,
@@ -520,18 +521,19 @@ export const storeControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-      payload: {
-        customer_profile_id?: string | null;
-        customer_name: string;
-        customer_gstin?: string | null;
-        promotion_code?: string | null;
-        customer_voucher_id?: string | null;
-        loyalty_points_to_redeem?: number;
-        store_credit_amount?: number;
-        gift_card_code?: string | null;
-        gift_card_amount?: number;
-        lines: Array<{ product_id: string; quantity: number }>;
-      },
+    payload: {
+      cashier_session_id: string;
+      customer_profile_id?: string | null;
+      customer_name: string;
+      customer_gstin?: string | null;
+      promotion_code?: string | null;
+      customer_voucher_id?: string | null;
+      loyalty_points_to_redeem?: number;
+      store_credit_amount?: number;
+      gift_card_code?: string | null;
+      gift_card_amount?: number;
+      lines: Array<{ product_id: string; quantity: number }>;
+    },
   ) {
     return request<ControlPlaneCheckoutPricePreview>(
       `/v1/tenants/${tenantId}/branches/${branchId}/checkout-price-preview`,
@@ -657,6 +659,52 @@ export const storeControlPlaneClient = {
       accessToken,
     );
   },
+  listCashierSessions(accessToken: string, tenantId: string, branchId: string, status?: string | null) {
+    const search = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request<{ records: ControlPlaneCashierSession[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/cashier-sessions${search}`,
+      undefined,
+      accessToken,
+    );
+  },
+  createCashierSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      device_registration_id: string;
+      staff_profile_id: string;
+      opening_float_amount: number;
+      opening_note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneCashierSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/cashier-sessions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  closeCashierSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    cashierSessionId: string,
+    payload: {
+      closing_note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneCashierSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/cashier-sessions/${cashierSessionId}/close`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
   resolveRuntimeDeviceClaim(
     accessToken: string,
     tenantId: string,
@@ -695,19 +743,20 @@ export const storeControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-      payload: {
-        customer_profile_id?: string | null;
-        customer_name: string;
-        customer_gstin?: string | null;
-        payment_method: string;
-        promotion_code?: string | null;
-        customer_voucher_id?: string | null;
-        store_credit_amount?: number;
-        gift_card_code?: string | null;
-        gift_card_amount?: number;
-        loyalty_points_to_redeem?: number;
-        lines: Array<{ product_id: string; quantity: number }>;
-      },
+    payload: {
+      cashier_session_id: string;
+      customer_profile_id?: string | null;
+      customer_name: string;
+      customer_gstin?: string | null;
+      payment_method: string;
+      promotion_code?: string | null;
+      customer_voucher_id?: string | null;
+      store_credit_amount?: number;
+      gift_card_code?: string | null;
+      gift_card_amount?: number;
+      loyalty_points_to_redeem?: number;
+      lines: Array<{ product_id: string; quantity: number }>;
+    },
   ) {
     return request<ControlPlaneSale>(
       `/v1/tenants/${tenantId}/branches/${branchId}/sales`,
@@ -722,22 +771,23 @@ export const storeControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-      payload: {
-        provider_name: string;
-        payment_method: string;
-        handoff_surface?: string | null;
-        provider_payment_mode?: string | null;
-        customer_profile_id?: string | null;
-        customer_name: string;
-        customer_gstin?: string | null;
-        promotion_code?: string | null;
-        customer_voucher_id?: string | null;
-        loyalty_points_to_redeem?: number;
-        store_credit_amount?: number;
-        gift_card_code?: string | null;
-        gift_card_amount?: number;
-        lines: Array<{ product_id: string; quantity: number }>;
-      },
+    payload: {
+      provider_name: string;
+      payment_method: string;
+      cashier_session_id: string;
+      handoff_surface?: string | null;
+      provider_payment_mode?: string | null;
+      customer_profile_id?: string | null;
+      customer_name: string;
+      customer_gstin?: string | null;
+      promotion_code?: string | null;
+      customer_voucher_id?: string | null;
+      loyalty_points_to_redeem?: number;
+      store_credit_amount?: number;
+      gift_card_code?: string | null;
+      gift_card_amount?: number;
+      lines: Array<{ product_id: string; quantity: number }>;
+    },
   ) {
     return request<ControlPlaneCheckoutPaymentSession>(
       `/v1/tenants/${tenantId}/branches/${branchId}/checkout-payment-sessions`,
@@ -913,10 +963,11 @@ export const storeControlPlaneClient = {
     accessToken: string,
     tenantId: string,
     branchId: string,
-    saleId: string,
-    payload: {
-      refund_amount: number;
-      refund_method: string;
+      saleId: string,
+      payload: {
+        cashier_session_id: string;
+        refund_amount: number;
+        refund_method: string;
       lines: Array<{ product_id: string; quantity: number }>;
     },
   ) {

@@ -3,6 +3,7 @@ import { OwnerBatchExpirySection } from './OwnerBatchExpirySection';
 import { OwnerBarcodeSection } from './OwnerBarcodeSection';
 import { OwnerBarcodePrintRuntimeSection } from './OwnerBarcodePrintRuntimeSection';
 import { OwnerBillingLifecycleSection } from './OwnerBillingLifecycleSection';
+import { OwnerCashierSessionSection } from './OwnerCashierSessionSection';
 import { OwnerComplianceSection } from './OwnerComplianceSection';
 import { OwnerCustomerInsightsSection } from './OwnerCustomerInsightsSection';
 import { OwnerDeviceClaimSection } from './OwnerDeviceClaimSection';
@@ -308,6 +309,7 @@ export function OwnerWorkspace() {
       <OwnerCustomerInsightsSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerSupplierReportingSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerSyncRuntimeSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
+      <OwnerCashierSessionSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerDeviceClaimSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
 
       <SectionCard eyebrow="Branch device foundation" title="Branch device registration">

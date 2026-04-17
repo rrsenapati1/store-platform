@@ -14,6 +14,7 @@ type PrepareOfflineSaleContinuityDraftArgs = {
   tenantId: string;
   branchId: string;
   branchCode: string;
+  cashierSessionId: string;
   hubDeviceId: string;
   staffActorId: string;
   branchGstin?: string | null;
@@ -220,6 +221,7 @@ export function prepareOfflineSaleContinuityDraft(
       continuity_invoice_number: continuityInvoiceNumber,
       tenant_id: args.tenantId,
       branch_id: args.branchId,
+      cashier_session_id: args.cashierSessionId,
       hub_device_id: args.hubDeviceId,
       staff_actor_id: args.staffActorId,
       customer_name: args.customerName.trim(),

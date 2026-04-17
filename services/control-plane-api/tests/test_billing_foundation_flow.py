@@ -180,11 +180,19 @@ def test_cashier_creates_gst_invoice_and_posts_sale_ledger():
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
             "payment_method": "UPI",
@@ -340,6 +348,13 @@ def test_sale_creation_rejects_missing_cashier_session_id() -> None:
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
@@ -599,12 +614,20 @@ def test_checkout_payment_session_does_not_create_sale_until_payment_confirms():
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     payment_session = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/checkout-payment-sessions",
         headers=cashier_headers,
         json={
             "provider_name": "cashfree",
+            "cashier_session_id": session_context["cashier_session_id"],
             "payment_method": "CASHFREE_UPI_QR",
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
@@ -756,11 +779,19 @@ def test_sale_and_checkout_payment_session_can_link_customer_profile():
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
@@ -776,6 +807,7 @@ def test_sale_and_checkout_payment_session_can_link_customer_profile():
         headers=cashier_headers,
         json={
             "provider_name": "cashfree",
+            "cashier_session_id": session_context["cashier_session_id"],
             "payment_method": "CASHFREE_UPI_QR",
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
@@ -920,11 +952,19 @@ def test_sale_can_partially_redeem_store_credit_for_a_linked_customer_profile() 
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
@@ -1087,11 +1127,19 @@ def test_sale_rejects_store_credit_redemption_without_customer_profile_or_when_b
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     anonymous_redemption = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_name": "Walk In",
             "payment_method": "UPI",
             "store_credit_amount": 10.0,
@@ -1105,6 +1153,7 @@ def test_sale_rejects_store_credit_redemption_without_customer_profile_or_when_b
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
@@ -1263,11 +1312,19 @@ def test_sale_can_redeem_loyalty_points_for_a_linked_customer_profile() -> None:
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
@@ -1440,11 +1497,19 @@ def test_sale_rejects_loyalty_redemption_without_customer_profile_or_when_points
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     anonymous_redemption = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_name": "Walk In",
             "payment_method": "UPI",
             "loyalty_points_to_redeem": 200,
@@ -1458,6 +1523,7 @@ def test_sale_rejects_loyalty_redemption_without_customer_profile_or_when_points
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
@@ -1646,11 +1712,19 @@ def test_sale_applies_promotion_code_before_loyalty_and_store_credit() -> None:
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
@@ -1781,11 +1855,19 @@ def test_sale_rejects_unknown_promotion_code() -> None:
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     invalid = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
             "payment_method": "UPI",
@@ -1993,11 +2075,19 @@ def test_sale_snapshots_automatic_discounts_before_code_loyalty_and_store_credit
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
@@ -2209,11 +2299,19 @@ def test_sale_snapshots_customer_voucher_and_marks_it_redeemed() -> None:
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    session_context = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": session_context["cashier_session_id"],
             "customer_profile_id": customer_profile_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",

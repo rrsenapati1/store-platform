@@ -15,6 +15,7 @@ from .checkout_payment_providers import build_checkout_payment_provider
 from .customer_profiles import CustomerProfileService
 from .loyalty import LoyaltyService
 from .promotions import PromotionService
+from .workforce import WorkforceService
 
 
 class CheckoutPaymentsService:
@@ -31,6 +32,7 @@ class CheckoutPaymentsService:
         self._customer_profile_service = CustomerProfileService(session)
         self._loyalty_service = LoyaltyService(session)
         self._promotion_service = PromotionService(session)
+        self._workforce_service = WorkforceService(session)
 
     async def create_checkout_payment_session(
         self,
@@ -38,6 +40,7 @@ class CheckoutPaymentsService:
         tenant_id: str,
         branch_id: str,
         actor_user_id: str,
+        cashier_session_id: str,
         provider_name: str,
         payment_method: str,
         handoff_surface: str | None,
@@ -61,6 +64,12 @@ class CheckoutPaymentsService:
             handoff_surface=handoff_surface,
             provider_payment_mode=provider_payment_mode,
         )
+        cashier_session = await self._workforce_service.require_open_cashier_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
+            actor_user_id=actor_user_id,
+        )
         pricing_preview = await self._build_checkout_pricing_preview(
             tenant_id=tenant_id,
             branch_id=branch_id,
@@ -79,6 +88,7 @@ class CheckoutPaymentsService:
             tenant_id=tenant_id,
             branch_id=branch_id,
             actor_user_id=actor_user_id,
+            cashier_session_id=cashier_session.id,
             customer_profile_id=customer_profile_id,
             provider_name=provider_name,
             payment_method=payment_method,
@@ -107,6 +117,7 @@ class CheckoutPaymentsService:
                 "customer_voucher_discount_total": pricing_preview["summary"]["customer_voucher_discount_total"],
             },
         )
+        await self._workforce_service.touch_cashier_session_activity(cashier_session=cashier_session)
         await self._session.commit()
         return self._serialize_checkout_payment_session(record, sale=None)
 
@@ -233,6 +244,7 @@ class CheckoutPaymentsService:
             tenant_id=tenant_id,
             branch_id=branch_id,
             actor_user_id=actor_user_id,
+            cashier_session_id=record.cashier_session_id,
             provider_name=record.provider_name,
             payment_method=record.payment_method,
             handoff_surface=record.handoff_surface,
@@ -364,6 +376,7 @@ class CheckoutPaymentsService:
         tenant_id: str,
         branch_id: str,
         actor_user_id: str,
+        cashier_session_id: str,
         customer_profile_id: str | None,
         provider_name: str,
         payment_method: str,
@@ -390,6 +403,7 @@ class CheckoutPaymentsService:
             session_id=checkout_payment_session_id,
             tenant_id=tenant_id,
             branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
             actor_user_id=actor_user_id,
             customer_profile_id=customer_profile_id,
             provider_name=provider_name,
@@ -455,6 +469,7 @@ class CheckoutPaymentsService:
                 tenant_id=record.tenant_id,
                 branch_id=record.branch_id,
                 actor_user_id=record.actor_user_id,
+                cashier_session_id=record.cashier_session_id,
                 customer_profile_id=record.customer_profile_id,
                 customer_name=record.customer_name,
                 customer_gstin=record.customer_gstin,
@@ -547,6 +562,7 @@ class CheckoutPaymentsService:
             "id": record.id,
             "tenant_id": record.tenant_id,
             "branch_id": record.branch_id,
+            "cashier_session_id": record.cashier_session_id,
             "customer_profile_id": record.customer_profile_id,
             "provider_name": record.provider_name,
             "provider_order_id": record.provider_order_id,

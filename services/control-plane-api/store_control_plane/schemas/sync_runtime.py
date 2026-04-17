@@ -105,6 +105,7 @@ class SyncOfflineSaleReplayRequest(BaseModel):
     continuity_invoice_number: str
     idempotency_key: str
     issued_offline_at: datetime
+    cashier_session_id: str | None = None
     staff_actor_id: str
     customer_name: str
     customer_gstin: str | None = None

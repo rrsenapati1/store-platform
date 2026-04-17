@@ -1,5 +1,22 @@
 # Store Worklog
 
+## 2026-04-18
+
+- Started `V2-006` with cashier session governance as the first live branch-operations authority boundary:
+  - added control-plane-owned branch cashier sessions with `OPEN`, `CLOSED`, and `FORCED_CLOSED` lifecycle support tied to tenant, branch, device registration, staff profile, and runtime actor, and linked sales, returns, checkout payment sessions, and offline replay records to `cashier_session_id`
+  - extended Store Desktop runtime governance so operators must open a cashier session before billing or processing returns, can close the session from the terminal, and carry cashier-session authority through checkout pricing preview, direct billing, provider-backed checkout, and branch-hub offline continuity
+  - added owner-web cashier session governance visibility with a dedicated board for active sessions, recent session history, selected-session detail, and force-close controls so owners can recover abandoned or stuck terminals without leaving the existing branch-operations workspace
+  - hardened desktop and owner-web integration tests by replacing stale signature assumptions with the new cashier-session contract, extending offline-continuity coverage for `cashier_session_id`, and stabilizing the slowest packaged-runtime continuity path under full-suite load
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_staff_device_foundation_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py services/control-plane-api/tests/test_sale_returns_flow.py services/control-plane-api/tests/test_offline_sale_replay_flow.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 ## 2026-04-17
 
 - Completed `V2-005` with gift-card foundation as the final commercial-control slice:

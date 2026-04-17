@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_actor, get_session
-from ..schemas import DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, RuntimeActivationIssueResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse
+from ..schemas import CashierSessionCloseRequest, CashierSessionCreateRequest, CashierSessionForceCloseRequest, CashierSessionListResponse, CashierSessionResponse, DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, RuntimeActivationIssueResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse
 from ..services import ActorContext, WorkforceService, assert_branch_any_capability, assert_tenant_capability
 
 router = APIRouter(prefix="/v1/tenants", tags=["workforce"])
@@ -78,6 +78,122 @@ async def list_branch_devices(
     service = WorkforceService(session)
     records = await service.list_branch_devices(tenant_id=tenant_id, branch_id=branch_id)
     return DeviceRegistrationListResponse(records=[DeviceRegistrationRecord(**record) for record in records])
+
+
+@router.get("/{tenant_id}/branches/{branch_id}/cashier-sessions", response_model=CashierSessionListResponse)
+async def list_branch_cashier_sessions(
+    tenant_id: str,
+    branch_id: str,
+    status: str | None = None,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CashierSessionListResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        capabilities=("branch.manage", "sales.bill", "sales.return"),
+    )
+    service = WorkforceService(session)
+    records = await service.list_branch_cashier_sessions(tenant_id=tenant_id, branch_id=branch_id, status=status)
+    return CashierSessionListResponse(records=[CashierSessionResponse(**record) for record in records])
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/cashier-sessions", response_model=CashierSessionResponse)
+async def create_branch_cashier_session(
+    tenant_id: str,
+    branch_id: str,
+    payload: CashierSessionCreateRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CashierSessionResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        capabilities=("branch.manage", "sales.bill", "sales.return"),
+    )
+    service = WorkforceService(session)
+    cashier_session = await service.create_cashier_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        actor_user_id=actor.user_id,
+        device_registration_id=payload.device_registration_id,
+        staff_profile_id=payload.staff_profile_id,
+        opening_float_amount=payload.opening_float_amount,
+        opening_note=payload.opening_note,
+    )
+    return CashierSessionResponse(**cashier_session)
+
+
+@router.get("/{tenant_id}/branches/{branch_id}/cashier-sessions/{cashier_session_id}", response_model=CashierSessionResponse)
+async def get_branch_cashier_session(
+    tenant_id: str,
+    branch_id: str,
+    cashier_session_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CashierSessionResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        capabilities=("branch.manage", "sales.bill", "sales.return"),
+    )
+    service = WorkforceService(session)
+    cashier_session = await service.get_cashier_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        cashier_session_id=cashier_session_id,
+    )
+    return CashierSessionResponse(**cashier_session)
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/cashier-sessions/{cashier_session_id}/close", response_model=CashierSessionResponse)
+async def close_branch_cashier_session(
+    tenant_id: str,
+    branch_id: str,
+    cashier_session_id: str,
+    payload: CashierSessionCloseRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CashierSessionResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        capabilities=("branch.manage", "sales.bill", "sales.return"),
+    )
+    service = WorkforceService(session)
+    cashier_session = await service.close_cashier_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        cashier_session_id=cashier_session_id,
+        actor_user_id=actor.user_id,
+        closing_note=payload.closing_note,
+    )
+    return CashierSessionResponse(**cashier_session)
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/cashier-sessions/{cashier_session_id}/force-close", response_model=CashierSessionResponse)
+async def force_close_branch_cashier_session(
+    tenant_id: str,
+    branch_id: str,
+    cashier_session_id: str,
+    payload: CashierSessionForceCloseRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> CashierSessionResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("branch.manage",))
+    service = WorkforceService(session)
+    cashier_session = await service.force_close_cashier_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        cashier_session_id=cashier_session_id,
+        actor_user_id=actor.user_id,
+        reason=payload.reason,
+    )
+    return CashierSessionResponse(**cashier_session)
 
 
 @router.get("/{tenant_id}/branches/{branch_id}/device-claims", response_model=DeviceClaimListResponse)

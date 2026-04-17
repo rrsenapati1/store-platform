@@ -11,6 +11,7 @@ class SaleLineCreateRequest(BaseModel):
 
 
 class SaleCreateRequest(BaseModel):
+    cashier_session_id: str
     customer_profile_id: str | None = None
     customer_name: str
     customer_gstin: str | None = None
@@ -25,6 +26,7 @@ class SaleCreateRequest(BaseModel):
 
 
 class CheckoutPaymentSessionCreateRequest(BaseModel):
+    cashier_session_id: str
     provider_name: str
     payment_method: str
     handoff_surface: str | None = None
@@ -144,6 +146,7 @@ class CheckoutPaymentSessionResponse(BaseModel):
     id: str
     tenant_id: str
     branch_id: str
+    cashier_session_id: str | None = None
     customer_profile_id: str | None = None
     provider_name: str
     provider_order_id: str
@@ -226,6 +229,7 @@ class SaleResponse(BaseModel):
     sale_id: str
     tenant_id: str
     branch_id: str
+    cashier_session_id: str | None = None
     customer_profile_id: str | None = None
     customer_name: str
     customer_gstin: str | None = None
@@ -266,6 +270,7 @@ class SaleResponse(BaseModel):
 
 class SaleRecord(BaseModel):
     sale_id: str
+    cashier_session_id: str | None = None
     customer_profile_id: str | None = None
     invoice_number: str
     customer_name: str
@@ -305,6 +310,7 @@ class SaleReturnLineCreateRequest(BaseModel):
 
 
 class SaleReturnCreateRequest(BaseModel):
+    cashier_session_id: str
     refund_amount: float = Field(ge=0)
     refund_method: str
     lines: list[SaleReturnLineCreateRequest]
@@ -350,6 +356,7 @@ class SaleReturnResponse(BaseModel):
     id: str
     tenant_id: str
     branch_id: str
+    cashier_session_id: str | None = None
     sale_id: str
     status: str
     refund_amount: float
@@ -360,6 +367,7 @@ class SaleReturnResponse(BaseModel):
 
 class SaleReturnRecord(BaseModel):
     sale_return_id: str
+    cashier_session_id: str | None = None
     sale_id: str
     invoice_number: str
     customer_name: str

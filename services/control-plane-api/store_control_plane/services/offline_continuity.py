@@ -7,7 +7,7 @@ from hashlib import sha256
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..repositories import AuditRepository, BillingRepository, CatalogRepository, InventoryRepository, SyncRuntimeRepository, TenantRepository
+from ..repositories import AuditRepository, BillingRepository, CatalogRepository, InventoryRepository, SyncRuntimeRepository, TenantRepository, WorkforceRepository
 from ..utils import utc_now
 from .billing_policy import SaleDraft, build_sale_draft, sale_invoice_number
 from .commercial_access import CommercialAccessService
@@ -46,6 +46,7 @@ class OfflineContinuityService:
         self._catalog_repo = CatalogRepository(session)
         self._inventory_repo = InventoryRepository(session)
         self._billing_repo = BillingRepository(session)
+        self._workforce_repo = WorkforceRepository(session)
         self._sync_repo = SyncRuntimeRepository(session)
         self._audit_repo = AuditRepository(session)
         self._commercial_access = CommercialAccessService(session)
@@ -152,6 +153,30 @@ class OfflineContinuityService:
                 message=stock_divergence,
             )
 
+        cashier_session_id = str(payload["cashier_session_id"]) if payload.get("cashier_session_id") else None
+        if cashier_session_id is None:
+            return await self._record_conflict(
+                device=device,
+                envelope=envelope,
+                payload=payload,
+                reason="CASHIER_SESSION_MISSING",
+                message="Offline sale replay requires a captured cashier session",
+            )
+
+        cashier_session = await self._workforce_repo.get_branch_cashier_session(
+            tenant_id=device.tenant_id,
+            branch_id=device.branch_id,
+            cashier_session_id=cashier_session_id,
+        )
+        if cashier_session is None:
+            return await self._record_conflict(
+                device=device,
+                envelope=envelope,
+                payload=payload,
+                reason="CASHIER_SESSION_MISSING",
+                message="Offline sale cashier session is no longer available for replay",
+            )
+
         sequence_number = await self._billing_repo.next_branch_sale_sequence(
             tenant_id=device.tenant_id,
             branch_id=device.branch_id,
@@ -160,6 +185,7 @@ class OfflineContinuityService:
         persisted = await self._billing_repo.create_sale(
             tenant_id=device.tenant_id,
             branch_id=device.branch_id,
+            cashier_session_id=cashier_session.id,
             customer_profile_id=None,
             customer_name=draft.customer_name,
             customer_gstin=draft.customer_gstin,

@@ -10,6 +10,7 @@ type LoadCheckoutPricePreviewArgs = {
   accessToken: string;
   tenantId: string;
   branchId: string;
+  cashierSessionId: string;
   selectedCatalogItem: ControlPlaneBranchCatalogItem | null;
   customerProfileId: string | null;
   customerVoucherId: string | null;
@@ -27,6 +28,7 @@ export async function runLoadCheckoutPricePreview({
   accessToken,
   tenantId,
   branchId,
+  cashierSessionId,
   selectedCatalogItem,
   customerProfileId,
   customerVoucherId,
@@ -47,6 +49,7 @@ export async function runLoadCheckoutPricePreview({
     throw new Error('Sale quantity must be a positive number.');
   }
   return storeControlPlaneClient.getCheckoutPricePreview(accessToken, tenantId, branchId, {
+    cashier_session_id: cashierSessionId,
     customer_profile_id: customerProfileId,
     customer_name: customerName,
     customer_gstin: customerGstin || null,

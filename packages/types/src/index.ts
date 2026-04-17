@@ -387,6 +387,32 @@ export interface ControlPlaneRuntimeDeviceClaimResolution {
   bound_device_code?: string | null;
 }
 
+export interface ControlPlaneCashierSession {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  device_registration_id: string;
+  device_name?: string | null;
+  device_code?: string | null;
+  staff_profile_id: string;
+  staff_full_name?: string | null;
+  runtime_user_id: string;
+  opened_by_user_id: string;
+  closed_by_user_id?: string | null;
+  status: string;
+  session_number: string;
+  opening_float_amount: number;
+  opening_note?: string | null;
+  closing_note?: string | null;
+  force_close_reason?: string | null;
+  opened_at: string;
+  closed_at?: string | null;
+  last_activity_at?: string | null;
+  linked_sales_count: number;
+  linked_returns_count: number;
+  gross_billed_amount: number;
+}
+
 export interface ControlPlaneRuntimeHubBootstrap {
   device_id: string;
   device_code: string;
@@ -457,6 +483,7 @@ export interface ControlPlaneOfflineSaleReplayRequest {
   continuity_invoice_number: string;
   idempotency_key: string;
   issued_offline_at: string;
+  cashier_session_id?: string | null;
   staff_actor_id: string;
   customer_name: string;
   customer_gstin?: string | null;
@@ -1481,6 +1508,7 @@ export interface ControlPlaneSale {
   id: string;
   tenant_id: string;
   branch_id: string;
+  cashier_session_id?: string | null;
   customer_profile_id?: string | null;
   customer_name: string;
   customer_gstin?: string | null;
@@ -1521,6 +1549,7 @@ export interface ControlPlaneSale {
 
 export interface ControlPlaneSaleRecord {
   sale_id: string;
+  cashier_session_id?: string | null;
   customer_profile_id?: string | null;
   invoice_number: string;
   customer_name: string;
@@ -1554,6 +1583,7 @@ export interface ControlPlaneCheckoutPaymentSession {
   id: string;
   tenant_id: string;
   branch_id: string;
+  cashier_session_id?: string | null;
   customer_profile_id?: string | null;
   provider_name: string;
   provider_order_id: string;
@@ -2009,6 +2039,7 @@ export interface ControlPlaneSaleReturn {
   tenant_id: string;
   branch_id: string;
   sale_id: string;
+  cashier_session_id?: string | null;
   status: string;
   refund_amount: number;
   refund_method: string;
@@ -2019,6 +2050,7 @@ export interface ControlPlaneSaleReturn {
 export interface ControlPlaneSaleReturnRecord {
   sale_return_id: string;
   sale_id: string;
+  cashier_session_id?: string | null;
   invoice_number: string;
   customer_name: string;
   status: string;

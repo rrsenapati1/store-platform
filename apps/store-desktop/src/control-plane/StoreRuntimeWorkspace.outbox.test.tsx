@@ -19,6 +19,48 @@ function jsonResponse(body: unknown, status = 200): MockResponse {
   };
 }
 
+function buildAssignedRuntimeDevice() {
+  return {
+    id: 'device-1',
+    tenant_id: 'tenant-acme',
+    branch_id: 'branch-1',
+    device_name: 'Counter Desktop 1',
+    device_code: 'counter-1',
+    session_surface: 'store_desktop',
+    status: 'ACTIVE',
+    assigned_staff_profile_id: 'staff-1',
+    assigned_staff_full_name: 'Counter Cashier',
+  };
+}
+
+function buildActiveCashierSession() {
+  return {
+    id: 'cashier-session-1',
+    tenant_id: 'tenant-acme',
+    branch_id: 'branch-1',
+    device_registration_id: 'device-1',
+    device_name: 'Counter Desktop 1',
+    device_code: 'counter-1',
+    staff_profile_id: 'staff-1',
+    staff_full_name: 'Counter Cashier',
+    runtime_user_id: 'user-cashier',
+    opened_by_user_id: 'user-cashier',
+    closed_by_user_id: null,
+    status: 'OPEN',
+    session_number: 'CS-BLRFLAGSHIP-0001',
+    opening_float_amount: 150,
+    opening_note: null,
+    closing_note: null,
+    force_close_reason: null,
+    opened_at: '2026-04-14T10:30:00Z',
+    closed_at: null,
+    last_activity_at: '2026-04-14T10:30:00Z',
+    linked_sales_count: 0,
+    linked_returns_count: 0,
+    gross_billed_amount: 0,
+  };
+}
+
 class MemoryStorage implements Storage {
   private readonly data = new Map<string, string>();
 
@@ -100,19 +142,10 @@ function queueBootstrapResponses(fetchMock: ReturnType<typeof vi.fn>) {
     }),
     jsonResponse({ records: [] }),
     jsonResponse({
-      records: [
-        {
-          id: 'device-1',
-          tenant_id: 'tenant-acme',
-          branch_id: 'branch-1',
-          device_name: 'Counter Desktop 1',
-          device_code: 'counter-1',
-          session_surface: 'store_desktop',
-          status: 'ACTIVE',
-          assigned_staff_profile_id: null,
-          assigned_staff_full_name: null,
-        },
-      ],
+      records: [buildAssignedRuntimeDevice()],
+    }),
+    jsonResponse({
+      records: [buildActiveCashierSession()],
     }),
     jsonResponse({ records: [] }),
   ];
@@ -227,7 +260,7 @@ describe('store runtime outbox continuity', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
     expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
 
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
@@ -262,9 +295,192 @@ describe('store runtime outbox continuity', () => {
   });
 
   test('queues an invoice print request locally and replays it once the control plane recovers', async () => {
-    const fetchMock = vi.fn();
-    queueBootstrapResponses(fetchMock);
-    queueSaleCreationResponses(fetchMock);
+    let salesRecords: Array<Record<string, unknown>> = [];
+    let inventorySnapshot = [
+      {
+        product_id: 'product-1',
+        product_name: 'Classic Tea',
+        sku_code: 'tea-classic-250g',
+        stock_on_hand: 24,
+        last_entry_type: 'PURCHASE_RECEIPT',
+      },
+    ];
+
+    const fetchMock = vi.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+
+      if (url.endsWith('/v1/auth/oidc/exchange') && method === 'POST') {
+        return jsonResponse({ access_token: 'session-cashier', token_type: 'Bearer' }) as never;
+      }
+      if (url.endsWith('/v1/auth/me')) {
+        return jsonResponse({
+          user_id: 'user-cashier',
+          email: 'cashier@acme.local',
+          full_name: 'Counter Cashier',
+          is_platform_admin: false,
+          tenant_memberships: [],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme')) {
+        return jsonResponse({
+          id: 'tenant-acme',
+          name: 'Acme Retail',
+          slug: 'acme-retail',
+          status: 'ACTIVE',
+          onboarding_status: 'BRANCH_READY',
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches')) {
+        return jsonResponse({
+          records: [{ branch_id: 'branch-1', tenant_id: 'tenant-acme', name: 'Bengaluru Flagship', code: 'blr-flagship', status: 'ACTIVE' }],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/catalog-items')) {
+        return jsonResponse({
+          records: [
+            {
+              id: 'catalog-item-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              barcode: '8901234567890',
+              hsn_sac_code: '0902',
+              gst_rate: 5,
+              base_selling_price: 92.5,
+              selling_price_override: null,
+              effective_selling_price: 92.5,
+              availability_status: 'ACTIVE',
+            },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/inventory-snapshot')) {
+        return jsonResponse({ records: inventorySnapshot }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'GET') {
+        return jsonResponse({ records: salesRecords }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/devices')) {
+        return jsonResponse({ records: [buildAssignedRuntimeDevice()] }) as never;
+      }
+      if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && url.includes('status=OPEN') && method === 'GET') {
+        return jsonResponse({ records: [buildActiveCashierSession()] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-payment-sessions') && method === 'GET') {
+        return jsonResponse({ records: [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/checkout-price-preview') && method === 'POST') {
+        return jsonResponse({
+          customer_profile_id: null,
+          customer_name: 'Acme Traders',
+          customer_gstin: '29AAEPM0111C1Z3',
+          automatic_campaign: null,
+          promotion_code_campaign: null,
+          customer_voucher: null,
+          gift_card: null,
+          summary: {
+            mrp_total: 480,
+            selling_price_subtotal: 370,
+            automatic_discount_total: 0,
+            promotion_code_discount_total: 0,
+            customer_voucher_discount_total: 0,
+            loyalty_discount_total: 0,
+            total_discount: 0,
+            tax_total: 18.5,
+            invoice_total: 388.5,
+            grand_total: 388.5,
+            store_credit_amount: 0,
+            gift_card_amount: 0,
+            final_payable_amount: 388.5,
+          },
+          lines: [
+            {
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              quantity: 4,
+              mrp: 120,
+              unit_selling_price: 92.5,
+              automatic_discount_amount: 0,
+              promotion_code_discount_amount: 0,
+              customer_voucher_discount_amount: 0,
+              promotion_discount_source: null,
+              taxable_amount: 370,
+              tax_amount: 18.5,
+              line_total: 388.5,
+            },
+          ],
+          tax_lines: [
+            { tax_type: 'CGST', tax_rate: 2.5, taxable_amount: 370, tax_amount: 9.25 },
+            { tax_type: 'SGST', tax_rate: 2.5, taxable_amount: 370, tax_amount: 9.25 },
+          ],
+        }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'POST') {
+        salesRecords = [
+          {
+            sale_id: 'sale-1',
+            invoice_number: 'SINV-BLRFLAGSHIP-0001',
+            customer_name: 'Acme Traders',
+            invoice_kind: 'B2B',
+            irn_status: 'IRN_PENDING',
+            payment_method: 'UPI',
+            grand_total: 388.5,
+            issued_on: '2026-04-14',
+          },
+        ];
+        inventorySnapshot = [
+          {
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            stock_on_hand: 20,
+            last_entry_type: 'SALE',
+          },
+        ];
+        return jsonResponse({
+          id: 'sale-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          customer_name: 'Acme Traders',
+          customer_gstin: '29AAEPM0111C1Z3',
+          invoice_kind: 'B2B',
+          irn_status: 'IRN_PENDING',
+          invoice_number: 'SINV-BLRFLAGSHIP-0001',
+          issued_on: '2026-04-14',
+          subtotal: 370,
+          cgst_total: 9.25,
+          sgst_total: 9.25,
+          igst_total: 0,
+          grand_total: 388.5,
+          payment: { payment_method: 'UPI', amount: 388.5 },
+          lines: [
+            {
+              product_id: 'product-1',
+              product_name: 'Classic Tea',
+              sku_code: 'tea-classic-250g',
+              hsn_sac_code: '0902',
+              quantity: 4,
+              unit_price: 92.5,
+              gst_rate: 5,
+              line_subtotal: 370,
+              tax_total: 18.5,
+              line_total: 388.5,
+            },
+          ],
+          tax_lines: [
+            { tax_type: 'CGST', tax_rate: 2.5, taxable_amount: 370, tax_amount: 9.25 },
+            { tax_type: 'SGST', tax_rate: 2.5, taxable_amount: 370, tax_amount: 9.25 },
+          ],
+        }) as never;
+      }
+
+      throw new Error(`Unexpected fetch call: ${method} ${url}`);
+    });
     globalThis.fetch = fetchMock as typeof fetch;
 
     render(<App />);
@@ -274,7 +490,7 @@ describe('store runtime outbox continuity', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
     expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });

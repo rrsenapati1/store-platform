@@ -105,11 +105,13 @@ class BillingRepository:
         selling_price_subtotal: float = 0.0,
         total_discount: float = 0.0,
         invoice_total: float = 0.0,
+        cashier_session_id: str | None = None,
     ) -> PersistedSaleBundle:
         sale = Sale(
             id=new_id(),
             tenant_id=tenant_id,
             branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
             customer_profile_id=customer_profile_id,
             customer_name=customer_name,
             customer_gstin=customer_gstin,
@@ -243,11 +245,13 @@ class BillingRepository:
         qr_payload: dict,
         qr_expires_at,
         provider_response_payload: dict,
+        cashier_session_id: str | None = None,
     ) -> CheckoutPaymentSession:
         record = CheckoutPaymentSession(
             id=session_id,
             tenant_id=tenant_id,
             branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
             actor_user_id=actor_user_id,
             customer_profile_id=customer_profile_id,
             provider_name=provider_name,
@@ -310,11 +314,13 @@ class BillingRepository:
         grand_total: float,
         lines: list[dict[str, float | str]],
         tax_lines: list[dict[str, float | str]],
+        cashier_session_id: str | None = None,
     ) -> PersistedSaleReturnBundle:
         sale_return = SaleReturn(
             id=new_id(),
             tenant_id=tenant_id,
             branch_id=branch_id,
+            cashier_session_id=cashier_session_id,
             sale_id=sale_id,
             status=status,
             refund_amount=refund_amount,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import DeviceClaim, DeviceRegistration, SpokeRuntimeActivation, StaffProfile, StoreDesktopActivation
+from ..models import BranchCashierSession, DeviceClaim, DeviceRegistration, Sale, SaleReturn, SpokeRuntimeActivation, StaffProfile, StoreDesktopActivation
 from ..utils import new_id
 
 
@@ -485,3 +485,178 @@ class WorkforceRepository:
             .order_by(DeviceClaim.created_at.desc(), DeviceClaim.id.desc())
         )
         return list((await self._session.scalars(statement)).all())
+
+    async def next_branch_cashier_session_sequence(self, *, tenant_id: str, branch_id: str) -> int:
+        statement = select(func.count(BranchCashierSession.id)).where(
+            BranchCashierSession.tenant_id == tenant_id,
+            BranchCashierSession.branch_id == branch_id,
+        )
+        count = await self._session.scalar(statement)
+        return int(count or 0) + 1
+
+    async def create_branch_cashier_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        device_registration_id: str,
+        staff_profile_id: str,
+        runtime_user_id: str | None,
+        opened_by_user_id: str | None,
+        session_number: str,
+        opening_float_amount: float,
+        opening_note: str | None,
+        opened_at,
+    ) -> BranchCashierSession:
+        record = BranchCashierSession(
+            id=new_id(),
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            device_registration_id=device_registration_id,
+            staff_profile_id=staff_profile_id,
+            runtime_user_id=runtime_user_id,
+            opened_by_user_id=opened_by_user_id,
+            status="OPEN",
+            session_number=session_number,
+            opening_float_amount=opening_float_amount,
+            opening_note=opening_note,
+            opened_at=opened_at,
+            last_activity_at=opened_at,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def get_branch_cashier_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        cashier_session_id: str,
+    ) -> BranchCashierSession | None:
+        statement = select(BranchCashierSession).where(
+            BranchCashierSession.tenant_id == tenant_id,
+            BranchCashierSession.branch_id == branch_id,
+            BranchCashierSession.id == cashier_session_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def get_open_cashier_session_by_device(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        device_registration_id: str,
+    ) -> BranchCashierSession | None:
+        statement = select(BranchCashierSession).where(
+            BranchCashierSession.tenant_id == tenant_id,
+            BranchCashierSession.branch_id == branch_id,
+            BranchCashierSession.device_registration_id == device_registration_id,
+            BranchCashierSession.status == "OPEN",
+        )
+        return await self._session.scalar(statement)
+
+    async def get_open_cashier_session_by_staff_profile(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        staff_profile_id: str,
+    ) -> BranchCashierSession | None:
+        statement = select(BranchCashierSession).where(
+            BranchCashierSession.tenant_id == tenant_id,
+            BranchCashierSession.branch_id == branch_id,
+            BranchCashierSession.staff_profile_id == staff_profile_id,
+            BranchCashierSession.status == "OPEN",
+        )
+        return await self._session.scalar(statement)
+
+    async def list_branch_cashier_sessions(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        status: str | None = None,
+    ) -> list[BranchCashierSession]:
+        statement = select(BranchCashierSession).where(
+            BranchCashierSession.tenant_id == tenant_id,
+            BranchCashierSession.branch_id == branch_id,
+        )
+        if status is not None:
+            statement = statement.where(BranchCashierSession.status == status)
+        statement = statement.order_by(BranchCashierSession.opened_at.desc(), BranchCashierSession.id.desc())
+        return list((await self._session.scalars(statement)).all())
+
+    async def close_branch_cashier_session(
+        self,
+        *,
+        cashier_session: BranchCashierSession,
+        closed_by_user_id: str | None,
+        status: str,
+        closing_note: str | None,
+        force_close_reason: str | None,
+        closed_at,
+    ) -> BranchCashierSession:
+        cashier_session.status = status
+        cashier_session.closed_by_user_id = closed_by_user_id
+        cashier_session.closing_note = closing_note
+        cashier_session.force_close_reason = force_close_reason
+        cashier_session.closed_at = closed_at
+        cashier_session.last_activity_at = closed_at
+        await self._session.flush()
+        return cashier_session
+
+    async def touch_branch_cashier_session_activity(
+        self,
+        *,
+        cashier_session: BranchCashierSession,
+        activity_at,
+    ) -> BranchCashierSession:
+        cashier_session.last_activity_at = activity_at
+        await self._session.flush()
+        return cashier_session
+
+    async def summarize_cashier_sessions(self, *, cashier_session_ids: list[str]) -> dict[str, dict[str, float | int]]:
+        if not cashier_session_ids:
+            return {}
+
+        sales_statement = (
+            select(
+                Sale.cashier_session_id,
+                func.count(Sale.id),
+                func.coalesce(func.sum(Sale.grand_total), 0.0),
+            )
+            .where(Sale.cashier_session_id.in_(cashier_session_ids))
+            .group_by(Sale.cashier_session_id)
+        )
+        sales_rows = (await self._session.execute(sales_statement)).all()
+        sales_by_session_id = {
+            str(cashier_session_id): {"linked_sales_count": int(count), "gross_billed_amount": float(gross_amount or 0.0)}
+            for cashier_session_id, count, gross_amount in sales_rows
+            if cashier_session_id is not None
+        }
+
+        returns_statement = (
+            select(SaleReturn.cashier_session_id, func.count(SaleReturn.id))
+            .where(SaleReturn.cashier_session_id.in_(cashier_session_ids))
+            .group_by(SaleReturn.cashier_session_id)
+        )
+        returns_rows = (await self._session.execute(returns_statement)).all()
+        returns_by_session_id = {
+            str(cashier_session_id): int(count)
+            for cashier_session_id, count in returns_rows
+            if cashier_session_id is not None
+        }
+
+        summaries: dict[str, dict[str, float | int]] = {}
+        for cashier_session_id in cashier_session_ids:
+            sales_summary = sales_by_session_id.get(
+                cashier_session_id,
+                {"linked_sales_count": 0, "gross_billed_amount": 0.0},
+            )
+            summaries[cashier_session_id] = {
+                "linked_sales_count": int(sales_summary["linked_sales_count"]),
+                "linked_returns_count": returns_by_session_id.get(cashier_session_id, 0),
+                "gross_billed_amount": round(float(sales_summary["gross_billed_amount"]), 2),
+            }
+        return summaries

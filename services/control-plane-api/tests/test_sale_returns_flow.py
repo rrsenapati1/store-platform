@@ -175,11 +175,19 @@ def test_cashier_creates_sale_return_and_owner_approves_refund() -> None:
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    cashier_session_id = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": cashier_session_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
             "payment_method": "UPI",
@@ -193,6 +201,7 @@ def test_cashier_creates_sale_return_and_owner_approves_refund() -> None:
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales/{sale_id}/returns",
         headers=cashier_headers,
         json={
+            "cashier_session_id": cashier_session_id,
             "refund_amount": 97.12,
             "refund_method": "UPI",
             "lines": [{"product_id": product_id, "quantity": 1}],

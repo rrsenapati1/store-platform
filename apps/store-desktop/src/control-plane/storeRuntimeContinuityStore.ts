@@ -34,6 +34,7 @@ export type StoreRuntimeOfflineSaleRecord = {
   continuity_invoice_number: string;
   tenant_id: string;
   branch_id: string;
+  cashier_session_id?: string | null;
   hub_device_id: string;
   staff_actor_id: string;
   customer_name: string;
@@ -135,6 +136,7 @@ function isOfflineSaleRecord(value: unknown): value is StoreRuntimeOfflineSaleRe
     && typeof value.continuity_invoice_number === 'string'
     && typeof value.tenant_id === 'string'
     && typeof value.branch_id === 'string'
+    && (typeof value.cashier_session_id === 'string' || value.cashier_session_id === null || typeof value.cashier_session_id === 'undefined')
     && typeof value.hub_device_id === 'string'
     && typeof value.staff_actor_id === 'string'
     && typeof value.customer_name === 'string'

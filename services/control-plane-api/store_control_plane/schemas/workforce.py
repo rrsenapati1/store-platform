@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -79,6 +81,51 @@ class DeviceRegistrationRecord(BaseModel):
 
 class DeviceRegistrationListResponse(BaseModel):
     records: list[DeviceRegistrationRecord]
+
+
+class CashierSessionCreateRequest(BaseModel):
+    device_registration_id: str
+    staff_profile_id: str
+    opening_float_amount: float = 0
+    opening_note: str | None = None
+
+
+class CashierSessionCloseRequest(BaseModel):
+    closing_note: str | None = None
+
+
+class CashierSessionForceCloseRequest(BaseModel):
+    reason: str
+
+
+class CashierSessionResponse(BaseModel):
+    id: str
+    tenant_id: str
+    branch_id: str
+    device_registration_id: str
+    device_name: str | None = None
+    device_code: str | None = None
+    staff_profile_id: str
+    staff_full_name: str | None = None
+    runtime_user_id: str | None = None
+    opened_by_user_id: str | None = None
+    closed_by_user_id: str | None = None
+    status: str
+    session_number: str
+    opening_float_amount: float
+    opening_note: str | None = None
+    closing_note: str | None = None
+    force_close_reason: str | None = None
+    opened_at: datetime
+    closed_at: datetime | None = None
+    last_activity_at: datetime | None = None
+    linked_sales_count: int = 0
+    linked_returns_count: int = 0
+    gross_billed_amount: float = 0
+
+
+class CashierSessionListResponse(BaseModel):
+    records: list[CashierSessionResponse]
 
 
 class RuntimeDeviceClaimResolveRequest(BaseModel):

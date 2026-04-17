@@ -14,6 +14,11 @@ class Sale(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
     branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    cashier_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("branch_cashier_sessions.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
     customer_profile_id: Mapped[str | None] = mapped_column(ForeignKey("customer_profiles.id", ondelete="SET NULL"), default=None, index=True)
     customer_name: Mapped[str] = mapped_column(String(255))
     customer_gstin: Mapped[str | None] = mapped_column(String(32), default=None)
@@ -130,6 +135,11 @@ class CheckoutPaymentSession(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
     branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    cashier_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("branch_cashier_sessions.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
     actor_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), default=None, index=True)
     customer_profile_id: Mapped[str | None] = mapped_column(ForeignKey("customer_profiles.id", ondelete="SET NULL"), default=None, index=True)
     provider_name: Mapped[str] = mapped_column(String(32), index=True)
@@ -168,6 +178,11 @@ class SaleReturn(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
     branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    cashier_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("branch_cashier_sessions.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
     sale_id: Mapped[str] = mapped_column(ForeignKey("sales.id", ondelete="CASCADE"), index=True)
     status: Mapped[str] = mapped_column(String(32))
     refund_amount: Mapped[float] = mapped_column(default=0.0)

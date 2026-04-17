@@ -112,7 +112,7 @@ from .sync_runtime import (
 from .supplier_reporting import VendorDisputeCreateRequest, VendorDisputeResolveRequest
 from .system import AuthorityBoundaryResponse, OperationsWorkerStatusResponse, SystemComponentStatusResponse, SystemHealthResponse
 from .tenants import BranchCreateRequest, BranchListResponse, BranchRecord, BranchResponse, TenantSummaryResponse
-from .workforce import DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, RuntimeActivationIssueResponse, RuntimeDeviceClaimResolveRequest, RuntimeDeviceClaimResolveResponse, RuntimeHubBootstrapRequest, RuntimeHubBootstrapResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse, StoreDesktopActivationRedeemRequest, StoreDesktopActivationRedeemResponse, StoreDesktopUnlockRequest, StoreDesktopUnlockResponse
+from .workforce import CashierSessionCloseRequest, CashierSessionCreateRequest, CashierSessionForceCloseRequest, CashierSessionListResponse, CashierSessionResponse, DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, RuntimeActivationIssueResponse, RuntimeDeviceClaimResolveRequest, RuntimeDeviceClaimResolveResponse, RuntimeHubBootstrapRequest, RuntimeHubBootstrapResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse, StoreDesktopActivationRedeemRequest, StoreDesktopActivationRedeemResponse, StoreDesktopUnlockRequest, StoreDesktopUnlockResponse
 
 __all__ = [
     "ActorBranchMembership",
@@ -154,6 +154,11 @@ __all__ = [
     "BranchMembershipCreateRequest",
     "BranchRecord",
     "BranchResponse",
+    "CashierSessionCloseRequest",
+    "CashierSessionCreateRequest",
+    "CashierSessionForceCloseRequest",
+    "CashierSessionListResponse",
+    "CashierSessionResponse",
     "CatalogProductCreateRequest",
     "CatalogProductListResponse",
     "CatalogProductRecord",
