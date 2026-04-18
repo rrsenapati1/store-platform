@@ -27,16 +27,20 @@ def _read_bundle_manifest(bundle_dir: Path) -> dict[str, object]:
 
 
 def _read_certification_status(bundle_dir: Path, bundle_manifest: dict[str, object]) -> str | None:
+    return _read_report_status(bundle_dir, bundle_manifest, label="certification_report")
+
+
+def _read_report_status(bundle_dir: Path, bundle_manifest: dict[str, object], *, label: str) -> str | None:
     reports = dict(bundle_manifest.get("reports") or {})
-    certification_report = dict(reports.get("certification_report") or {})
-    bundle_path = certification_report.get("bundle_path")
+    report = dict(reports.get(label) or {})
+    bundle_path = report.get("bundle_path")
     if not bundle_path:
         return None
     report_path = bundle_dir / str(bundle_path)
     if not report_path.exists():
         return None
-    certification_payload = _load_json(report_path)
-    raw_status = certification_payload.get("status")
+    report_payload = _load_json(report_path)
+    raw_status = report_payload.get("status")
     return None if raw_status is None else str(raw_status)
 
 
@@ -104,6 +108,7 @@ def publish_release_evidence_bundle(
 
     bundle_manifest = _read_bundle_manifest(bundle_dir)
     certification_status = _read_certification_status(bundle_dir, bundle_manifest)
+    launch_readiness_status = _read_report_status(bundle_dir, bundle_manifest, label="launch_readiness_report")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     publication_base_name = f"store-release-evidence-{environment}-{release_version}"
@@ -122,6 +127,7 @@ def publish_release_evidence_bundle(
         "bundle_manifest_sha256": _hash_file(bundle_manifest_path),
         "bundle_status": bundle_manifest.get("status"),
         "certification_status": certification_status,
+        "launch_readiness_status": launch_readiness_status,
         "archive_path": str(archive_path),
         "archive_sha256": _hash_file(archive_path),
         "archive_size_bytes": archive_path.stat().st_size,
@@ -137,6 +143,7 @@ def publish_release_evidence_bundle(
             "published_at": effective_published_at,
             "status": publication_manifest["status"],
             "certification_status": certification_status,
+            "launch_readiness_status": launch_readiness_status,
             "archive_path": str(archive_path),
             "publication_manifest_path": str(publication_manifest_path),
         },

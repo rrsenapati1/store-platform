@@ -43,6 +43,10 @@ def test_build_release_evidence_bundle_script_writes_manifest(monkeypatch: pytes
             str(output_dir),
             "--release-evidence",
             str(tmp_path / "release-candidate-evidence.md"),
+            "--launch-readiness-report",
+            str(tmp_path / "launch-readiness-report.json"),
+            "--launch-manifest",
+            str(tmp_path / "v2-launch-readiness-manifest.json"),
         ],
     )
 
@@ -76,6 +80,10 @@ def test_build_release_evidence_bundle_script_exits_non_zero_on_failed_bundle(
             str(tmp_path / "evidence-bundle"),
             "--release-evidence",
             str(tmp_path / "release-candidate-evidence.md"),
+            "--launch-readiness-report",
+            str(tmp_path / "launch-readiness-report.json"),
+            "--launch-manifest",
+            str(tmp_path / "v2-launch-readiness-manifest.json"),
         ],
     )
 

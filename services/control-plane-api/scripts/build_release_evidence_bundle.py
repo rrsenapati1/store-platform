@@ -30,6 +30,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path.")
     parser.add_argument("--restore-drill-report", help="Optional JSON restore-drill report path.")
+    parser.add_argument("--launch-readiness-report", help="Optional JSON launch-readiness report path.")
+    parser.add_argument("--launch-manifest", help="Optional JSON launch-readiness manifest path.")
     parser.add_argument("--sbom-artifact-dir", help="Optional directory containing raw SBOM artifacts.")
     parser.add_argument("--vulnerability-raw-output-dir", help="Optional directory containing raw vulnerability scan output.")
     return parser.parse_args()
@@ -53,6 +55,8 @@ def main() -> int:
             "rollback_report": Path(args.rollback_report) if args.rollback_report else None,
             "vulnerability_scan_report": Path(args.vulnerability_scan_report) if args.vulnerability_scan_report else None,
             "restore_drill_report": Path(args.restore_drill_report) if args.restore_drill_report else None,
+            "launch_readiness_report": Path(args.launch_readiness_report) if args.launch_readiness_report else None,
+            "launch_readiness_manifest": Path(args.launch_manifest) if args.launch_manifest else None,
         },
         directory_paths={
             "sbom_artifacts": Path(args.sbom_artifact_dir) if args.sbom_artifact_dir else None,

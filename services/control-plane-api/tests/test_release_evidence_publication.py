@@ -25,6 +25,14 @@ def _create_bundle(root: Path) -> Path:
         ),
         encoding="utf-8",
     )
+    (bundle_dir / "reports" / "launch-readiness-report.json").write_text(
+        json.dumps({"status": "ready"}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "reports" / "launch-readiness-manifest.json").write_text(
+        json.dumps({"release_version": "2026.04.19"}),
+        encoding="utf-8",
+    )
     (bundle_dir / "artifacts" / "sbom-artifacts" / "control-plane-api.cdx.json").write_text(
         '{"bomFormat":"CycloneDX"}',
         encoding="utf-8",
@@ -39,6 +47,12 @@ def _create_bundle(root: Path) -> Path:
                     },
                     "certification_report": {
                         "bundle_path": "reports/certification-report.json"
+                    },
+                    "launch_readiness_report": {
+                        "bundle_path": "reports/launch-readiness-report.json"
+                    },
+                    "launch_readiness_manifest": {
+                        "bundle_path": "reports/launch-readiness-manifest.json"
                     },
                 },
                 "directories": {
@@ -78,6 +92,7 @@ def test_publish_release_evidence_bundle_writes_archive_manifest_and_catalog(tmp
     assert manifest["release_version"] == "2026.04.19"
     assert manifest["environment"] == "prod"
     assert manifest["certification_status"] == "approved"
+    assert manifest["launch_readiness_status"] == "ready"
     assert manifest["bundle_manifest_sha256"]
     assert manifest["archive_sha256"]
 
@@ -85,11 +100,13 @@ def test_publish_release_evidence_bundle_writes_archive_manifest_and_catalog(tmp
     assert len(catalog["publications"]) == 1
     assert catalog["publications"][0]["release_version"] == "2026.04.19"
     assert catalog["publications"][0]["environment"] == "prod"
+    assert catalog["publications"][0]["launch_readiness_status"] == "ready"
 
     with tarfile.open(archive_path, "r:gz") as archive:
         names = sorted(archive.getnames())
     assert "store-release-evidence-prod-2026.04.19/bundle-manifest.json" in names
     assert "store-release-evidence-prod-2026.04.19/reports/certification-report.json" in names
+    assert "store-release-evidence-prod-2026.04.19/reports/launch-readiness-report.json" in names
     assert "store-release-evidence-prod-2026.04.19/artifacts/sbom-artifacts/control-plane-api.cdx.json" in names
 
 
