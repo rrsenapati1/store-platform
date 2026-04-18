@@ -152,6 +152,16 @@ def _seed_checkout_context(client: TestClient) -> dict[str, object]:
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    attendance_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/attendance-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": device_id,
+            "staff_profile_id": staff_profile_id,
+            "clock_in_note": "Morning shift attendance",
+        },
+    )
+    assert attendance_session.status_code == 200
 
     open_session = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/cashier-sessions",

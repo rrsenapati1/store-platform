@@ -22,6 +22,7 @@ describe('store runtime sale return flow', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    let activeAttendanceSession: Record<string, unknown> | null = null;
     let activeCashierSession: Record<string, unknown> | null = null;
     let latestSaleId: string | null = null;
     let stockOnHand = 24;
@@ -131,6 +132,34 @@ describe('store runtime sale return flow', () => {
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/sync-spokes') && method === 'GET') {
         return jsonResponse({ records: [] }) as never;
+      }
+      if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/attendance-sessions') && method === 'GET') {
+        return jsonResponse({ records: activeAttendanceSession ? [activeAttendanceSession] : [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/attendance-sessions') && method === 'POST') {
+        activeAttendanceSession = {
+          id: 'attendance-session-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          device_registration_id: 'device-1',
+          device_name: 'Counter Desktop 1',
+          device_code: 'counter-1',
+          staff_profile_id: 'staff-1',
+          staff_full_name: 'Counter Cashier',
+          runtime_user_id: 'user-cashier',
+          opened_by_user_id: 'user-cashier',
+          closed_by_user_id: null,
+          status: 'OPEN',
+          attendance_number: 'ATTD-BLRFLAGSHIP-0001',
+          clock_in_note: 'Morning shift start',
+          clock_out_note: null,
+          force_close_reason: null,
+          opened_at: '2026-04-17T08:55:00Z',
+          closed_at: null,
+          last_activity_at: '2026-04-17T08:55:00Z',
+          linked_cashier_sessions_count: 0,
+        };
+        return jsonResponse(activeAttendanceSession) as never;
       }
       if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && method === 'GET') {
         return jsonResponse({ records: activeCashierSession ? [activeCashierSession] : [] }) as never;
@@ -263,6 +292,9 @@ describe('store runtime sale return flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
+    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
     expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
@@ -289,6 +321,8 @@ describe('store runtime sale return flow', () => {
   });
 
   test('submits a store-credit refund method for a linked customer sale return', async () => {
+    let activeAttendanceSession: Record<string, unknown> | null = null;
+    let activeCashierSession: Record<string, unknown> | null = null;
     globalThis.fetch = vi.fn(async (input, init) => {
       const url = String(input);
       const method = init?.method ?? 'GET';
@@ -377,11 +411,40 @@ describe('store runtime sale return flow', () => {
           ],
         }) as never;
       }
+      if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/attendance-sessions') && method === 'GET') {
+        return jsonResponse({ records: activeAttendanceSession ? [activeAttendanceSession] : [] }) as never;
+      }
+      if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/attendance-sessions') && method === 'POST') {
+        const payload = JSON.parse(String(init?.body ?? '{}'));
+        activeAttendanceSession = {
+          id: 'attendance-session-1',
+          tenant_id: 'tenant-acme',
+          branch_id: 'branch-1',
+          device_registration_id: payload.device_registration_id,
+          device_name: 'Counter Desktop 1',
+          device_code: 'counter-1',
+          staff_profile_id: payload.staff_profile_id,
+          staff_full_name: 'Counter Cashier',
+          runtime_user_id: 'user-cashier',
+          opened_by_user_id: 'user-cashier',
+          closed_by_user_id: null,
+          status: 'OPEN',
+          attendance_number: 'ATTD-BLRFLAGSHIP-0001',
+          clock_in_note: payload.clock_in_note ?? null,
+          clock_out_note: null,
+          force_close_reason: null,
+          opened_at: '2026-04-17T08:55:00Z',
+          closed_at: null,
+          last_activity_at: '2026-04-17T08:55:00Z',
+          linked_cashier_sessions_count: 0,
+        };
+        return jsonResponse(activeAttendanceSession) as never;
+      }
       if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && method === 'GET') {
-        return jsonResponse({ records: [] }) as never;
+        return jsonResponse({ records: activeCashierSession ? [activeCashierSession] : [] }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && method === 'POST') {
-        return jsonResponse({
+        activeCashierSession = {
           id: 'cashier-session-1',
           tenant_id: 'tenant-acme',
           branch_id: 'branch-1',
@@ -405,7 +468,8 @@ describe('store runtime sale return flow', () => {
           linked_sales_count: 0,
           linked_returns_count: 0,
           gross_billed_amount: 0,
-        }) as never;
+        };
+        return jsonResponse(activeCashierSession) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme/customer-profiles') && method === 'GET') {
         return jsonResponse({
@@ -575,6 +639,9 @@ describe('store runtime sale return flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
+    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
     expect(await screen.findByText('Active cashier session')).toBeInTheDocument();

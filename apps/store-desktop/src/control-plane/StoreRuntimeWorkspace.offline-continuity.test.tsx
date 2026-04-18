@@ -635,16 +635,17 @@ describe('store runtime offline continuity flow', () => {
       expect(screen.getAllByText(/SINV-BLRFLAGSHIP-0001/).length).toBeGreaterThan(0);
     }, { timeout: 10000 });
 
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      'http://127.0.0.1:8000/v1/sync/offline-sales/replay',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'x-store-device-id': 'device-1',
-          'x-store-device-secret': 'hub-secret-1',
-        }),
-      }),
+    const replayCall = vi.mocked(globalThis.fetch).mock.calls.find(
+      ([url]) => url === 'http://127.0.0.1:8000/v1/sync/offline-sales/replay',
     );
+    expect(replayCall).toBeDefined();
+    expect(replayCall?.[1]).toEqual(expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'x-store-device-id': 'device-1',
+        'x-store-device-secret': 'hub-secret-1',
+      }),
+    }));
     expect((replayBody as { cashier_session_id?: string | null } | null)?.cashier_session_id).toBe('cashier-session-1');
   });
 });

@@ -9,6 +9,7 @@ import type {
   ControlPlaneBranchCatalogItem,
   ControlPlaneBranchRecord,
   ControlPlaneBranchCustomerReport,
+  ControlPlaneAttendanceSession,
   ControlPlaneCashierSession,
   ControlPlaneCheckoutPaymentSession,
   ControlPlaneCheckoutPricePreview,
@@ -698,6 +699,51 @@ export const storeControlPlaneClient = {
   ) {
     return request<ControlPlaneCashierSession>(
       `/v1/tenants/${tenantId}/branches/${branchId}/cashier-sessions/${cashierSessionId}/close`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  listAttendanceSessions(accessToken: string, tenantId: string, branchId: string, status?: string | null) {
+    const search = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request<{ records: ControlPlaneAttendanceSession[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/attendance-sessions${search}`,
+      undefined,
+      accessToken,
+    );
+  },
+  createAttendanceSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      device_registration_id: string;
+      staff_profile_id: string;
+      clock_in_note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneAttendanceSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/attendance-sessions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  closeAttendanceSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    attendanceSessionId: string,
+    payload: {
+      clock_out_note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneAttendanceSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/attendance-sessions/${attendanceSessionId}/close`,
       {
         method: 'POST',
         body: JSON.stringify(payload),

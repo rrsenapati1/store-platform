@@ -17,6 +17,21 @@
   - `npm run build --workspace @store/store-desktop`
   - `git -c core.safecrlf=false diff --check`
 
+- Extended `V2-006` with attendance foundation and finished the cashier-session offline continuity linkage:
+  - added control-plane-owned branch attendance sessions with `OPEN`, `CLOSED`, and `FORCED_CLOSED` lifecycle support tied to tenant, branch, device registration, staff profile, runtime actor, and linked cashier-session authority so billing terminals now require an open attendance session before a cashier session can begin
+  - extended Store Desktop runtime governance with clock-in/clock-out actions, active attendance posture, cashier-session gating on attendance, and branch-hub offline continuity payloads that preserve `cashier_session_id` cleanly through replay without the debug leftovers from the recovered stash work
+  - added owner-web attendance visibility and force-close controls alongside the cashier-session governance board so branch managers can inspect live attendance posture and recover abandoned attendance sessions from the same operational surface
+  - hardened backend and desktop test fixtures to open attendance before cashier sessions, updated offline replay verification for cashier-session preservation, and stabilized runtime background refresh so attendance and cashier actions do not deadlock the terminal UI
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_staff_device_foundation_flow.py services/control-plane-api/tests/test_offline_sale_replay_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py services/control-plane-api/tests/test_sale_returns_flow.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 ## 2026-04-17
 
 - Completed `V2-005` with gift-card foundation as the final commercial-control slice:

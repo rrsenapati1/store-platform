@@ -128,6 +128,47 @@ class CashierSessionListResponse(BaseModel):
     records: list[CashierSessionResponse]
 
 
+class AttendanceSessionCreateRequest(BaseModel):
+    device_registration_id: str
+    staff_profile_id: str
+    clock_in_note: str | None = None
+
+
+class AttendanceSessionCloseRequest(BaseModel):
+    clock_out_note: str | None = None
+
+
+class AttendanceSessionForceCloseRequest(BaseModel):
+    reason: str
+
+
+class AttendanceSessionResponse(BaseModel):
+    id: str
+    tenant_id: str
+    branch_id: str
+    device_registration_id: str
+    device_name: str | None = None
+    device_code: str | None = None
+    staff_profile_id: str
+    staff_full_name: str | None = None
+    runtime_user_id: str | None = None
+    opened_by_user_id: str | None = None
+    closed_by_user_id: str | None = None
+    status: str
+    attendance_number: str
+    clock_in_note: str | None = None
+    clock_out_note: str | None = None
+    force_close_reason: str | None = None
+    opened_at: datetime
+    closed_at: datetime | None = None
+    last_activity_at: datetime | None = None
+    linked_cashier_sessions_count: int = 0
+
+
+class AttendanceSessionListResponse(BaseModel):
+    records: list[AttendanceSessionResponse]
+
+
 class RuntimeDeviceClaimResolveRequest(BaseModel):
     installation_id: str
     runtime_kind: str

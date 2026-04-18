@@ -26,6 +26,7 @@ import type {
   ControlPlaneCustomerVoucher,
   ControlPlaneLoyaltyProgram,
   ControlPlaneComplianceProviderProfile,
+  ControlPlaneAttendanceSession,
   ControlPlaneCashierSession,
   ControlPlaneDeviceClaimApproval,
   ControlPlaneDeviceClaimRecord,
@@ -1422,6 +1423,30 @@ export const ownerControlPlaneClient = {
     return request<{ records: ControlPlaneCashierSession[] }>(
       `/v1/tenants/${tenantId}/branches/${branchId}/cashier-sessions${search}`,
       undefined,
+      accessToken,
+    );
+  },
+  listBranchAttendanceSessions(accessToken: string, tenantId: string, branchId: string, status?: string) {
+    const search = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request<{ records: ControlPlaneAttendanceSession[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/attendance-sessions${search}`,
+      undefined,
+      accessToken,
+    );
+  },
+  forceCloseBranchAttendanceSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    attendanceSessionId: string,
+    payload: { reason: string },
+  ) {
+    return request<ControlPlaneAttendanceSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/attendance-sessions/${attendanceSessionId}/force-close`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
       accessToken,
     );
   },

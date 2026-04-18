@@ -18,7 +18,7 @@ function jsonResponse(body: unknown, status = 200): MockResponse {
   };
 }
 
-function installCashierSessionFetchMock() {
+function installAttendanceFetchMock() {
   let activeAttendanceSession: Record<string, unknown> | null = null;
   let activeCashierSession: Record<string, unknown> | null = null;
   let latestSaleId: string | null = null;
@@ -105,7 +105,7 @@ function installCashierSessionFetchMock() {
               loyalty_points_redeemed: 0,
               loyalty_discount_amount: 0,
               loyalty_points_earned: 0,
-              issued_on: '2026-04-17',
+              issued_on: '2026-04-18',
             },
           ]
           : [],
@@ -156,11 +156,24 @@ function installCashierSessionFetchMock() {
         clock_in_note: payload.clock_in_note ?? null,
         clock_out_note: null,
         force_close_reason: null,
-        opened_at: '2026-04-17T08:55:00Z',
+        opened_at: '2026-04-18T09:00:00Z',
         closed_at: null,
-        last_activity_at: '2026-04-17T08:55:00Z',
+        last_activity_at: '2026-04-18T09:00:00Z',
         linked_cashier_sessions_count: 0,
       };
+      return jsonResponse(activeAttendanceSession) as never;
+    }
+    if (url.includes('/attendance-sessions/attendance-session-1/close') && method === 'POST') {
+      const payload = JSON.parse(String(init?.body ?? '{}'));
+      activeAttendanceSession = activeAttendanceSession
+        ? {
+          ...activeAttendanceSession,
+          status: 'CLOSED',
+          clock_out_note: payload.clock_out_note ?? null,
+          closed_by_user_id: 'user-cashier',
+          closed_at: '2026-04-18T18:00:00Z',
+        }
+        : null;
       return jsonResponse(activeAttendanceSession) as never;
     }
     if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && method === 'GET') {
@@ -168,6 +181,9 @@ function installCashierSessionFetchMock() {
     }
     if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && method === 'POST') {
       const payload = JSON.parse(String(init?.body ?? '{}'));
+      if (!activeAttendanceSession) {
+        return jsonResponse({ detail: 'Open an attendance session before opening a cashier session.' }, 400) as never;
+      }
       activeCashierSession = {
         id: 'cashier-session-1',
         tenant_id: 'tenant-acme',
@@ -186,13 +202,27 @@ function installCashierSessionFetchMock() {
         opening_note: payload.opening_note ?? null,
         closing_note: null,
         force_close_reason: null,
-        opened_at: '2026-04-17T09:00:00Z',
+        opened_at: '2026-04-18T09:05:00Z',
         closed_at: null,
-        last_activity_at: '2026-04-17T09:00:00Z',
+        last_activity_at: '2026-04-18T09:05:00Z',
         linked_sales_count: 0,
         linked_returns_count: 0,
         gross_billed_amount: 0,
       };
+      return jsonResponse(activeCashierSession) as never;
+    }
+    if (url.includes('/cashier-sessions/cashier-session-1/close') && method === 'POST') {
+      const payload = JSON.parse(String(init?.body ?? '{}'));
+      activeCashierSession = activeCashierSession
+        ? {
+          ...activeCashierSession,
+          status: 'CLOSED',
+          closing_note: payload.closing_note ?? null,
+          closed_by_user_id: 'user-cashier',
+          closed_at: '2026-04-18T17:55:00Z',
+          last_activity_at: '2026-04-18T17:55:00Z',
+        }
+        : null;
       return jsonResponse(activeCashierSession) as never;
     }
     if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'POST') {
@@ -212,7 +242,7 @@ function installCashierSessionFetchMock() {
         invoice_kind: 'B2C',
         irn_status: 'NOT_APPLICABLE',
         invoice_number: 'SINV-BLRFLAGSHIP-0001',
-        issued_on: '2026-04-17',
+        issued_on: '2026-04-18',
         subtotal: 92.5,
         cgst_total: 2.31,
         sgst_total: 2.31,
@@ -244,56 +274,12 @@ function installCashierSessionFetchMock() {
         ],
       }) as never;
     }
-    if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales/sale-1/returns') && method === 'POST') {
-      const payload = JSON.parse(String(init?.body ?? '{}'));
-      if (!payload.cashier_session_id) {
-        return jsonResponse({ detail: 'Cashier session is required before processing returns' }, 400) as never;
-      }
-      return jsonResponse({
-        id: 'sale-return-1',
-        tenant_id: 'tenant-acme',
-        branch_id: 'branch-1',
-        sale_id: 'sale-1',
-        cashier_session_id: payload.cashier_session_id,
-        status: 'REFUND_PENDING_APPROVAL',
-        refund_amount: 97.12,
-        refund_method: 'Cash',
-        lines: [
-          {
-            product_id: 'product-1',
-            product_name: 'Classic Tea',
-            sku_code: 'tea-classic-250g',
-            hsn_sac_code: '0902',
-            quantity: 1,
-            unit_price: 92.5,
-            gst_rate: 5,
-            line_subtotal: 92.5,
-            tax_total: 4.62,
-            line_total: 97.12,
-          },
-        ],
-        credit_note: {
-          id: 'credit-note-1',
-          credit_note_number: 'SCN-BLRFLAGSHIP-0001',
-          issued_on: '2026-04-17',
-          subtotal: 92.5,
-          cgst_total: 2.31,
-          sgst_total: 2.31,
-          igst_total: 0,
-          grand_total: 97.12,
-          tax_lines: [
-            { tax_type: 'CGST', tax_rate: 2.5, taxable_amount: 92.5, tax_amount: 2.31 },
-            { tax_type: 'SGST', tax_rate: 2.5, taxable_amount: 92.5, tax_amount: 2.31 },
-          ],
-        },
-      }) as never;
-    }
 
     throw new Error(`Unexpected fetch call: ${method} ${url}`);
   }) as typeof fetch;
 }
 
-describe('store runtime cashier session governance', () => {
+describe('store runtime attendance foundation', () => {
   const originalFetch = globalThis.fetch;
 
   afterEach(() => {
@@ -301,8 +287,8 @@ describe('store runtime cashier session governance', () => {
     vi.restoreAllMocks();
   });
 
-  test('requires an open cashier session before billing and includes cashier_session_id after opening one', async () => {
-    installCashierSessionFetchMock();
+  test('requires attendance before cashier session and supports clock in/out on the runtime device', async () => {
+    installAttendanceFetchMock();
 
     render(<App />);
 
@@ -313,74 +299,32 @@ describe('store runtime cashier session governance', () => {
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
 
-    fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'Cash' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
-
-    expect(await screen.findByText('Open a cashier session before billing.')).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '250' } });
     fireEvent.change(screen.getByLabelText('Opening note'), { target: { value: 'Morning float' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
 
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
-
-    await waitFor(() => {
-      const createSaleCall = vi.mocked(globalThis.fetch).mock.calls.find(
-        ([url, init]) =>
-          String(url).includes('/v1/tenants/tenant-acme/branches/branch-1/sales')
-          && init?.method === 'POST',
-      );
-      expect(createSaleCall).toBeDefined();
-      expect(JSON.parse(String(createSaleCall?.[1]?.body ?? '{}'))).toMatchObject({
-        cashier_session_id: 'cashier-session-1',
-      });
-    });
-  });
-
-  test('includes cashier_session_id when creating a sale return', async () => {
-    installCashierSessionFetchMock();
-
-    render(<App />);
-
-    fireEvent.change(screen.getByLabelText('Korsenex token'), {
-      target: { value: 'stub:sub=cashier-1;email=cashier@acme.local;name=Counter Cashier' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
-
-    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Open an attendance session before opening a cashier session.')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
     fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
 
+    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
+    expect(screen.getByText('ATTD-BLRFLAGSHIP-0001')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
     expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
-    expect(await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).not.toHaveLength(0);
-
-    fireEvent.change(screen.getByLabelText('Return quantity'), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '97.12' } });
-    fireEvent.change(screen.getByLabelText('Refund method'), { target: { value: 'Cash' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create sale return' }));
+    fireEvent.change(screen.getByLabelText('Closing note'), { target: { value: 'Till handoff complete' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Close cashier session' }));
 
     await waitFor(() => {
-      const createReturnCall = vi.mocked(globalThis.fetch).mock.calls.find(
-        ([url, init]) =>
-          String(url).includes('/v1/tenants/tenant-acme/branches/branch-1/sales/sale-1/returns')
-          && init?.method === 'POST',
-      );
-      expect(createReturnCall).toBeDefined();
-      expect(JSON.parse(String(createReturnCall?.[1]?.body ?? '{}'))).toMatchObject({
-        cashier_session_id: 'cashier-session-1',
-      });
+      expect(screen.queryByText('Active cashier session')).not.toBeInTheDocument();
     });
+
+    fireEvent.change(screen.getByLabelText('Clock-out note'), { target: { value: 'Shift complete' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Clock out' }));
+
+    expect(await screen.findByText('Attendance history')).toBeInTheDocument();
+    expect(screen.getByText('Shift complete')).toBeInTheDocument();
   });
 });

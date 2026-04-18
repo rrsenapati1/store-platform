@@ -1,5 +1,6 @@
 import { ActionButton, AppShell, DetailList, FormField, MetricGrid, SectionCard, StatusBadge } from '@store/ui';
 import { OwnerBatchExpirySection } from './OwnerBatchExpirySection';
+import { OwnerAttendanceSection } from './OwnerAttendanceSection';
 import { OwnerBarcodeSection } from './OwnerBarcodeSection';
 import { OwnerBarcodePrintRuntimeSection } from './OwnerBarcodePrintRuntimeSection';
 import { OwnerBillingLifecycleSection } from './OwnerBillingLifecycleSection';
@@ -309,6 +310,7 @@ export function OwnerWorkspace() {
       <OwnerCustomerInsightsSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerSupplierReportingSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerSyncRuntimeSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
+      <OwnerAttendanceSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerCashierSessionSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerDeviceClaimSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
 

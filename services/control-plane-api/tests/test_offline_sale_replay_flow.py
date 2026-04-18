@@ -123,8 +123,20 @@ def _bootstrap_replay_context(client: TestClient) -> dict[str, str]:
         json={"email": "cashier@acme.local", "full_name": "Counter Cashier", "role_name": "cashier"},
     )
     assert branch_membership.status_code == 200
-    cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
-    cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    staff_profile = client.post(
+        f"/v1/tenants/{tenant_id}/staff-profiles",
+        headers=owner_headers,
+        json={
+            "email": "cashier@acme.local",
+            "full_name": "Counter Cashier",
+            "phone_number": "9876543210",
+            "primary_branch_id": branch_id,
+        },
+    )
+    assert staff_profile.status_code == 200
+    staff_profile_id = staff_profile.json()["id"]
+    cashier_identity = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
+    cashier_headers = {"authorization": f"Bearer {cashier_identity['access_token']}"}
     cashier_actor = client.get("/v1/auth/me", headers=cashier_headers)
     assert cashier_actor.status_code == 200
 
@@ -141,7 +153,16 @@ def _bootstrap_replay_context(client: TestClient) -> dict[str, str]:
     )
     assert hub.status_code == 200
     hub_payload = hub.json()
-
+    attendance_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/attendance-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": hub_payload["id"],
+            "staff_profile_id": staff_profile_id,
+            "clock_in_note": "Continuity attendance",
+        },
+    )
+    assert attendance_session.status_code == 200
     cashier_session = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/cashier-sessions",
         headers=cashier_headers,
@@ -149,7 +170,7 @@ def _bootstrap_replay_context(client: TestClient) -> dict[str, str]:
             "device_registration_id": hub_payload["id"],
             "staff_profile_id": staff_profile_id,
             "opening_float_amount": 150.0,
-            "opening_note": "Branch hub opening float",
+            "opening_note": "Continuity shift",
         },
     )
     assert cashier_session.status_code == 200
@@ -161,6 +182,7 @@ def _bootstrap_replay_context(client: TestClient) -> dict[str, str]:
         "owner_access_token": owner_session["access_token"],
         "cashier_user_id": cashier_actor.json()["user_id"],
         "cashier_session_id": cashier_session.json()["id"],
+        "cashier_access_token": cashier_identity["access_token"],
         "hub_device_id": hub_payload["id"],
         "hub_device_secret": hub_payload["sync_access_secret"],
     }
@@ -172,8 +194,8 @@ def _offline_sale_payload(context: dict[str, str], *, quantity: float) -> dict[s
         "continuity_invoice_number": "OFF-BLRFLAGSHIP-0001",
         "idempotency_key": "offline-replay-offline-sale-1",
         "issued_offline_at": "2026-04-14T18:00:00.000Z",
-        "cashier_session_id": context["cashier_session_id"],
         "staff_actor_id": context["cashier_user_id"],
+        "cashier_session_id": context["cashier_session_id"],
         "customer_name": "Acme Traders",
         "customer_gstin": "29AAEPM0111C1Z3",
         "payment_method": "UPI",
@@ -215,10 +237,9 @@ def test_branch_hub_replays_offline_sale_once_and_returns_duplicate_result() -> 
     assert accepted.json()["duplicate"] is False
     assert accepted.json()["sale_id"]
     assert accepted.json()["invoice_number"] == "SINV-BLRFLAGSHIP-0001"
-
     sales = client.get(
         f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/sales",
-        headers={"authorization": f"Bearer {context['owner_access_token']}"},
+        headers={"authorization": f"Bearer {context['cashier_access_token']}"},
     )
     assert sales.status_code == 200
     assert sales.json()["records"][0]["cashier_session_id"] == context["cashier_session_id"]

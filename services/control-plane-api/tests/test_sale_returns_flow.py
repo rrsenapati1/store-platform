@@ -50,6 +50,17 @@ def _open_cashier_session(
     )
     assert device.status_code == 200
 
+    attendance_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/attendance-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": device.json()["id"],
+            "staff_profile_id": staff_profile_id,
+            "clock_in_note": "Morning shift attendance",
+        },
+    )
+    assert attendance_session.status_code == 200
+
     cashier_session = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/cashier-sessions",
         headers=cashier_headers,

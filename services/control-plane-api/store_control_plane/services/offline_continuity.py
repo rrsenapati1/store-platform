@@ -48,6 +48,7 @@ class OfflineContinuityService:
         self._billing_repo = BillingRepository(session)
         self._workforce_repo = WorkforceRepository(session)
         self._sync_repo = SyncRuntimeRepository(session)
+        self._workforce_repo = WorkforceRepository(session)
         self._audit_repo = AuditRepository(session)
         self._commercial_access = CommercialAccessService(session)
 
@@ -162,7 +163,6 @@ class OfflineContinuityService:
                 reason="CASHIER_SESSION_MISSING",
                 message="Offline sale replay requires a captured cashier session",
             )
-
         cashier_session = await self._workforce_repo.get_branch_cashier_session(
             tenant_id=device.tenant_id,
             branch_id=device.branch_id,

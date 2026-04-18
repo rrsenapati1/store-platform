@@ -6,6 +6,7 @@ import type {
   ControlPlaneBatchExpiryReviewSession,
   ControlPlaneBatchExpiryWriteOff,
   ControlPlaneBarcodeScanLookup,
+  ControlPlaneAttendanceSession,
   ControlPlaneBranchCatalogItem,
   ControlPlaneExchange,
   ControlPlaneBranchRecord,
@@ -58,6 +59,11 @@ import {
   saveStoreRuntimeSession,
   type StoreRuntimeSessionRecord,
 } from './storeRuntimeSessionStore';
+import {
+  runCloseAttendanceSession,
+  runLoadAttendanceSessions,
+  runOpenAttendanceSession,
+} from './storeAttendanceActions';
 import {
   runCloseCashierSession,
   runLoadCashierSessions,
@@ -153,6 +159,8 @@ export function useStoreRuntimeWorkspace() {
   const [runtimeDevices, setRuntimeDevices] = useState<ControlPlaneDeviceRecord[]>([]);
   const [selectedRuntimeDeviceId, setSelectedRuntimeDeviceId] = useState('');
   const [runtimeDeviceClaim, setRuntimeDeviceClaim] = useState<ControlPlaneRuntimeDeviceClaimResolution | null>(null);
+  const [attendanceSessions, setAttendanceSessions] = useState<ControlPlaneAttendanceSession[]>([]);
+  const [activeAttendanceSession, setActiveAttendanceSession] = useState<ControlPlaneAttendanceSession | null>(null);
   const [cashierSessions, setCashierSessions] = useState<ControlPlaneCashierSession[]>([]);
   const [activeCashierSession, setActiveCashierSession] = useState<ControlPlaneCashierSession | null>(null);
   const [runtimeHeartbeat, setRuntimeHeartbeat] = useState<ControlPlaneRuntimeHeartbeat | null>(null);
@@ -219,6 +227,8 @@ export function useStoreRuntimeWorkspace() {
   const [blindCountedQuantity, setBlindCountedQuantity] = useState('');
   const [stockCountReviewNote, setStockCountReviewNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [attendanceClockInNote, setAttendanceClockInNote] = useState('');
+  const [attendanceClockOutNote, setAttendanceClockOutNote] = useState('');
   const [cashierOpeningFloatAmount, setCashierOpeningFloatAmount] = useState('');
   const [cashierOpeningNote, setCashierOpeningNote] = useState('');
   const [cashierClosingNote, setCashierClosingNote] = useState('');
@@ -427,6 +437,31 @@ export function useStoreRuntimeWorkspace() {
   useEffect(() => {
     if (!accessToken || !tenantId || !branchId || !actor?.user_id || !selectedRuntimeDeviceId) {
       applyStateTransition(() => {
+        setAttendanceSessions([]);
+        setActiveAttendanceSession(null);
+      });
+      return;
+    }
+    if (!selectedRuntimeDevice?.assigned_staff_profile_id) {
+      applyStateTransition(() => {
+        setAttendanceSessions([]);
+        setActiveAttendanceSession(null);
+      });
+      return;
+    }
+    void loadAttendanceSessions();
+  }, [
+    accessToken,
+    actor?.user_id,
+    branchId,
+    selectedRuntimeDevice?.assigned_staff_profile_id,
+    selectedRuntimeDeviceId,
+    tenantId,
+  ]);
+
+  useEffect(() => {
+    if (!accessToken || !tenantId || !branchId || !actor?.user_id || !selectedRuntimeDeviceId) {
+      applyStateTransition(() => {
         setCashierSessions([]);
         setActiveCashierSession(null);
       });
@@ -470,6 +505,8 @@ export function useStoreRuntimeWorkspace() {
       setRuntimeDevices([]);
       setSelectedRuntimeDeviceId('');
       setRuntimeDeviceClaim(null);
+      setAttendanceSessions([]);
+      setActiveAttendanceSession(null);
       setCashierSessions([]);
       setActiveCashierSession(null);
       setRuntimeHeartbeat(null);
@@ -511,6 +548,8 @@ export function useStoreRuntimeWorkspace() {
       setGiftCardAmountState('');
       setStoreCreditAmount('');
       setLoyaltyPointsToRedeem('');
+      setAttendanceClockInNote('');
+      setAttendanceClockOutNote('');
       setCashierOpeningFloatAmount('');
       setCashierOpeningNote('');
       setCashierClosingNote('');
@@ -675,10 +714,86 @@ export function useStoreRuntimeWorkspace() {
       branchId,
       actorUserId: actor.user_id,
       selectedRuntimeDeviceId,
-      setIsBusy,
+      setIsBusy: () => {},
       setErrorMessage,
       setCashierSessions,
       setActiveCashierSession,
+    });
+  }
+
+  async function loadAttendanceSessions() {
+    if (!accessToken || !tenantId || !branchId || !actor?.user_id || !selectedRuntimeDeviceId) {
+      return;
+    }
+    if (!selectedRuntimeDevice?.assigned_staff_profile_id) {
+      applyStateTransition(() => {
+        setAttendanceSessions([]);
+        setActiveAttendanceSession(null);
+      });
+      return;
+    }
+    await runLoadAttendanceSessions({
+      accessToken,
+      tenantId,
+      branchId,
+      actorUserId: actor.user_id,
+      selectedRuntimeDeviceId,
+      setIsBusy: () => {},
+      setErrorMessage,
+      setAttendanceSessions,
+      setActiveAttendanceSession,
+    });
+  }
+
+  async function openAttendanceSession() {
+    if (!accessToken || !tenantId || !branchId || !actor?.user_id) {
+      return;
+    }
+    if (!selectedRuntimeDeviceId || !selectedRuntimeDevice) {
+      setErrorMessage('Select an assigned runtime device before clocking in.');
+      return;
+    }
+    if (!selectedRuntimeDevice.assigned_staff_profile_id) {
+      setErrorMessage('The selected runtime device must be assigned to a staff profile before clocking in.');
+      return;
+    }
+    await runOpenAttendanceSession({
+      accessToken,
+      tenantId,
+      branchId,
+      deviceRegistrationId: selectedRuntimeDeviceId,
+      staffProfileId: selectedRuntimeDevice.assigned_staff_profile_id,
+      clockInNote: attendanceClockInNote,
+      actorUserId: actor.user_id,
+      setIsBusy,
+      setErrorMessage,
+      setAttendanceSessions,
+      setActiveAttendanceSession,
+      setAttendanceClockInNote,
+    });
+  }
+
+  async function closeAttendanceSession() {
+    if (!accessToken || !tenantId || !branchId || !actor?.user_id || !activeAttendanceSession) {
+      return;
+    }
+    if (activeCashierSession) {
+      setErrorMessage('Close the linked cashier session before clocking out.');
+      return;
+    }
+    await runCloseAttendanceSession({
+      accessToken,
+      tenantId,
+      branchId,
+      attendanceSessionId: activeAttendanceSession.id,
+      actorUserId: actor.user_id,
+      selectedRuntimeDeviceId,
+      clockOutNote: attendanceClockOutNote,
+      setIsBusy,
+      setErrorMessage,
+      setAttendanceSessions,
+      setActiveAttendanceSession,
+      setAttendanceClockOutNote,
     });
   }
 
@@ -692,6 +807,10 @@ export function useStoreRuntimeWorkspace() {
     }
     if (!selectedRuntimeDevice.assigned_staff_profile_id) {
       setErrorMessage('The selected runtime device must be assigned to a staff profile before opening a cashier session.');
+      return;
+    }
+    if (!activeAttendanceSession) {
+      setErrorMessage('Open an attendance session before opening a cashier session.');
       return;
     }
     const parsedOpeningFloatAmount = Number(cashierOpeningFloatAmount || 0);
@@ -801,6 +920,8 @@ export function useStoreRuntimeWorkspace() {
       setSales(cachedSnapshot.sales);
       setRuntimeDevices(cachedSnapshot.runtime_devices);
       setSelectedRuntimeDeviceId(cachedSnapshot.selected_runtime_device_id || (cachedSnapshot.runtime_devices[0]?.id ?? ''));
+      setAttendanceSessions([]);
+      setActiveAttendanceSession(null);
       setCashierSessions([]);
       setActiveCashierSession(null);
       setRuntimeHeartbeat(cachedSnapshot.runtime_heartbeat);
@@ -877,6 +998,8 @@ export function useStoreRuntimeWorkspace() {
       setRuntimeDevices(devicesResponse.records);
       setSelectedRuntimeDeviceId(runtimeDeviceBinding.selectedRuntimeDeviceId);
       setRuntimeDeviceClaim(runtimeDeviceBinding.runtimeDeviceClaim);
+      setAttendanceSessions([]);
+      setActiveAttendanceSession(null);
       setCashierSessions([]);
       setActiveCashierSession(null);
       setHubIdentityRecord(nextHubIdentity);
@@ -2383,9 +2506,13 @@ export function useStoreRuntimeWorkspace() {
 
   return {
     accessToken,
+    activeAttendanceSession,
     activeBatchExpirySession,
     activeCashierSession,
     activeStockCountSession,
+    attendanceClockInNote,
+    attendanceClockOutNote,
+    attendanceSessions,
     actor,
     approveStockCountSession,
     approveBatchExpirySession,
@@ -2411,6 +2538,7 @@ export function useStoreRuntimeWorkspace() {
     createExchange,
     createBatchExpirySession,
     createBatchExpiryWriteOff,
+    closeAttendanceSession,
     closeCashierSession,
     createStockCountSession,
     createSaleReturn,
@@ -2474,6 +2602,7 @@ export function useStoreRuntimeWorkspace() {
     pendingMutationCount,
     pendingRuntimeMutations: pendingMutations,
     printJobs,
+    loadAttendanceSessions,
     loadBatchExpiryBoard,
     loadBatchExpiryReport,
     loadCashierSessions,
@@ -2492,6 +2621,7 @@ export function useStoreRuntimeWorkspace() {
     assignRuntimePreferredScanner: runtimeHardware.assignPreferredScanner,
     assignRuntimeReceiptPrinter: runtimeHardware.assignReceiptPrinter,
     openRuntimeCashDrawer,
+    openAttendanceSession,
     openCashierSession,
     readRuntimeScaleWeight,
     recordBatchExpirySession,
@@ -2602,6 +2732,8 @@ export function useStoreRuntimeWorkspace() {
     setCustomerProfileSearchQuery,
     setCustomerGstin,
     setCustomerName,
+    setAttendanceClockInNote,
+    setAttendanceClockOutNote,
     setBlindCountedQuantity,
     setExpiryReviewNote,
     setExpirySessionNote,
