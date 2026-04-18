@@ -1184,3 +1184,64 @@ def test_generate_release_candidate_evidence_can_retain_published_bundle_offsite
     )
     assert retention_manifest["environment"] == "prod"
     assert retention_manifest["release_version"] == "2026.04.19"
+
+
+def test_generate_release_candidate_evidence_passes_restore_drill_report_to_certifier(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence.md"
+    restore_drill_report_path = tmp_path / "restore-drill-report.json"
+    restore_drill_report_path.write_text(
+        json.dumps(
+            {
+                "status": "passed",
+                "failure_reason": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    seen: dict[str, object] = {}
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.19",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**kwargs: object) -> dict[str, object]:
+        seen["restore_drill_result"] = kwargs.get("restore_drill_result")
+        return {
+            "status": "approved",
+            "environment": "prod",
+            "release_version": "2026.04.19",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "vulnerability_scans_passed": True,
+                "restore_drill_verified": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.19",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        vulnerability_scan_report_path=None,
+        restore_drill_report_path=restore_drill_report_path,
+        date_text="2026-04-19",
+    )
+
+    assert result["final_status"] == "approved"
+    assert seen["restore_drill_result"] == {"status": "passed", "failure_reason": None}

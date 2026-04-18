@@ -329,6 +329,12 @@ If release certification is run with `certify_release_candidate.py`, also pass:
 
 This verifier approves only schema-compatible app-layer rollback. If the target bundle `alembic_head` differs from the deployed schema head, treat rollback as `restore_required` and use the backup/restore path instead of a simple app rollback.
 
+Release certification can now also consume restore-drill evidence directly:
+
+- `--restore-drill-report <restore-drill-report.json>`
+
+If you are enforcing the strict final gate, treat restore-drill evidence as mandatory alongside rollback verification.
+
 ## Vulnerability Scan Evidence
 
 Before certifying a staging or production release candidate, generate a normalized vulnerability report:
@@ -463,10 +469,38 @@ python services/control-plane-api/scripts/verify_retained_release_evidence.py `
 
 This verification is intentionally separate from upload. It downloads the retained archive and manifests, validates the immutable archive and publication hashes from the offsite-retention manifest, checks the archive can still be opened, and confirms the rolling publication catalog still includes the retained release entry.
 
+## One-Shot Final Gate
+
+When the environment is ready for the full bounded V2 hardening gate, prefer the orchestration command:
+
+```powershell
+python services/control-plane-api/scripts/run_release_gate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.19 `
+  --release-owner ops@store.korsenex.com `
+  --output-dir docs/launch/evidence/prod-release-gate `
+  --admin-bearer-token <admin-token> `
+  --branch-bearer-token <branch-token> `
+  --tenant-id <tenant-id> `
+  --branch-id <branch-id> `
+  --product-id <product-id> `
+  --dump-key control-plane/prod/postgres-backups/<backup>/store-control-plane-prod.dump `
+  --metadata-key control-plane/prod/postgres-backups/<backup>/metadata.json `
+  --target-database-url postgresql+asyncpg://store:secret@restore-host:5432/store_control_plane_restore `
+  --image-ref store-control-plane-api:prod `
+  --image-ref postgres:16 `
+  --retain-evidence-offsite `
+  --verify-retained-evidence
+```
+
+Use `release-gate-report.json` from that run as the final machine-readable status record for the V2-009 hardening lane. It consolidates strict certification, evidence packaging/publication, and optional off-host retention plus retrieval verification.
+
 ## Failure Posture
 
 - If pre-migration backup fails: stop deployment.
 - If Alembic fails: do not restart services on the new release.
 - If API or worker restart fails: revert the release bundle path and investigate before re-running migrations.
 - If post-deploy verification fails after migrations succeed: prefer restore-forward fixes; use DB restore only when the release cannot be recovered safely.
+- If the restore-drill report is missing or failed: treat recovery evidence as incomplete for the strict final gate.
 - If retained evidence retrieval verification fails: treat the retained evidence trail as incomplete until object-storage access, integrity, and catalog visibility are re-established.

@@ -1,5 +1,16 @@
 # Store Worklog
 
+## 2026-04-19
+
+- Completed `V2-009` release-gate orchestration and track closure:
+  - added strict release-gate orchestration in `services/control-plane-api/store_control_plane/release_gate_orchestration.py`
+  - added one-shot operator CLI `services/control-plane-api/scripts/run_release_gate.py`
+  - extended release certification and evidence generation so restore-drill evidence can participate in the strict final certification path
+  - documented the one-shot final hardening gate in the verification and production deployment runbooks
+  - marked `V2-009` complete in `docs/TASK_LEDGER.md`
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_release_candidate_certification.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_gate_orchestration.py services/control-plane-api/tests/test_run_release_gate_script.py -q`
+
 ## 2026-04-18
 
 - Extended `V2-009` with license-compliance foundation:

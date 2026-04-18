@@ -430,6 +430,50 @@ python services/control-plane-api/scripts/certify_release_candidate.py `
   --provenance-report docs\launch\evidence\store-control-plane-2026.04.18.provenance.json
 ```
 
+It can also consume a saved restore-drill report directly:
+
+```powershell
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --restore-drill-report docs\launch\evidence\prod-restore-drill-report.json
+```
+
+## Run The Full V2 Release Gate
+
+For the bounded final V2-009 operator path, prefer the one-shot orchestration command instead of assembling the hardening lane manually:
+
+```powershell
+python services/control-plane-api/scripts/run_release_gate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.19 `
+  --release-owner ops@store.korsenex.com `
+  --output-dir docs\launch\evidence\prod-release-gate `
+  --admin-bearer-token <admin-token> `
+  --branch-bearer-token <branch-token> `
+  --tenant-id <tenant-id> `
+  --branch-id <branch-id> `
+  --product-id <product-id> `
+  --dump-key control-plane/prod/postgres-backups/<backup>/store-control-plane-prod.dump `
+  --metadata-key control-plane/prod/postgres-backups/<backup>/metadata.json `
+  --target-database-url postgresql+asyncpg://store:secret@restore-host:5432/store_control_plane_restore `
+  --image-ref store-control-plane-api:prod `
+  --image-ref postgres:16 `
+  --retain-evidence-offsite `
+  --verify-retained-evidence
+```
+
+That path now:
+
+- runs vulnerability, alert, drift, TLS, SBOM, license, deployed-load, rollback, and restore-drill evidence
+- packages the control-plane release and reuses that manifest for provenance and rollback verification
+- generates strict certification that includes deployed-load, rollback, and restore-drill posture
+- assembles and publishes the evidence bundle
+- optionally performs off-host retention and post-retention retrieval verification
+- writes `release-gate-report.json` as the final machine-readable result for the V2-009 hardening lane
+
 ## Expected Success Signal
 
 The script exits `0` and prints a JSON summary with:
@@ -455,7 +499,9 @@ The script exits `0` and prints a JSON summary with:
 - If release provenance is missing or failed, treat the release candidate as blocked until the bundle has source-attested provenance evidence again.
 - If deployed load verification fails, treat the staged release as not scale-ready until the failing HTTP scenarios are understood and reverified.
 - If deployed security verification fails, treat the release candidate as blocked until the secure-header or throttle mismatch is resolved.
+- If restore-drill verification fails, treat recovery posture as unproven and block the strict final release gate.
 - If retained evidence retrieval verification fails, treat off-host evidence retention as unproven until the stored pack can be downloaded and revalidated successfully.
+- If `run_release_gate.py` finishes blocked, treat its `release-gate-report.json` as the final authority for the bounded V2-009 gate even if some lower-level reports were individually green.
 
 ## Cleanup
 

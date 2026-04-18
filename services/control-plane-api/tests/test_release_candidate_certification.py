@@ -636,3 +636,70 @@ def test_release_candidate_certification_approves_when_rollback_report_passes() 
 
     assert result["status"] == "approved"
     assert result["gates"]["rollback_verified"] is True
+
+
+def test_release_candidate_certification_blocks_missing_restore_drill_when_required() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.19",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
+        tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
+        provenance_result={"status": "passed", "failure_reason": None},
+        license_compliance_result={"status": "passed", "failing_surfaces": []},
+        deployed_load_result={"status": "passed", "failing_scenarios": []},
+        rollback_result={"status": "passed", "failure_reason": None},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        require_deployed_load=True,
+        require_rollback_verification=True,
+        require_restore_drill=True,
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.19",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "blocked"
+    assert result["gates"]["restore_drill_verified"] is False
+
+
+def test_release_candidate_certification_approves_when_restore_drill_passes_when_required() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.19",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
+        tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
+        provenance_result={"status": "passed", "failure_reason": None},
+        license_compliance_result={"status": "passed", "failing_surfaces": []},
+        deployed_load_result={"status": "passed", "failing_scenarios": []},
+        rollback_result={"status": "passed", "failure_reason": None},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        restore_drill_result={"status": "passed", "failure_reason": None},
+        require_deployed_load=True,
+        require_rollback_verification=True,
+        require_restore_drill=True,
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.19",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "approved"
+    assert result["gates"]["restore_drill_verified"] is True

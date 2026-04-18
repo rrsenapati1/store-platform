@@ -516,6 +516,7 @@ def generate_release_candidate_evidence(
         license_compliance_result=license_compliance_result,
         deployed_load_result=deployed_load_result,
         rollback_result=rollback_result,
+        restore_drill_result=restore_drill_result,
         vulnerability_scan_result=vulnerability_scan_result,
     )
 

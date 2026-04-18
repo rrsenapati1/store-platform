@@ -42,6 +42,7 @@ def certify_release_candidate(
     deployed_load_result: dict[str, object] | None = None,
     rollback_result: dict[str, object] | None = None,
     vulnerability_scan_result: dict[str, object] | None = None,
+    restore_drill_result: dict[str, object] | None = None,
     require_operational_alerts: bool = True,
     require_environment_drift: bool = True,
     require_tls_posture: bool = True,
@@ -51,6 +52,7 @@ def certify_release_candidate(
     require_deployed_load: bool = False,
     require_rollback_verification: bool = False,
     require_vulnerability_scan: bool = True,
+    require_restore_drill: bool = False,
     verify_deployed: VerifyDeployedCallable | None = None,
 ) -> dict[str, object]:
     verification = verify_deployed or _load_verify_script_module().verify_deployed_control_plane
@@ -104,6 +106,11 @@ def certify_release_candidate(
           if rollback_result is not None
           else not require_rollback_verification
       ),
+      "restore_drill_verified": (
+          restore_drill_result.get("status") == "passed"
+          if restore_drill_result is not None
+          else not require_restore_drill
+      ),
       "vulnerability_scans_passed": (not require_vulnerability_scan) or (
           vulnerability_scan_result is not None and vulnerability_scan_result.get("status") == "passed"
       ),
@@ -134,6 +141,8 @@ def certify_release_candidate(
       "deployed_load_failing_scenarios": [] if deployed_load_result is None else list(deployed_load_result.get("failing_scenarios") or []),
       "rollback_result_status": None if rollback_result is None else rollback_result.get("status"),
       "rollback_failure_reason": None if rollback_result is None else rollback_result.get("failure_reason"),
+      "restore_drill_result_status": None if restore_drill_result is None else restore_drill_result.get("status"),
+      "restore_drill_failure_reason": None if restore_drill_result is None else restore_drill_result.get("failure_reason"),
       "vulnerability_result_status": None if vulnerability_scan_result is None else vulnerability_scan_result.get("status"),
       "vulnerability_failing_surfaces": [] if vulnerability_scan_result is None else list(vulnerability_scan_result.get("failing_surfaces") or []),
       "gates": gates,
@@ -155,6 +164,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--license-compliance-report", help="Optional JSON license report path produced by run_license_compliance.py.")
     parser.add_argument("--deployed-load-report", help="Optional JSON deployed load report path produced by verify_deployed_load_posture.py.")
     parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path produced by verify_release_rollback.py.")
+    parser.add_argument("--restore-drill-report", help="Optional JSON restore-drill report path produced by run_restore_drill.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
     return parser.parse_args()
 
@@ -188,6 +198,9 @@ def main() -> None:
     rollback_result = None
     if args.rollback_report:
         rollback_result = json.loads(Path(args.rollback_report).read_text(encoding="utf-8"))
+    restore_drill_result = None
+    if args.restore_drill_report:
+        restore_drill_result = json.loads(Path(args.restore_drill_report).read_text(encoding="utf-8"))
     vulnerability_scan_result = None
     if args.vulnerability_scan_report:
         vulnerability_scan_result = json.loads(Path(args.vulnerability_scan_report).read_text(encoding="utf-8"))
@@ -205,6 +218,7 @@ def main() -> None:
         license_compliance_result=license_compliance_result,
         deployed_load_result=deployed_load_result,
         rollback_result=rollback_result,
+        restore_drill_result=restore_drill_result,
         vulnerability_scan_result=vulnerability_scan_result,
     )
     print(json.dumps(result, indent=2))
