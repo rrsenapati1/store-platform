@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..dependencies import get_session, get_settings
-from ..schemas import AuthorityBoundaryResponse, SystemHealthResponse
+from ..schemas import AuthorityBoundaryResponse, SystemHealthResponse, SystemSecurityControlsResponse
 from ..services.authority import build_authority_boundary
 from ..services.system_status import build_system_health
 
@@ -25,3 +25,20 @@ async def get_authority_boundary(
     settings: Settings = Depends(get_settings),
 ) -> AuthorityBoundaryResponse:
     return build_authority_boundary(settings)
+
+
+@router.get("/security-controls", response_model=SystemSecurityControlsResponse)
+async def get_security_controls(
+    settings: Settings = Depends(get_settings),
+) -> SystemSecurityControlsResponse:
+    return SystemSecurityControlsResponse(
+        secure_headers_enabled=settings.secure_headers_enabled,
+        secure_headers_hsts_enabled=settings.secure_headers_hsts_enabled,
+        secure_headers_csp=settings.secure_headers_csp,
+        rate_limits={
+            "window_seconds": settings.rate_limit_window_seconds,
+            "auth_requests": settings.rate_limit_auth_requests,
+            "activation_requests": settings.rate_limit_activation_requests,
+            "webhook_requests": settings.rate_limit_webhook_requests,
+        },
+    )

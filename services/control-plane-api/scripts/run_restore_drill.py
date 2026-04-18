@@ -9,7 +9,7 @@ if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
 from store_control_plane.config import Settings
-from store_control_plane.ops import run_postgres_restore_drill, write_restore_drill_report
+from store_control_plane.ops.postgres_restore_drill import run_postgres_restore_drill, write_restore_drill_report
 
 
 def parse_args() -> argparse.Namespace:

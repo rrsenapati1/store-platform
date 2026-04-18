@@ -47,6 +47,7 @@ def certify_release_candidate(
     release_version = deployed.get("release_version")
     legacy_write_mode = deployed.get("legacy_write_mode")
     legacy_remaining_domains = list(deployed.get("legacy_remaining_domains") or [])
+    security_result = dict(deployed.get("security_result") or {})
     status = deployed.get("status")
 
     gates = {
@@ -55,6 +56,7 @@ def certify_release_candidate(
       "release_version_match": not expected_release_version or release_version == expected_release_version,
       "legacy_write_mode_cutover": legacy_write_mode == "cutover",
       "legacy_remaining_domains_cleared": len(legacy_remaining_domains) == 0,
+      "security_controls_verified": not security_result or security_result.get("status") == "passed",
       "performance_budgets_passed": performance_result is None or performance_result.get("status") == "passed",
     }
     overall_status = "approved" if all(gates.values()) else "blocked"
@@ -64,6 +66,7 @@ def certify_release_candidate(
       "release_version": release_version,
       "legacy_write_mode": legacy_write_mode,
       "legacy_remaining_domains": legacy_remaining_domains,
+      "security_result_status": security_result.get("status"),
       "performance_result_status": None if performance_result is None else performance_result.get("status"),
       "performance_failing_scenarios": [] if performance_result is None else list(performance_result.get("failing_scenarios") or []),
       "gates": gates,

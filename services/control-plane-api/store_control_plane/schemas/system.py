@@ -33,3 +33,17 @@ class AuthorityBoundaryResponse(BaseModel):
     legacy_remaining_domains: list[str]
     shutdown_criteria: list[str]
     shutdown_steps: list[str]
+
+
+class SystemSecurityRateLimitsResponse(BaseModel):
+    window_seconds: int
+    auth_requests: int
+    activation_requests: int
+    webhook_requests: int
+
+
+class SystemSecurityControlsResponse(BaseModel):
+    secure_headers_enabled: bool
+    secure_headers_hsts_enabled: bool
+    secure_headers_csp: str
+    rate_limits: SystemSecurityRateLimitsResponse

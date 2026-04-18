@@ -27,6 +27,7 @@ def test_release_candidate_certification_approves_cutover_ready_deployment() -> 
             "release_version": "2026.04.15-rc1",
             "legacy_write_mode": "cutover",
             "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
         },
     )
 
@@ -36,6 +37,7 @@ def test_release_candidate_certification_approves_cutover_ready_deployment() -> 
     assert result["gates"]["release_version_match"] is True
     assert result["gates"]["legacy_write_mode_cutover"] is True
     assert result["gates"]["legacy_remaining_domains_cleared"] is True
+    assert result["gates"]["security_controls_verified"] is True
 
 
 def test_release_candidate_certification_blocks_shadow_mode() -> None:
@@ -51,6 +53,7 @@ def test_release_candidate_certification_blocks_shadow_mode() -> None:
             "release_version": "2026.04.15-rc1",
             "legacy_write_mode": "shadow",
             "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
         },
     )
 
@@ -71,6 +74,7 @@ def test_release_candidate_certification_blocks_remaining_legacy_domains() -> No
             "release_version": "2026.04.15-rc1",
             "legacy_write_mode": "cutover",
             "legacy_remaining_domains": ["legacy_customer_lookup"],
+            "security_result": {"status": "passed"},
         },
     )
 
@@ -97,6 +101,7 @@ def test_release_candidate_certification_approves_when_performance_budgets_pass(
             "release_version": "2026.04.15-rc1",
             "legacy_write_mode": "cutover",
             "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
         },
     )
 
@@ -122,8 +127,30 @@ def test_release_candidate_certification_blocks_when_performance_budgets_fail() 
             "release_version": "2026.04.15-rc1",
             "legacy_write_mode": "cutover",
             "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
         },
     )
 
     assert result["status"] == "blocked"
     assert result["gates"]["performance_budgets_passed"] is False
+
+
+def test_release_candidate_certification_blocks_failed_security_verification() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.15-rc1",
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.15-rc1",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "failed"},
+        },
+    )
+
+    assert result["status"] == "blocked"
+    assert result["gates"]["security_controls_verified"] is False

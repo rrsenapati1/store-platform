@@ -82,6 +82,7 @@ def test_generate_release_candidate_evidence_writes_markdown_with_verification_r
     assert "local verification passed" in content
     assert "python services/control-plane-api/scripts/validate_performance_foundation.py" in content
     assert "8 scenarios passed" in content
+    assert "Security verification status: not-run" in content
     assert "`legacy_write_mode`: cutover" in content
     assert "`legacy_remaining_domains`: none" in content
     assert "Status: approved" in content
@@ -133,9 +134,66 @@ def test_generate_release_candidate_evidence_records_blocked_state_and_skipped_l
     content = output_path.read_text(encoding="utf-8")
     assert "result: skipped" in content
     assert "Performance validation command: not-run" in content
+    assert "Security verification status: not-run" in content
     assert "`legacy_write_mode`: shadow" in content
     assert "`legacy_remaining_domains`: legacy_customer_reads" in content
     assert "Status: blocked" in content
+
+
+def test_generate_release_candidate_evidence_renders_security_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-security.md"
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc1",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {
+                "status": "passed",
+                "secure_headers": {"status": "passed"},
+                "auth_rate_limit": {"status": "passed"},
+                "webhook_rate_limit": {"status": "passed"},
+            },
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "approved",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc1",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "security_controls_verified": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc1",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "approved"
+    content = output_path.read_text(encoding="utf-8")
+    assert "Security verification status: passed" in content
+    assert "auth rate limit: passed" in content
+    assert "webhook rate limit: passed" in content
 
 
 def test_generate_release_candidate_evidence_renders_restore_drill_report(tmp_path: Path) -> None:

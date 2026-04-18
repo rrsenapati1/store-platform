@@ -124,6 +124,12 @@ Before certifying a staging or production release candidate, attach recent resto
 - keep the JSON restore-drill report with the release notes or evidence bundle
 - if release evidence is generated with `generate_release_candidate_evidence.py`, pass `--restore-drill-report <restore-drill-report.json>` so recovery posture is recorded alongside verification and performance evidence
 
+Also keep the deployed security verification result from:
+
+- `python scripts/verify_deployed_control_plane.py --base-url ... --expected-environment ... --expected-release-version ...`
+
+That verification now includes secure-header checks and bounded live auth/webhook throttle probes, and release certification should block if those controls fail.
+
 ## Failure Posture
 
 - If pre-migration backup fails: stop deployment.

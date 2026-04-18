@@ -99,6 +99,23 @@ def _render_markdown(
 ) -> str:
     deployed_domains = list(deployed_result.get("legacy_remaining_domains") or [])
     final_status = str(certification_result.get("status") or "blocked")
+    security_result = dict(deployed_result.get("security_result") or {})
+    security_lines = [
+        "## Security Evidence",
+        "",
+        "- Security verification status: not-run",
+        "",
+    ]
+    if security_result:
+        security_lines = [
+            "## Security Evidence",
+            "",
+            f"- Security verification status: {security_result.get('status')}",
+            f"- secure headers: {dict(security_result.get('secure_headers') or {}).get('status') or 'unknown'}",
+            f"- auth rate limit: {dict(security_result.get('auth_rate_limit') or {}).get('status') or 'unknown'}",
+            f"- webhook rate limit: {dict(security_result.get('webhook_rate_limit') or {}).get('status') or 'unknown'}",
+            "",
+        ]
     restore_drill_lines = [
         "## Recovery Evidence",
         "",
@@ -145,6 +162,7 @@ def _render_markdown(
             "- Release-candidate certification command: python services/control-plane-api/scripts/certify_release_candidate.py --base-url ... --expected-environment ... --expected-release-version ...",
             f"  - result: {certification_result.get('status')}",
             "",
+            *security_lines,
             *restore_drill_lines,
             "## Authority / Cutover Evidence",
             "",

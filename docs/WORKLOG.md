@@ -2,6 +2,16 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with security verification foundation:
+  - added a control-plane `GET /v1/system/security-controls` read model so deployed verification can discover the effective secure-header and rate-limit posture instead of hardcoding assumptions
+  - extended `verify_deployed_control_plane.py` to verify live secure headers and run bounded invalid auth-exchange plus billing-webhook probes until the deployed throttles return `429`, while preserving the existing environment and authority checks
+  - extended release-candidate evidence and certification so security posture is rendered explicitly and can block approval when deployed security controls are missing or misconfigured
+  - updated the verification and production deployment runbooks to document the new live security probe behavior and its role in release readiness
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_system_routes.py services/control-plane-api/tests/test_verify_deployed_control_plane.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py services/control-plane-api/tests/test_rate_limiting.py services/control-plane-api/tests/test_security_headers.py -q`
+  - `python services/control-plane-api/scripts/verify_deployed_control_plane.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
 - Extended `V2-009` with restore-drill automation foundation:
   - added control-plane restore-drill orchestration on top of the existing Postgres restore flow so selected backup artifacts can be restored into an explicit target database, booted locally through the control plane, and verified through mandatory health plus optional bounded smoke checks
   - added `run_restore_drill.py` as the operator-facing CLI that writes machine-readable JSON recovery evidence and returns a non-zero status on failed drills

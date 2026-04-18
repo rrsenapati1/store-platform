@@ -1,6 +1,6 @@
 # Control-Plane Verification Runbook
 
-Updated: 2026-04-14
+Updated: 2026-04-18
 
 ## Purpose
 
@@ -73,6 +73,15 @@ Optional:
 
 - pass `--bearer-token <token>` if you also want the script to verify `/v1/auth/me`
 
+The deployed verifier now also:
+
+- reads `GET /v1/system/security-controls`
+- verifies secure headers on the health response
+- sends bounded invalid auth-exchange requests until the deployed auth throttle triggers
+- sends bounded invalid billing-webhook requests until the deployed webhook throttle triggers
+
+Those probes are intentionally invalid but well-formed and should not mutate tenant data. They do consume a small number of rate-limit slots from the verifying client IP, so do not run them continuously from a shared operator workstation during incident response.
+
 ## Run The Launch-Foundation Performance Validation Lane
 
 From `services/control-plane-api/` or repo root with the database URL available:
@@ -124,6 +133,7 @@ If you do not skip it, the evidence markdown records:
 - the performance validation command
 - the result status
 - a compact scenario summary
+- the deployed security verification status and throttle posture
 
 `certify_release_candidate.py` can also consume a saved performance report directly:
 
@@ -153,6 +163,7 @@ The script exits `0` and prints a JSON summary with:
 - If app-flow tests fail, do not mark the current UI/runtime surface healthy.
 - If the smoke fails after tests pass, treat it as an integration regression between control-plane modules.
 - If performance validation fails, treat the release evidence as incomplete until the failing scenarios are understood and the budgets are re-met or intentionally revised.
+- If deployed security verification fails, treat the release candidate as blocked until the secure-header or throttle mismatch is resolved.
 
 ## Cleanup
 
