@@ -336,6 +336,30 @@ python services/control-plane-api/scripts/generate_release_candidate_evidence.py
 
 This path is explicit on purpose. Off-host retention should never happen implicitly during ordinary local verification.
 
+To verify that retained evidence is actually recoverable later, download it back from object storage and re-check the retained hashes:
+
+```powershell
+python services/control-plane-api/scripts/verify_retained_release_evidence.py `
+  --environment prod `
+  --release-version 2026.04.19 `
+  --output-dir docs\launch\evidence\retrieved\prod-2026.04.19 `
+  --report-path docs\launch\evidence\retrieved\prod-2026.04.19.retrieval-report.json
+```
+
+This retrieves:
+
+- the retained archive
+- the retained publication manifest
+- the rolling publication catalog
+- the offsite-retention manifest
+
+Then it verifies:
+
+- archive SHA-256 against the retention manifest
+- publication-manifest SHA-256 and identity
+- archive readability plus required evidence contents
+- that the rolling catalog still contains the retained `environment + release_version` entry
+
 `certify_release_candidate.py` can also consume a saved performance report directly:
 
 ```powershell
@@ -431,6 +455,7 @@ The script exits `0` and prints a JSON summary with:
 - If release provenance is missing or failed, treat the release candidate as blocked until the bundle has source-attested provenance evidence again.
 - If deployed load verification fails, treat the staged release as not scale-ready until the failing HTTP scenarios are understood and reverified.
 - If deployed security verification fails, treat the release candidate as blocked until the secure-header or throttle mismatch is resolved.
+- If retained evidence retrieval verification fails, treat off-host evidence retention as unproven until the stored pack can be downloaded and revalidated successfully.
 
 ## Cleanup
 

@@ -449,9 +449,24 @@ The offsite-retention manifest is the operator-visible proof of what was uploade
 
 Use this step when the evidence pack must survive workstation loss or needs to be reviewed from a shared durable store.
 
+## Retained Evidence Retrieval Verification
+
+After off-host retention, periodically prove the stored evidence pack is still recoverable:
+
+```powershell
+python services/control-plane-api/scripts/verify_retained_release_evidence.py `
+  --environment prod `
+  --release-version 2026.04.19 `
+  --output-dir docs/launch/evidence/retrieved/prod-2026.04.19 `
+  --report-path docs/launch/evidence/retrieved/prod-2026.04.19.retrieval-report.json
+```
+
+This verification is intentionally separate from upload. It downloads the retained archive and manifests, validates the immutable archive and publication hashes from the offsite-retention manifest, checks the archive can still be opened, and confirms the rolling publication catalog still includes the retained release entry.
+
 ## Failure Posture
 
 - If pre-migration backup fails: stop deployment.
 - If Alembic fails: do not restart services on the new release.
 - If API or worker restart fails: revert the release bundle path and investigate before re-running migrations.
 - If post-deploy verification fails after migrations succeed: prefer restore-forward fixes; use DB restore only when the release cannot be recovered safely.
+- If retained evidence retrieval verification fails: treat the retained evidence trail as incomplete until object-storage access, integrity, and catalog visibility are re-established.

@@ -1012,6 +1012,16 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+
+- Completed `V2-009` retained-evidence retrieval verification foundation:
+  - added `verify_retained_release_evidence(...)` in `services/control-plane-api/store_control_plane/ops/release_evidence_retrieval.py`
+  - added `services/control-plane-api/scripts/verify_retained_release_evidence.py`
+  - verifies retained archive and publication-manifest hashes from the offsite-retention manifest
+  - verifies retained archive readability and required evidence contents
+  - verifies the rolling publication catalog still contains the retained release entry without freezing the catalog hash
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_release_evidence_retrieval_ops.py services/control-plane-api/tests/test_verify_retained_release_evidence_script.py services/control-plane-api/tests/test_release_evidence_retention_ops.py -q`
+  - `python services/control-plane-api/scripts/verify_retained_release_evidence.py --help`
 - Added V2-009 release evidence bundle foundation:
   - deterministic bundle assembly in `store_control_plane/release_evidence_bundle.py`
   - standalone `build_release_evidence_bundle.py` CLI
