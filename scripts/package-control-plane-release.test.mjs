@@ -39,6 +39,13 @@ test('buildControlPlaneReleaseArchive packages the service tree and excludes loc
     version: '0.1.0',
     alembicHead: '20260418_0049_rollback_verification_foundation',
     builtAt: '2026-04-18T12:00:00.000Z',
+    gitMetadata: {
+      commit: '8a1a8103f0d7d4633ef97bd43af3e0cd91f36f51',
+      tree: 'a95d5c1c3b1ff8c6c5af0fc22d7c4b3f2d85c011',
+      ref: 'main',
+      remote: 'https://github.com/korsenex/store.git',
+      worktreeClean: true,
+    },
   });
 
   assert.equal(path.basename(archivePath), 'store-control-plane-0.1.0.tar.gz');
@@ -48,6 +55,20 @@ test('buildControlPlaneReleaseArchive packages the service tree and excludes loc
   assert.equal(manifest.bundle_name, 'store-control-plane-0.1.0');
   assert.equal(manifest.alembic_head, '20260418_0049_rollback_verification_foundation');
   assert.equal(manifest.built_at, '2026-04-18T12:00:00.000Z');
+  const provenancePath = path.join(outputDir, 'store-control-plane-0.1.0.provenance.json');
+  const provenance = JSON.parse(await fs.readFile(provenancePath, 'utf8'));
+  assert.equal(provenance.status, 'passed');
+  assert.equal(provenance.release_version, '0.1.0');
+  assert.equal(provenance.bundle_name, 'store-control-plane-0.1.0');
+  assert.equal(provenance.source_commit, '8a1a8103f0d7d4633ef97bd43af3e0cd91f36f51');
+  assert.equal(provenance.source_tree, 'a95d5c1c3b1ff8c6c5af0fc22d7c4b3f2d85c011');
+  assert.equal(provenance.source_ref, 'main');
+  assert.equal(provenance.source_remote, 'https://github.com/korsenex/store.git');
+  assert.equal(provenance.source_worktree_clean, true);
+  assert.equal(typeof provenance.archive_sha256, 'string');
+  assert.equal(provenance.archive_sha256.length, 64);
+  assert.equal(typeof provenance.manifest_sha256, 'string');
+  assert.equal(provenance.manifest_sha256.length, 64);
 
   const entries = await listArchiveEntries(archivePath);
 

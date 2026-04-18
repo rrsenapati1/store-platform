@@ -2,6 +2,15 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with release provenance / artifact attestation foundation:
+  - extended `package-control-plane-release.mjs` so each control-plane release bundle now emits a provenance sidecar with archive and manifest SHA-256 hashes plus source commit, tree, ref, remote, and worktree-clean posture captured at packaging time
+  - extended release-candidate evidence generation and certification so provenance posture is rendered explicitly and now blocks approval when the provenance report is missing or failed
+  - updated verification, production deployment, and GitHub release-automation runbooks so operators preserve and pass the provenance sidecar through release readiness
+- Verified:
+  - `node --test scripts/package-control-plane-release.test.mjs`
+  - `python -m pytest services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `git -c core.safecrlf=false diff --check`
+
 - Extended `V2-009` with SBOM generation and release-evidence foundation:
   - added a `sbom_generation` domain module so Store release surfaces can produce normalized SBOM posture alongside raw CycloneDX artifacts instead of relying only on vulnerability scans
   - added `generate_sbom_bundle.py` so operators can generate one SBOM summary report plus raw artifacts for the backend, web, desktop, mobile, native desktop runtime, and explicit image references

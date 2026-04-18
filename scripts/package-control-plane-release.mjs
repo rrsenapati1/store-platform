@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { copyTreeFiltered, createTarGz, ensureDirectory, parseCliArgs, removeIfExists, writeJsonFile } from './release-archive-utils.mjs';
@@ -54,7 +55,91 @@ function resolveAlembicHead({ sourceDir, pythonCommand = process.env.PYTHON || '
   return result.stdout.trim();
 }
 
-export async function buildControlPlaneReleaseArchive({ sourceDir, outputDir, version, alembicHead, builtAt }) {
+function runGitCommand(args, { optional = false } = {}) {
+  const result = spawnSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    if (optional) {
+      return null;
+    }
+    throw new Error(result.stderr || result.stdout || `git ${args.join(' ')} failed with status ${result.status ?? 'unknown'}`);
+  }
+  return result.stdout.trim();
+}
+
+function resolveGitMetadata() {
+  const dirtyStatus = runGitCommand(['status', '--porcelain']);
+  return {
+    commit: runGitCommand(['rev-parse', 'HEAD']),
+    tree: runGitCommand(['rev-parse', 'HEAD^{tree}']),
+    ref: runGitCommand(['rev-parse', '--abbrev-ref', 'HEAD']),
+    remote: runGitCommand(['remote', 'get-url', 'origin'], { optional: true }),
+    worktreeClean: dirtyStatus === '',
+  };
+}
+
+async function sha256File(filePath) {
+  const content = await fs.readFile(filePath);
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+function buildReleaseProvenanceReport({
+  archivePath,
+  bundleName,
+  gitMetadata,
+  manifestPath,
+  manifest,
+  archiveSha256,
+  manifestSha256,
+  archiveSizeBytes,
+}) {
+  const normalizedMetadata = {
+    commit: typeof gitMetadata?.commit === 'string' ? gitMetadata.commit.trim() : '',
+    tree: typeof gitMetadata?.tree === 'string' ? gitMetadata.tree.trim() : '',
+    ref: typeof gitMetadata?.ref === 'string' ? gitMetadata.ref.trim() : '',
+    remote: typeof gitMetadata?.remote === 'string' ? gitMetadata.remote.trim() : '',
+    worktreeClean: gitMetadata?.worktreeClean === true,
+  };
+  const failureReasons = [];
+  if (!normalizedMetadata.commit) {
+    failureReasons.push('missing source commit');
+  }
+  if (!normalizedMetadata.tree) {
+    failureReasons.push('missing source tree');
+  }
+  if (!normalizedMetadata.ref) {
+    failureReasons.push('missing source ref');
+  }
+  if (!normalizedMetadata.remote) {
+    failureReasons.push('missing source remote');
+  }
+  if (!normalizedMetadata.worktreeClean) {
+    failureReasons.push('source worktree was not clean at packaging time');
+  }
+  const failureReason = failureReasons.length > 0 ? failureReasons.join('; ') : null;
+  return {
+    status: failureReason === null ? 'passed' : 'failed',
+    generated_at: manifest.built_at,
+    release_version: manifest.release_version,
+    bundle_name: bundleName,
+    archive_path: archivePath,
+    archive_sha256: archiveSha256,
+    archive_size_bytes: archiveSizeBytes,
+    manifest_path: manifestPath,
+    manifest_sha256: manifestSha256,
+    source_commit: normalizedMetadata.commit,
+    source_tree: normalizedMetadata.tree,
+    source_ref: normalizedMetadata.ref,
+    source_remote: normalizedMetadata.remote,
+    source_worktree_clean: normalizedMetadata.worktreeClean,
+    summary: failureReason === null ? 'release provenance verified' : failureReason,
+    failure_reason: failureReason,
+  };
+}
+
+export async function buildControlPlaneReleaseArchive({ sourceDir, outputDir, version, alembicHead, builtAt, gitMetadata }) {
   const normalizedSourceDir = path.resolve(sourceDir);
   const normalizedOutputDir = path.resolve(outputDir);
   const releaseName = `store-control-plane-${version}`;
@@ -62,6 +147,8 @@ export async function buildControlPlaneReleaseArchive({ sourceDir, outputDir, ve
   const stagedReleaseDir = path.join(stagingRoot, releaseName);
   const archivePath = path.join(normalizedOutputDir, `${releaseName}.tar.gz`);
   const manifestPath = path.join(normalizedOutputDir, `${releaseName}.manifest.json`);
+  const provenancePath = path.join(normalizedOutputDir, `${releaseName}.provenance.json`);
+  const effectiveGitMetadata = gitMetadata ?? resolveGitMetadata();
   const releaseManifest = {
     release_version: version,
     bundle_name: releaseName,
@@ -75,7 +162,22 @@ export async function buildControlPlaneReleaseArchive({ sourceDir, outputDir, ve
     await writeJsonFile(path.join(stagedReleaseDir, 'release-manifest.json'), releaseManifest);
     await writeJsonFile(manifestPath, releaseManifest);
     await removeIfExists(archivePath);
+    await removeIfExists(provenancePath);
     await createTarGz(stagedReleaseDir, archivePath);
+    const archiveSha256 = await sha256File(archivePath);
+    const manifestSha256 = await sha256File(manifestPath);
+    const archiveStats = await fs.stat(archivePath);
+    const provenanceReport = buildReleaseProvenanceReport({
+      archivePath,
+      archiveSha256,
+      archiveSizeBytes: archiveStats.size,
+      bundleName: releaseName,
+      gitMetadata: effectiveGitMetadata,
+      manifest: releaseManifest,
+      manifestPath,
+      manifestSha256,
+    });
+    await writeJsonFile(provenancePath, provenanceReport);
     return archivePath;
   } finally {
     await removeIfExists(stagingRoot);

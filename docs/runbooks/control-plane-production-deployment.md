@@ -201,6 +201,34 @@ If release certification is run with `certify_release_candidate.py`, also pass:
 
 Release certification should now block if the SBOM report is missing or failed.
 
+## Release Provenance Evidence
+
+Before certifying a staging or production release candidate, keep the provenance sidecar produced with the release bundle:
+
+- `store-control-plane-<version>.provenance.json`
+
+`scripts/package-control-plane-release.mjs` now emits that file beside:
+
+- `store-control-plane-<version>.tar.gz`
+- `store-control-plane-<version>.manifest.json`
+
+The provenance sidecar records:
+
+- release version and bundle name
+- archive and manifest SHA-256 hashes
+- source commit, tree, ref, and origin remote
+- whether the source worktree was clean at packaging time
+
+If release evidence is generated with `generate_release_candidate_evidence.py`, also pass:
+
+- `--provenance-report <provenance-report.json>`
+
+If release certification is run with `certify_release_candidate.py`, also pass:
+
+- `--provenance-report <provenance-report.json>`
+
+Release certification should now block if the provenance report is missing or failed.
+
 ## Operational Alert Evidence
 
 Before certifying a staging or production release candidate, generate operational alert posture evidence:

@@ -235,6 +235,7 @@ If you do not skip it, the evidence markdown records:
 - environment drift posture when a `--environment-drift-report` is supplied
 - TLS posture when a `--tls-posture-report` is supplied
 - SBOM posture when a `--sbom-report` is supplied
+- release provenance posture when a `--provenance-report` is supplied
 - deployed load posture when a `--deployed-load-report` is supplied
 
 `certify_release_candidate.py` can also consume a saved performance report directly:
@@ -287,6 +288,16 @@ python services/control-plane-api/scripts/certify_release_candidate.py `
   --sbom-report docs\launch\evidence\prod-sbom-report.json
 ```
 
+It can also consume a saved provenance report directly:
+
+```powershell
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --provenance-report docs\launch\evidence\store-control-plane-2026.04.18.provenance.json
+```
+
 ## Expected Success Signal
 
 The script exits `0` and prints a JSON summary with:
@@ -308,6 +319,7 @@ The script exits `0` and prints a JSON summary with:
 - If environment drift verification fails, treat the release candidate as blocked until deployed configuration matches the declared environment contract.
 - If TLS posture verification fails, treat the release candidate as blocked until certificate validity or hostname posture is corrected.
 - If SBOM generation fails, treat the release candidate as blocked until machine-readable component inventory can be regenerated successfully.
+- If release provenance is missing or failed, treat the release candidate as blocked until the bundle has source-attested provenance evidence again.
 - If deployed load verification fails, treat the staged release as not scale-ready until the failing HTTP scenarios are understood and reverified.
 - If deployed security verification fails, treat the release candidate as blocked until the secure-header or throttle mismatch is resolved.
 

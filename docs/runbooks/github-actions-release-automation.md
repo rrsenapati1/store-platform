@@ -1,6 +1,6 @@
 # GitHub Actions Release Automation
 
-Updated: 2026-04-15
+Updated: 2026-04-18
 
 ## Purpose
 
@@ -54,6 +54,7 @@ Responsibilities:
 
 - build `store-control-plane-<version>.tar.gz`
 - emit `store-control-plane-<version>.manifest.json`
+- emit `store-control-plane-<version>.provenance.json`
 - build and archive `platform-admin` and `owner-web` dist artifacts
 - build signed Windows Store Desktop installer artifacts
 - attach artifacts to a GitHub Release when triggered from a tag
@@ -121,6 +122,7 @@ Download:
 
 - `store-control-plane-<version>.tar.gz`
 - `store-control-plane-<version>.manifest.json`
+- `store-control-plane-<version>.provenance.json`
 
 Then continue with:
 
@@ -132,6 +134,12 @@ The manifest is the operator-visible rollback metadata source for:
 - `alembic_head`
 - bundle name
 - build timestamp
+
+The provenance sidecar is the operator-visible artifact-attestation source for:
+
+- archive and manifest SHA-256 hashes
+- source commit, tree, ref, and origin remote
+- source worktree cleanliness at packaging time
 
 ### Web Apps
 

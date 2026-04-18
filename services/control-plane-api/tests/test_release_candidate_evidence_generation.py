@@ -346,6 +346,78 @@ def test_generate_release_candidate_evidence_renders_vulnerability_scan_posture(
     assert "images: passed" in content
 
 
+def test_generate_release_candidate_evidence_renders_provenance_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-provenance.md"
+    provenance_report_path = tmp_path / "provenance-report.json"
+    provenance_report_path.write_text(
+        json.dumps(
+            {
+                "status": "passed",
+                "release_version": "2026.04.18-rc4",
+                "bundle_name": "store-control-plane-2026.04.18-rc4",
+                "archive_sha256": "a" * 64,
+                "manifest_sha256": "b" * 64,
+                "source_commit": "c" * 40,
+                "source_tree": "d" * 40,
+                "source_ref": "main",
+                "source_remote": "https://github.com/korsenex/store.git",
+                "source_worktree_clean": True,
+                "summary": "release provenance verified",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc4",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "approved",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc4",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "provenance_verified": True,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc4",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        provenance_report_path=provenance_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "approved"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Release Provenance Evidence" in content
+    assert "provenance status: passed" in content
+    assert "source commit:" in content
+    assert "source worktree clean: True" in content
+
+
 def test_generate_release_candidate_evidence_renders_operational_alert_posture(tmp_path: Path) -> None:
     module = _load_script_module()
     output_path = tmp_path / "rc-evidence-alerts.md"
