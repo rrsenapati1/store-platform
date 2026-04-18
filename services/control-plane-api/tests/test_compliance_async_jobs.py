@@ -21,6 +21,65 @@ def _exchange(client: TestClient, *, subject: str, email: str, name: str) -> dic
     return response.json()
 
 
+def _open_cashier_session(
+    client: TestClient,
+    *,
+    tenant_id: str,
+    branch_id: str,
+    owner_headers: dict[str, str],
+    cashier_headers: dict[str, str],
+) -> str:
+    staff_profile = client.post(
+        f"/v1/tenants/{tenant_id}/staff-profiles",
+        headers=owner_headers,
+        json={
+            "email": "cashier@acme.local",
+            "full_name": "Counter Cashier",
+            "phone_number": "9876543210",
+            "primary_branch_id": branch_id,
+        },
+    )
+    assert staff_profile.status_code == 200
+    staff_profile_id = staff_profile.json()["id"]
+
+    device = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/devices",
+        headers=owner_headers,
+        json={
+            "device_name": "Counter Desktop 1",
+            "device_code": "BLR-POS-01",
+            "session_surface": "store_desktop",
+            "assigned_staff_profile_id": staff_profile_id,
+        },
+    )
+    assert device.status_code == 200
+    device_id = device.json()["id"]
+
+    attendance_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/attendance-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": device_id,
+            "staff_profile_id": staff_profile_id,
+            "clock_in_note": "Morning shift attendance",
+        },
+    )
+    assert attendance_session.status_code == 200
+
+    cashier_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/cashier-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": device_id,
+            "staff_profile_id": staff_profile_id,
+            "opening_float_amount": 500.0,
+            "opening_note": "Morning shift",
+        },
+    )
+    assert cashier_session.status_code == 200
+    return cashier_session.json()["id"]
+
+
 def _seed_sale_context(client: TestClient) -> dict[str, str]:
     admin_session = _exchange(client, subject="platform-admin-1", email="admin@store.local", name="Platform Admin")
     admin_headers = {"authorization": f"Bearer {admin_session['access_token']}"}
@@ -117,11 +176,19 @@ def _seed_sale_context(client: TestClient) -> dict[str, str]:
 
     cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
     cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    cashier_session_id = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
 
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
         headers=cashier_headers,
         json={
+            "cashier_session_id": cashier_session_id,
             "customer_name": "Acme Traders",
             "customer_gstin": "29AAEPM0111C1Z3",
             "payment_method": "UPI",
