@@ -498,3 +498,76 @@ def test_generate_release_candidate_evidence_renders_deployed_load_posture(tmp_p
     assert "concurrency: 4" in content
     assert "checkout price preview http: failed" in content
     assert "failing scenarios: checkout_price_preview_http" in content
+
+
+def test_generate_release_candidate_evidence_renders_rollback_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-rollback.md"
+    rollback_report_path = tmp_path / "rollback-report.json"
+    rollback_report_path.write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "environment": "staging",
+                "current_release_version": "2026.04.18",
+                "current_alembic_head": "20260418_0049_rollback_verification_foundation",
+                "target_release_version": "2026.04.17",
+                "target_alembic_head": "20260417_0048_previous_head",
+                "rollback_mode": "restore_required",
+                "failure_reason": "target bundle schema head differs from deployed schema head",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "blocked",
+            "environment": "staging",
+            "release_version": "2026.04.18",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "deployed_load_verified": True,
+                "rollback_verified": False,
+                "operational_alerts_verified": False,
+                "vulnerability_scans_passed": False,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        rollback_report_path=rollback_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "blocked"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Rollback Evidence" in content
+    assert "rollback status: failed" in content
+    assert "current release version: 2026.04.18" in content
+    assert "target release version: 2026.04.17" in content
+    assert "rollback mode: restore_required" in content
+    assert "failure reason: target bundle schema head differs from deployed schema head" in content

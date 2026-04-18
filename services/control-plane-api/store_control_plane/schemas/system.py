@@ -20,6 +20,7 @@ class SystemHealthResponse(BaseModel):
     environment: str
     public_base_url: str
     release_version: str
+    alembic_head: str
     database: SystemComponentStatusResponse
     operations_worker: OperationsWorkerStatusResponse
 

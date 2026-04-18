@@ -37,9 +37,17 @@ test('buildControlPlaneReleaseArchive packages the service tree and excludes loc
     outputDir,
     sourceDir,
     version: '0.1.0',
+    alembicHead: '20260418_0049_rollback_verification_foundation',
+    builtAt: '2026-04-18T12:00:00.000Z',
   });
 
   assert.equal(path.basename(archivePath), 'store-control-plane-0.1.0.tar.gz');
+  const manifestPath = path.join(outputDir, 'store-control-plane-0.1.0.manifest.json');
+  const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+  assert.equal(manifest.release_version, '0.1.0');
+  assert.equal(manifest.bundle_name, 'store-control-plane-0.1.0');
+  assert.equal(manifest.alembic_head, '20260418_0049_rollback_verification_foundation');
+  assert.equal(manifest.built_at, '2026-04-18T12:00:00.000Z');
 
   const entries = await listArchiveEntries(archivePath);
 
@@ -47,6 +55,7 @@ test('buildControlPlaneReleaseArchive packages the service tree and excludes loc
   assert(entries.includes('store-control-plane-0.1.0/alembic.ini'));
   assert(entries.includes('store-control-plane-0.1.0/alembic/versions/001_initial.py'));
   assert(entries.includes('store-control-plane-0.1.0/store_control_plane/__init__.py'));
+  assert(entries.includes('store-control-plane-0.1.0/release-manifest.json'));
   assert.equal(entries.some((entry) => entry.includes('.venv')), false);
   assert.equal(entries.some((entry) => entry.includes('__pycache__')), false);
   assert.equal(entries.some((entry) => entry.includes('.pytest_cache')), false);

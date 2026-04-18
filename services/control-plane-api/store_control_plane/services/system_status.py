@@ -4,6 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
+from ..ops.postgres_backup import resolve_alembic_head
 from ..schemas import OperationsWorkerStatusResponse, SystemComponentStatusResponse, SystemHealthResponse
 
 
@@ -20,6 +21,7 @@ async def build_system_health(*, settings: Settings, session: AsyncSession) -> S
         environment=settings.deployment_environment,
         public_base_url=settings.public_base_url,
         release_version=settings.release_version,
+        alembic_head=resolve_alembic_head(),
         database=database_status,
         operations_worker=OperationsWorkerStatusResponse(
             configured=True,

@@ -2,6 +2,18 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with rollback verification foundation:
+  - added control-plane release-bundle manifests so GitHub release artifacts now carry explicit `release_version`, `bundle_name`, `alembic_head`, and build timestamp metadata
+  - extended deployed system health and deployed verification to surface the current `alembic_head` alongside environment and release version
+  - added `verify_release_rollback.py` plus the underlying rollback-verification module so operators can verify whether a target bundle is eligible for schema-compatible app-layer rollback or requires restore-based recovery
+  - extended release-candidate evidence generation and certification so rollback posture is rendered explicitly and can block approval when a supplied rollback report fails
+  - updated deployment and GitHub release-automation runbooks to document the new manifest and rollback evidence flow
+- Verified:
+  - `node --test scripts/package-control-plane-release.test.mjs`
+  - `python -m pytest services/control-plane-api/tests/test_system_routes.py services/control-plane-api/tests/test_rollback_verification.py services/control-plane-api/tests/test_verify_release_rollback.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `python services/control-plane-api/scripts/verify_release_rollback.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
 - Extended `V2-009` with deployed load verification foundation:
   - added a `deployed_load_verification` domain module to evaluate bounded concurrent HTTP scenario budgets and write normalized machine-readable reports
   - added `verify_deployed_load_posture.py` so staging-style environments can be checked for real deployed HTTP load posture across system health, observability, checkout preview, and branch management dashboard reads

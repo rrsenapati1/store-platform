@@ -35,9 +35,11 @@ def certify_release_candidate(
     performance_result: dict[str, object] | None = None,
     operational_alert_result: dict[str, object] | None = None,
     deployed_load_result: dict[str, object] | None = None,
+    rollback_result: dict[str, object] | None = None,
     vulnerability_scan_result: dict[str, object] | None = None,
     require_operational_alerts: bool = True,
     require_deployed_load: bool = False,
+    require_rollback_verification: bool = False,
     require_vulnerability_scan: bool = True,
     verify_deployed: VerifyDeployedCallable | None = None,
 ) -> dict[str, object]:
@@ -72,6 +74,11 @@ def certify_release_candidate(
           if deployed_load_result is not None
           else not require_deployed_load
       ),
+      "rollback_verified": (
+          rollback_result.get("status") == "passed"
+          if rollback_result is not None
+          else not require_rollback_verification
+      ),
       "vulnerability_scans_passed": (not require_vulnerability_scan) or (
           vulnerability_scan_result is not None and vulnerability_scan_result.get("status") == "passed"
       ),
@@ -90,6 +97,8 @@ def certify_release_candidate(
       "operational_alert_failing_checks": [] if operational_alert_result is None else list(operational_alert_result.get("failing_checks") or []),
       "deployed_load_result_status": None if deployed_load_result is None else deployed_load_result.get("status"),
       "deployed_load_failing_scenarios": [] if deployed_load_result is None else list(deployed_load_result.get("failing_scenarios") or []),
+      "rollback_result_status": None if rollback_result is None else rollback_result.get("status"),
+      "rollback_failure_reason": None if rollback_result is None else rollback_result.get("failure_reason"),
       "vulnerability_result_status": None if vulnerability_scan_result is None else vulnerability_scan_result.get("status"),
       "vulnerability_failing_surfaces": [] if vulnerability_scan_result is None else list(vulnerability_scan_result.get("failing_surfaces") or []),
       "gates": gates,
@@ -105,6 +114,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--performance-report", help="Optional JSON performance report path produced by validate_performance_foundation.py.")
     parser.add_argument("--operational-alert-report", help="Optional JSON operational alert report path produced by verify_operational_alert_posture.py.")
     parser.add_argument("--deployed-load-report", help="Optional JSON deployed load report path produced by verify_deployed_load_posture.py.")
+    parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path produced by verify_release_rollback.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
     return parser.parse_args()
 
@@ -120,6 +130,9 @@ def main() -> None:
     deployed_load_result = None
     if args.deployed_load_report:
         deployed_load_result = json.loads(Path(args.deployed_load_report).read_text(encoding="utf-8"))
+    rollback_result = None
+    if args.rollback_report:
+        rollback_result = json.loads(Path(args.rollback_report).read_text(encoding="utf-8"))
     vulnerability_scan_result = None
     if args.vulnerability_scan_report:
         vulnerability_scan_result = json.loads(Path(args.vulnerability_scan_report).read_text(encoding="utf-8"))
@@ -131,6 +144,7 @@ def main() -> None:
         performance_result=performance_result,
         operational_alert_result=operational_alert_result,
         deployed_load_result=deployed_load_result,
+        rollback_result=rollback_result,
         vulnerability_scan_result=vulnerability_scan_result,
     )
     print(json.dumps(result, indent=2))

@@ -340,3 +340,59 @@ def test_release_candidate_certification_approves_when_deployed_load_passes() ->
 
     assert result["status"] == "approved"
     assert result["gates"]["deployed_load_verified"] is True
+
+
+def test_release_candidate_certification_blocks_failed_rollback_report() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.18",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        rollback_result={
+            "status": "failed",
+            "rollback_mode": "restore_required",
+            "failure_reason": "target bundle schema head differs from deployed schema head",
+        },
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.18",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "blocked"
+    assert result["gates"]["rollback_verified"] is False
+
+
+def test_release_candidate_certification_approves_when_rollback_report_passes() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.18",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        rollback_result={
+            "status": "passed",
+            "rollback_mode": "app_only",
+            "failure_reason": None,
+        },
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.18",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "approved"
+    assert result["gates"]["rollback_verified"] is True

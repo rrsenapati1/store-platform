@@ -183,6 +183,29 @@ If release certification is run with `certify_release_candidate.py`, also pass:
 
 This gate is optional when no deployed-load report is supplied, but any supplied failed report should block approval.
 
+## Rollback Evidence
+
+Before certifying a staging or production release candidate, verify the intended rollback target:
+
+```powershell
+python scripts/verify_release_rollback.py `
+  --base-url https://control.staging.store.korsenex.com `
+  --target-bundle-manifest C:\store-control-plane\releases\store-control-plane-2026.04.17.manifest.json `
+  --output-path docs/launch/evidence/staging-rollback-report.json
+```
+
+Keep that JSON report with the release notes or evidence bundle.
+
+If release evidence is generated with `generate_release_candidate_evidence.py`, also pass:
+
+- `--rollback-report <rollback-report.json>`
+
+If release certification is run with `certify_release_candidate.py`, also pass:
+
+- `--rollback-report <rollback-report.json>`
+
+This verifier approves only schema-compatible app-layer rollback. If the target bundle `alembic_head` differs from the deployed schema head, treat rollback as `restore_required` and use the backup/restore path instead of a simple app rollback.
+
 ## Vulnerability Scan Evidence
 
 Before certifying a staging or production release candidate, generate a normalized vulnerability report:

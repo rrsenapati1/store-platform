@@ -26,6 +26,7 @@ def test_system_health_reports_environment_release_and_database_posture() -> Non
     assert response.json()["environment"] == "staging"
     assert response.json()["public_base_url"] == "https://control.staging.store.korsenex.com"
     assert response.json()["release_version"] == "2026.04.14-staging"
+    assert response.json()["alembic_head"]
     assert response.json()["database"]["status"] == "ok"
     assert response.json()["operations_worker"]["configured"] is True
 

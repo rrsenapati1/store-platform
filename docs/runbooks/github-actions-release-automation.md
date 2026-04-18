@@ -53,6 +53,7 @@ Triggers:
 Responsibilities:
 
 - build `store-control-plane-<version>.tar.gz`
+- emit `store-control-plane-<version>.manifest.json`
 - build and archive `platform-admin` and `owner-web` dist artifacts
 - build signed Windows Store Desktop installer artifacts
 - attach artifacts to a GitHub Release when triggered from a tag
@@ -119,10 +120,18 @@ GitHub Actions produces artifacts. Operators promote them.
 Download:
 
 - `store-control-plane-<version>.tar.gz`
+- `store-control-plane-<version>.manifest.json`
 
 Then continue with:
 
 - [control-plane-production-deployment.md](./control-plane-production-deployment.md)
+
+The manifest is the operator-visible rollback metadata source for:
+
+- `release_version`
+- `alembic_head`
+- bundle name
+- build timestamp
 
 ### Web Apps
 

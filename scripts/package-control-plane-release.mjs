@@ -3,9 +3,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { copyTreeFiltered, createTarGz, ensureDirectory, parseCliArgs, removeIfExists } from './release-archive-utils.mjs';
+import { copyTreeFiltered, createTarGz, ensureDirectory, parseCliArgs, removeIfExists, writeJsonFile } from './release-archive-utils.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -35,17 +36,44 @@ export function shouldIncludeControlPlanePath(relativePath) {
   return !EXCLUDED_SUFFIXES.some((suffix) => relativePath.endsWith(suffix));
 }
 
-export async function buildControlPlaneReleaseArchive({ sourceDir, outputDir, version }) {
+function resolveAlembicHead({ sourceDir, pythonCommand = process.env.PYTHON || 'python' }) {
+  const script = [
+    'from pathlib import Path',
+    'import sys',
+    `source_dir = Path(r"""${sourceDir}""")`,
+    'sys.path.insert(0, str(source_dir))',
+    'from store_control_plane.ops.postgres_backup import resolve_alembic_head',
+    'print(resolve_alembic_head(service_root=source_dir))',
+  ].join('\n');
+  const result = spawnSync(pythonCommand, ['-c', script], {
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `failed to resolve alembic head using ${pythonCommand}`);
+  }
+  return result.stdout.trim();
+}
+
+export async function buildControlPlaneReleaseArchive({ sourceDir, outputDir, version, alembicHead, builtAt }) {
   const normalizedSourceDir = path.resolve(sourceDir);
   const normalizedOutputDir = path.resolve(outputDir);
   const releaseName = `store-control-plane-${version}`;
   const stagingRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'store-control-plane-release-'));
   const stagedReleaseDir = path.join(stagingRoot, releaseName);
   const archivePath = path.join(normalizedOutputDir, `${releaseName}.tar.gz`);
+  const manifestPath = path.join(normalizedOutputDir, `${releaseName}.manifest.json`);
+  const releaseManifest = {
+    release_version: version,
+    bundle_name: releaseName,
+    alembic_head: alembicHead || resolveAlembicHead({ sourceDir: normalizedSourceDir }),
+    built_at: builtAt || new Date().toISOString(),
+  };
 
   try {
     await ensureDirectory(normalizedOutputDir);
     await copyTreeFiltered(normalizedSourceDir, stagedReleaseDir, (relativePath) => shouldIncludeControlPlanePath(relativePath));
+    await writeJsonFile(path.join(stagedReleaseDir, 'release-manifest.json'), releaseManifest);
+    await writeJsonFile(manifestPath, releaseManifest);
     await removeIfExists(archivePath);
     await createTarGz(stagedReleaseDir, archivePath);
     return archivePath;

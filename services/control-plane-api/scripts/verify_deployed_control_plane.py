@@ -202,6 +202,7 @@ def verify_deployed_control_plane(
         "status": str(health.get("status")),
         "environment": health.get("environment"),
         "release_version": health.get("release_version"),
+        "alembic_head": health.get("alembic_head"),
         "legacy_write_mode": authority.get("legacy_write_mode"),
         "legacy_remaining_domains": authority.get("legacy_remaining_domains"),
         "security_result": security_result,
