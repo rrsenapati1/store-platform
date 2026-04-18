@@ -1,6 +1,6 @@
 # Security And Observability Operations
 
-Updated: 2026-04-15
+Updated: 2026-04-18
 
 ## Purpose
 
@@ -142,6 +142,33 @@ Start with these thresholds:
 
 These are release-blocking when they remain unresolved in `prod`.
 
+## Operational Alert Verification
+
+`V2-009` adds an executable alert-posture verifier:
+
+```powershell
+python services/control-plane-api/scripts/verify_operational_alert_posture.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --output-path docs/launch/evidence/prod-operational-alerts.json
+```
+
+The script evaluates one normalized JSON report from:
+
+- `/v1/platform/observability/summary`
+- deployed security verification posture from `verify_deployed_control_plane.py`
+
+Current checks:
+
+- `operations_dead_letter_clear`
+- `operations_retryable_within_limit`
+- `runtime_degradation_within_limit`
+- `backup_freshness_within_limit`
+- `security_verification_passed`
+
+Treat a failed report as release-blocking until the failing checks are resolved or an explicit operator exception is recorded.
+
 ## Incident Flow
 
 ### 1. Backend or frontend exception spike
@@ -172,6 +199,13 @@ These are release-blocking when they remain unresolved in `prod`.
 3. Run the backup flow manually only after confirming Postgres health.
 4. If a manual backup cannot complete, treat deployment changes as blocked until backup posture is restored.
 
+### 5. Release alert posture failure
+
+1. Run `verify_operational_alert_posture.py` against the target environment.
+2. Inspect `failing_checks` in the JSON report instead of relying on dashboard impressions.
+3. Resolve dead-letter, retry, degradation, backup, or security failures at the underlying source.
+4. Re-run the verifier and keep the updated JSON report with the release evidence bundle.
+
 ## Verification Checklist
 
 After environment changes or release deployment:
@@ -182,6 +216,7 @@ After environment changes or release deployment:
 4. confirm JSON request logs are being written on the app VM
 5. confirm Sentry receives testable errors only in the intended environment and project
 6. confirm platform-admin renders the observability section without API errors
+7. run `verify_operational_alert_posture.py` and keep the JSON report when preparing release evidence
 
 ## Guardrails
 

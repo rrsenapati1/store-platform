@@ -941,6 +941,15 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+- 2026-04-18: Completed `V2-009` alert verification foundation.
+  - Added `store_control_plane.operational_alerts` to normalize release-blocking alert checks from observability and deployed security posture.
+  - Added `scripts/verify_operational_alert_posture.py` to emit machine-readable operational alert evidence with release-safe exit status.
+  - Extended release evidence generation and release certification to consume operational alert reports and block approval when the report is missing or failed.
+  - Updated security/observability and deployment runbooks so operators collect operational alert evidence alongside recovery, security, performance, and vulnerability evidence.
+  - Verified:
+    - `python -m pytest services/control-plane-api/tests/test_operational_alerts.py services/control-plane-api/tests/test_verify_operational_alert_posture.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py services/control-plane-api/tests/test_verify_deployed_control_plane.py -q`
+    - `python services/control-plane-api/scripts/verify_operational_alert_posture.py --help`
+    - `git -c core.safecrlf=false diff --check`
 - Completed the next `V2-009` hardening slice:
   - added `store_control_plane/vulnerability_scanning.py` as the normalized scan-policy and report engine for Python, Node, Rust, and image vulnerability posture
   - added `scripts/run_vulnerability_scans.py` plus `docs/launch/security/vulnerability-exceptions.json` so operators can produce one machine-readable vulnerability report and track expiring accepted exceptions

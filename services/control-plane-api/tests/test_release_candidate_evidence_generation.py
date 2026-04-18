@@ -344,3 +344,84 @@ def test_generate_release_candidate_evidence_renders_vulnerability_scan_posture(
     assert "overall scan status: passed" in content
     assert "python: passed" in content
     assert "images: passed" in content
+
+
+def test_generate_release_candidate_evidence_renders_operational_alert_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-alerts.md"
+    alert_report_path = tmp_path / "operational-alerts.json"
+    alert_report_path.write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "summary": "1 alert check failing",
+                "failing_checks": ["backup_freshness_within_limit"],
+                "alert_checks": [
+                    {
+                        "name": "operations_dead_letter_clear",
+                        "status": "passed",
+                        "observed_value": 0,
+                        "threshold": 0,
+                        "reason": "dead letter queue clear",
+                    },
+                    {
+                        "name": "backup_freshness_within_limit",
+                        "status": "failed",
+                        "observed_value": 31,
+                        "threshold": 26,
+                        "reason": "backup age breached",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc3",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "blocked",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc3",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "operational_alerts_verified": False,
+                "vulnerability_scans_passed": False,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc3",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        alert_report_path=alert_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "blocked"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Operational Alert Evidence" in content
+    assert "overall alert status: failed" in content
+    assert "operations dead letter clear: passed" in content
+    assert "backup freshness within limit: failed" in content
+    assert "failing checks: backup_freshness_within_limit" in content

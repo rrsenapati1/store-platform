@@ -85,6 +85,10 @@ def _stringify_domains(domains: list[str]) -> str:
     return ", ".join(domains) if domains else "none"
 
 
+def _humanize_check_name(name: str) -> str:
+    return name.replace("_", " ")
+
+
 def _render_markdown(
     *,
     expected_release_version: str | None,
@@ -93,6 +97,7 @@ def _render_markdown(
     date_text: str,
     local_result: dict[str, object],
     performance_result: dict[str, object],
+    operational_alert_result: dict[str, object] | None,
     vulnerability_scan_result: dict[str, object] | None,
     restore_drill_result: dict[str, object] | None,
     deployed_result: dict[str, object],
@@ -117,6 +122,26 @@ def _render_markdown(
             f"- webhook rate limit: {dict(security_result.get('webhook_rate_limit') or {}).get('status') or 'unknown'}",
             "",
         ]
+    operational_alert_lines = [
+        "## Operational Alert Evidence",
+        "",
+        "- Operational alert status: not-run",
+        "",
+    ]
+    if operational_alert_result is not None:
+        operational_alert_checks = list(operational_alert_result.get("alert_checks") or [])
+        operational_alert_lines = [
+            "## Operational Alert Evidence",
+            "",
+            f"- overall alert status: {operational_alert_result.get('status')}",
+            f"- failing checks: {_stringify_domains(list(operational_alert_result.get('failing_checks') or []))}",
+        ]
+        for check in operational_alert_checks:
+            check_dict = dict(check or {})
+            operational_alert_lines.append(
+                f"- {_humanize_check_name(str(check_dict.get('name') or 'unknown'))}: {check_dict.get('status') or 'unknown'}"
+            )
+        operational_alert_lines.append("")
     vulnerability_lines = [
         "## Vulnerability Scan Evidence",
         "",
@@ -183,6 +208,7 @@ def _render_markdown(
             f"  - result: {certification_result.get('status')}",
             "",
             *security_lines,
+            *operational_alert_lines,
             *vulnerability_lines,
             *restore_drill_lines,
             "## Authority / Cutover Evidence",
@@ -206,6 +232,7 @@ def generate_release_candidate_evidence(
     expected_release_version: str | None = None,
     release_owner: str | None = None,
     output_path: Path,
+    alert_report_path: Path | None = None,
     vulnerability_scan_report_path: Path | None = None,
     restore_drill_report_path: Path | None = None,
     bearer_token: str | None = None,
@@ -239,6 +266,11 @@ def generate_release_candidate_evidence(
         if run_performance_validation
         else {"status": "skipped", "command": "not-run", "summary": "not-run"}
     )
+    operational_alert_result = (
+        json.loads(alert_report_path.read_text(encoding="utf-8"))
+        if alert_report_path is not None
+        else None
+    )
     vulnerability_scan_result = (
         json.loads(vulnerability_scan_report_path.read_text(encoding="utf-8"))
         if vulnerability_scan_report_path is not None
@@ -261,6 +293,7 @@ def generate_release_candidate_evidence(
         expected_release_version=expected_release_version,
         bearer_token=bearer_token,
         performance_result=None if performance_result.get("status") == "skipped" else performance_result,
+        operational_alert_result=operational_alert_result,
         vulnerability_scan_result=vulnerability_scan_result,
     )
 
@@ -273,6 +306,7 @@ def generate_release_candidate_evidence(
             date_text=effective_date_text,
             local_result=local_result,
             performance_result=performance_result,
+            operational_alert_result=operational_alert_result,
             vulnerability_scan_result=vulnerability_scan_result,
             restore_drill_result=restore_drill_result,
             deployed_result=deployed_result,
@@ -286,6 +320,7 @@ def generate_release_candidate_evidence(
         "output_path": str(output_path),
         "local_result": local_result,
         "performance_result": performance_result,
+        "operational_alert_result": operational_alert_result,
         "vulnerability_scan_result": vulnerability_scan_result,
         "restore_drill_result": restore_drill_result,
         "deployed_result": deployed_result,
@@ -300,6 +335,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-release-version", help="Expected release version reported by the deployment.")
     parser.add_argument("--release-owner", help="Release owner recorded in the evidence file.")
     parser.add_argument("--output-path", help="Markdown file path for the generated evidence document.")
+    parser.add_argument("--operational-alert-report", help="Optional JSON alert report path produced by verify_operational_alert_posture.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
     parser.add_argument("--restore-drill-report", help="Optional JSON restore-drill report path produced by run_restore_drill.py.")
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
@@ -323,6 +359,7 @@ def main() -> None:
         expected_release_version=args.expected_release_version,
         release_owner=args.release_owner,
         output_path=output_path,
+        alert_report_path=Path(args.operational_alert_report) if args.operational_alert_report else None,
         vulnerability_scan_report_path=Path(args.vulnerability_scan_report) if args.vulnerability_scan_report else None,
         restore_drill_report_path=Path(args.restore_drill_report) if args.restore_drill_report else None,
         bearer_token=args.bearer_token,

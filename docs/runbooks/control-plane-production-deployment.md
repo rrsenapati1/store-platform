@@ -130,6 +130,30 @@ Also keep the deployed security verification result from:
 
 That verification now includes secure-header checks and bounded live auth/webhook throttle probes, and release certification should block if those controls fail.
 
+## Operational Alert Evidence
+
+Before certifying a staging or production release candidate, generate operational alert posture evidence:
+
+```powershell
+python scripts/verify_operational_alert_posture.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --output-path docs/launch/evidence/prod-operational-alerts.json
+```
+
+Keep that JSON report with the release notes or evidence bundle.
+
+If release evidence is generated with `generate_release_candidate_evidence.py`, also pass:
+
+- `--operational-alert-report <operational-alerts.json>`
+
+If release certification is run with `certify_release_candidate.py`, also pass:
+
+- `--operational-alert-report <operational-alerts.json>`
+
+Release certification should now block if the operational alert report is missing or failed.
+
 ## Vulnerability Scan Evidence
 
 Before certifying a staging or production release candidate, generate a normalized vulnerability report:
