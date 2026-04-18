@@ -286,3 +286,57 @@ def test_release_candidate_certification_approves_when_operational_alerts_pass()
 
     assert result["status"] == "approved"
     assert result["gates"]["operational_alerts_verified"] is True
+
+
+def test_release_candidate_certification_blocks_failed_deployed_load_report() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.18-rc5",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        deployed_load_result={
+            "status": "failed",
+            "failing_scenarios": ["checkout_price_preview_http"],
+        },
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.18-rc5",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "blocked"
+    assert result["gates"]["deployed_load_verified"] is False
+
+
+def test_release_candidate_certification_approves_when_deployed_load_passes() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.18-rc5",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        deployed_load_result={
+            "status": "passed",
+            "failing_scenarios": [],
+        },
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.18-rc5",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "approved"
+    assert result["gates"]["deployed_load_verified"] is True

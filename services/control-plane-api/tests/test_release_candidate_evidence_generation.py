@@ -425,3 +425,76 @@ def test_generate_release_candidate_evidence_renders_operational_alert_posture(t
     assert "operations dead letter clear: passed" in content
     assert "backup freshness within limit: failed" in content
     assert "failing checks: backup_freshness_within_limit" in content
+
+
+def test_generate_release_candidate_evidence_renders_deployed_load_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-deployed-load.md"
+    deployed_load_report_path = tmp_path / "deployed-load-report.json"
+    deployed_load_report_path.write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "environment": "staging",
+                "release_version": "2026.04.18-rc5",
+                "concurrency": 4,
+                "iterations_per_worker": 5,
+                "failing_scenarios": ["checkout_price_preview_http"],
+                "scenario_results": [
+                    {"scenario_name": "system_health_http", "status": "passed"},
+                    {"scenario_name": "checkout_price_preview_http", "status": "failed"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc5",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "blocked",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc5",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "operational_alerts_verified": False,
+                "vulnerability_scans_passed": False,
+                "deployed_load_verified": False,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc5",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        deployed_load_report_path=deployed_load_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "blocked"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Deployed Load Evidence" in content
+    assert "overall deployed load status: failed" in content
+    assert "concurrency: 4" in content
+    assert "checkout price preview http: failed" in content
+    assert "failing scenarios: checkout_price_preview_http" in content

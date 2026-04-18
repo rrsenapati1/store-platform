@@ -34,8 +34,10 @@ def certify_release_candidate(
     bearer_token: str | None = None,
     performance_result: dict[str, object] | None = None,
     operational_alert_result: dict[str, object] | None = None,
+    deployed_load_result: dict[str, object] | None = None,
     vulnerability_scan_result: dict[str, object] | None = None,
     require_operational_alerts: bool = True,
+    require_deployed_load: bool = False,
     require_vulnerability_scan: bool = True,
     verify_deployed: VerifyDeployedCallable | None = None,
 ) -> dict[str, object]:
@@ -65,6 +67,11 @@ def certify_release_candidate(
       "operational_alerts_verified": (not require_operational_alerts) or (
           operational_alert_result is not None and operational_alert_result.get("status") == "passed"
       ),
+      "deployed_load_verified": (
+          deployed_load_result.get("status") == "passed"
+          if deployed_load_result is not None
+          else not require_deployed_load
+      ),
       "vulnerability_scans_passed": (not require_vulnerability_scan) or (
           vulnerability_scan_result is not None and vulnerability_scan_result.get("status") == "passed"
       ),
@@ -81,6 +88,8 @@ def certify_release_candidate(
       "performance_failing_scenarios": [] if performance_result is None else list(performance_result.get("failing_scenarios") or []),
       "operational_alert_result_status": None if operational_alert_result is None else operational_alert_result.get("status"),
       "operational_alert_failing_checks": [] if operational_alert_result is None else list(operational_alert_result.get("failing_checks") or []),
+      "deployed_load_result_status": None if deployed_load_result is None else deployed_load_result.get("status"),
+      "deployed_load_failing_scenarios": [] if deployed_load_result is None else list(deployed_load_result.get("failing_scenarios") or []),
       "vulnerability_result_status": None if vulnerability_scan_result is None else vulnerability_scan_result.get("status"),
       "vulnerability_failing_surfaces": [] if vulnerability_scan_result is None else list(vulnerability_scan_result.get("failing_surfaces") or []),
       "gates": gates,
@@ -95,6 +104,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
     parser.add_argument("--performance-report", help="Optional JSON performance report path produced by validate_performance_foundation.py.")
     parser.add_argument("--operational-alert-report", help="Optional JSON operational alert report path produced by verify_operational_alert_posture.py.")
+    parser.add_argument("--deployed-load-report", help="Optional JSON deployed load report path produced by verify_deployed_load_posture.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
     return parser.parse_args()
 
@@ -107,6 +117,9 @@ def main() -> None:
     operational_alert_result = None
     if args.operational_alert_report:
         operational_alert_result = json.loads(Path(args.operational_alert_report).read_text(encoding="utf-8"))
+    deployed_load_result = None
+    if args.deployed_load_report:
+        deployed_load_result = json.loads(Path(args.deployed_load_report).read_text(encoding="utf-8"))
     vulnerability_scan_result = None
     if args.vulnerability_scan_report:
         vulnerability_scan_result = json.loads(Path(args.vulnerability_scan_report).read_text(encoding="utf-8"))
@@ -117,6 +130,7 @@ def main() -> None:
         bearer_token=args.bearer_token,
         performance_result=performance_result,
         operational_alert_result=operational_alert_result,
+        deployed_load_result=deployed_load_result,
         vulnerability_scan_result=vulnerability_scan_result,
     )
     print(json.dumps(result, indent=2))

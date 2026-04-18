@@ -116,6 +116,42 @@ The output is a machine-readable JSON report with:
 
 This lane is the first bounded performance gate for the broadened V2 suite. It is intentionally an in-process validation harness, not an internet-scale external load test.
 
+## Run The Deployed Load Verification Lane
+
+From repo root against a staging-style environment with dedicated fixture credentials:
+
+```powershell
+python services/control-plane-api/scripts/verify_deployed_load_posture.py `
+  --base-url https://control.staging.store.korsenex.com `
+  --expected-environment staging `
+  --expected-release-version 2026.04.18 `
+  --output-path docs\launch\evidence\staging-deployed-load.json `
+  --admin-bearer-token <admin-token> `
+  --branch-bearer-token <branch-token> `
+  --tenant-id <tenant-id> `
+  --branch-id <branch-id> `
+  --product-id <product-id>
+```
+
+What this validates:
+
+- `GET /v1/system/health`
+- `GET /v1/platform/observability/summary`
+- `POST /v1/tenants/{tenant_id}/branches/{branch_id}/checkout-price-preview`
+- `GET /v1/tenants/{tenant_id}/branches/{branch_id}/management-dashboard`
+
+The output is a machine-readable JSON report with:
+
+- `status`
+- `environment`
+- `release_version`
+- `concurrency`
+- `iterations_per_worker`
+- `scenario_results`
+- `failing_scenarios`
+
+This lane is intentionally bounded and staging-safe. It is meant to prove deployed-stack posture under concurrent HTTP traffic, not replace a dedicated long-running load-testing system.
+
 ## Release Evidence Integration
 
 `generate_release_candidate_evidence.py` now runs the performance-validation lane by default unless you explicitly pass:
@@ -134,6 +170,7 @@ If you do not skip it, the evidence markdown records:
 - the result status
 - a compact scenario summary
 - the deployed security verification status and throttle posture
+- deployed load posture when a `--deployed-load-report` is supplied
 
 `certify_release_candidate.py` can also consume a saved performance report directly:
 
@@ -143,6 +180,16 @@ python services/control-plane-api/scripts/certify_release_candidate.py `
   --expected-environment prod `
   --expected-release-version 2026.04.18 `
   --performance-report docs\launch\evidence\performance-launch-foundation.json
+```
+
+It can also consume a saved deployed-load report directly:
+
+```powershell
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --deployed-load-report docs\launch\evidence\staging-deployed-load.json
 ```
 
 ## Expected Success Signal
@@ -163,6 +210,7 @@ The script exits `0` and prints a JSON summary with:
 - If app-flow tests fail, do not mark the current UI/runtime surface healthy.
 - If the smoke fails after tests pass, treat it as an integration regression between control-plane modules.
 - If performance validation fails, treat the release evidence as incomplete until the failing scenarios are understood and the budgets are re-met or intentionally revised.
+- If deployed load verification fails, treat the staged release as not scale-ready until the failing HTTP scenarios are understood and reverified.
 - If deployed security verification fails, treat the release candidate as blocked until the secure-header or throttle mismatch is resolved.
 
 ## Cleanup

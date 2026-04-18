@@ -2,6 +2,16 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with deployed load verification foundation:
+  - added a `deployed_load_verification` domain module to evaluate bounded concurrent HTTP scenario budgets and write normalized machine-readable reports
+  - added `verify_deployed_load_posture.py` so staging-style environments can be checked for real deployed HTTP load posture across system health, observability, checkout preview, and branch management dashboard reads
+  - extended release-candidate evidence generation and certification so deployed-load posture is rendered explicitly and can block approval when a supplied report fails
+  - updated the verification and production deployment runbooks so operators collect staged deployed-load evidence alongside local performance, security, recovery, alert, and vulnerability evidence
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_deployed_load_verification.py services/control-plane-api/tests/test_verify_deployed_load_posture.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `python services/control-plane-api/scripts/verify_deployed_load_posture.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
 - Extended `V2-009` with security verification foundation:
   - added a control-plane `GET /v1/system/security-controls` read model so deployed verification can discover the effective secure-header and rate-limit posture instead of hardcoding assumptions
   - extended `verify_deployed_control_plane.py` to verify live secure headers and run bounded invalid auth-exchange plus billing-webhook probes until the deployed throttles return `429`, while preserving the existing environment and authority checks
