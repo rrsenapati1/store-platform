@@ -93,11 +93,31 @@ def _render_markdown(
     date_text: str,
     local_result: dict[str, object],
     performance_result: dict[str, object],
+    restore_drill_result: dict[str, object] | None,
     deployed_result: dict[str, object],
     certification_result: dict[str, object],
 ) -> str:
     deployed_domains = list(deployed_result.get("legacy_remaining_domains") or [])
     final_status = str(certification_result.get("status") or "blocked")
+    restore_drill_lines = [
+        "## Recovery Evidence",
+        "",
+        "- Restore drill: not-run",
+        "",
+    ]
+    if restore_drill_result is not None:
+        restore_drill_source = dict(restore_drill_result.get("source") or {})
+        restore_drill_manifest = dict(restore_drill_result.get("restored_manifest") or {})
+        restore_drill_lines = [
+            "## Recovery Evidence",
+            "",
+            f"- restore drill status: {restore_drill_result.get('status')}",
+            f"- dump key: {restore_drill_source.get('dump_key') or ''}",
+            f"- metadata key: {restore_drill_source.get('metadata_key') or ''}",
+            f"- restored environment: {restore_drill_manifest.get('environment') or ''}",
+            f"- restored release version: {restore_drill_manifest.get('release_version') or ''}",
+            "",
+        ]
     return "\n".join(
         [
             "# Release Candidate Evidence",
@@ -125,6 +145,7 @@ def _render_markdown(
             "- Release-candidate certification command: python services/control-plane-api/scripts/certify_release_candidate.py --base-url ... --expected-environment ... --expected-release-version ...",
             f"  - result: {certification_result.get('status')}",
             "",
+            *restore_drill_lines,
             "## Authority / Cutover Evidence",
             "",
             f"- `legacy_write_mode`: {deployed_result.get('legacy_write_mode')}",
@@ -146,6 +167,7 @@ def generate_release_candidate_evidence(
     expected_release_version: str | None = None,
     release_owner: str | None = None,
     output_path: Path,
+    restore_drill_report_path: Path | None = None,
     bearer_token: str | None = None,
     run_local_verification: bool = True,
     run_performance_validation: bool = True,
@@ -177,6 +199,11 @@ def generate_release_candidate_evidence(
         if run_performance_validation
         else {"status": "skipped", "command": "not-run", "summary": "not-run"}
     )
+    restore_drill_result = (
+        json.loads(restore_drill_report_path.read_text(encoding="utf-8"))
+        if restore_drill_report_path is not None
+        else None
+    )
     deployed_result = deployed_verifier(
         base_url=base_url,
         expected_environment=expected_environment,
@@ -200,6 +227,7 @@ def generate_release_candidate_evidence(
             date_text=effective_date_text,
             local_result=local_result,
             performance_result=performance_result,
+            restore_drill_result=restore_drill_result,
             deployed_result=deployed_result,
             certification_result=certification_result,
         ),
@@ -211,6 +239,7 @@ def generate_release_candidate_evidence(
         "output_path": str(output_path),
         "local_result": local_result,
         "performance_result": performance_result,
+        "restore_drill_result": restore_drill_result,
         "deployed_result": deployed_result,
         "certification_result": certification_result,
     }
@@ -223,6 +252,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-release-version", help="Expected release version reported by the deployment.")
     parser.add_argument("--release-owner", help="Release owner recorded in the evidence file.")
     parser.add_argument("--output-path", help="Markdown file path for the generated evidence document.")
+    parser.add_argument("--restore-drill-report", help="Optional JSON restore-drill report path produced by run_restore_drill.py.")
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
     parser.add_argument("--skip-local-verification", action="store_true", help="Skip the local verify_control_plane.py run.")
     parser.add_argument("--skip-performance-validation", action="store_true", help="Skip the local performance validation run.")
@@ -244,6 +274,7 @@ def main() -> None:
         expected_release_version=args.expected_release_version,
         release_owner=args.release_owner,
         output_path=output_path,
+        restore_drill_report_path=Path(args.restore_drill_report) if args.restore_drill_report else None,
         bearer_token=args.bearer_token,
         run_local_verification=not args.skip_local_verification,
         run_performance_validation=not args.skip_performance_validation,
