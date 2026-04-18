@@ -1012,6 +1012,15 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+- Added V2-009 release evidence bundle foundation:
+  - deterministic bundle assembly in `store_control_plane/release_evidence_bundle.py`
+  - standalone `build_release_evidence_bundle.py` CLI
+  - optional certification JSON persistence from `generate_release_candidate_evidence.py`
+  - one-shot evidence markdown + bundle assembly with copied raw artifact directories
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_release_evidence_bundle.py services/control-plane-api/tests/test_build_release_evidence_bundle_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py -q`
+  - `python services/control-plane-api/scripts/build_release_evidence_bundle.py --help`
+  - `git -c core.safecrlf=false diff --check`
 - 2026-04-18: Completed `V2-009` alert verification foundation.
   - Added `store_control_plane.operational_alerts` to normalize release-blocking alert checks from observability and deployed security posture.
   - Added `scripts/verify_operational_alert_posture.py` to emit machine-readable operational alert evidence with release-safe exit status.

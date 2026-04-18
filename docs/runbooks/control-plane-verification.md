@@ -1,6 +1,6 @@
 # Control-Plane Verification Runbook
 
-Updated: 2026-04-18
+Updated: 2026-04-19
 
 ## Purpose
 
@@ -238,6 +238,42 @@ If you do not skip it, the evidence markdown records:
 - license compliance posture when a `--license-compliance-report` is supplied
 - release provenance posture when a `--provenance-report` is supplied
 - deployed load posture when a `--deployed-load-report` is supplied
+
+It can now also assemble a deterministic evidence bundle in the same run:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.19 `
+  --output-path docs\launch\evidence\prod-rc-evidence.md `
+  --certification-output-path docs\launch\evidence\prod-certification-report.json `
+  --vulnerability-scan-report docs\launch\evidence\prod-vulnerability-report.json `
+  --sbom-report docs\launch\evidence\prod-sbom-report.json `
+  --sbom-artifact-dir docs\launch\evidence\prod-sbom-artifacts `
+  --evidence-bundle-output-dir docs\launch\evidence\prod-evidence-bundle
+```
+
+That bundle contains:
+
+- the release-candidate markdown evidence
+- the saved certification JSON
+- any supplied machine-readable evidence reports
+- any supplied raw artifact directories such as SBOM output
+- `bundle-manifest.json` with copied-path, hash, and count metadata
+- `bundle-index.md` for quick operator inspection
+
+If you already have the reports and only need to assemble the pack, use:
+
+```powershell
+python services/control-plane-api/scripts/build_release_evidence_bundle.py `
+  --output-dir docs\launch\evidence\prod-evidence-bundle `
+  --release-evidence docs\launch\evidence\prod-rc-evidence.md `
+  --certification-report docs\launch\evidence\prod-certification-report.json `
+  --vulnerability-scan-report docs\launch\evidence\prod-vulnerability-report.json `
+  --sbom-report docs\launch\evidence\prod-sbom-report.json `
+  --sbom-artifact-dir docs\launch\evidence\prod-sbom-artifacts
+```
 
 `certify_release_candidate.py` can also consume a saved performance report directly:
 

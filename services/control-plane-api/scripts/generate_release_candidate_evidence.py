@@ -15,6 +15,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
+from store_control_plane.release_evidence_bundle import build_release_evidence_bundle
+
 
 VerifyCallable = Callable[..., dict[str, object]]
 LocalVerifyCallable = Callable[[], dict[str, object]]
@@ -401,6 +403,10 @@ def generate_release_candidate_evidence(
     rollback_report_path: Path | None = None,
     vulnerability_scan_report_path: Path | None = None,
     restore_drill_report_path: Path | None = None,
+    certification_output_path: Path | None = None,
+    evidence_bundle_output_dir: Path | None = None,
+    sbom_artifact_dir: Path | None = None,
+    vulnerability_raw_output_dir: Path | None = None,
     bearer_token: str | None = None,
     run_local_verification: bool = True,
     run_performance_validation: bool = True,
@@ -530,9 +536,48 @@ def generate_release_candidate_evidence(
         encoding="utf-8",
     )
 
+    effective_certification_output_path = certification_output_path
+    if effective_certification_output_path is None and evidence_bundle_output_dir is not None:
+        effective_certification_output_path = output_path.with_name(f"{output_path.stem}-certification.json")
+
+    if effective_certification_output_path is not None:
+        effective_certification_output_path.parent.mkdir(parents=True, exist_ok=True)
+        effective_certification_output_path.write_text(
+            json.dumps(certification_result, indent=2),
+            encoding="utf-8",
+        )
+
+    evidence_bundle_result: dict[str, object] | None = None
+    if evidence_bundle_output_dir is not None:
+        report_paths: dict[str, Path | None] = {
+            "release_candidate_evidence": output_path,
+            "certification_report": effective_certification_output_path,
+            "performance_report": performance_output_path if performance_output_path.exists() else None,
+            "operational_alert_report": alert_report_path,
+            "environment_drift_report": environment_drift_report_path,
+            "tls_posture_report": tls_posture_report_path,
+            "sbom_report": sbom_report_path,
+            "provenance_report": provenance_report_path,
+            "license_compliance_report": license_compliance_report_path,
+            "deployed_load_report": deployed_load_report_path,
+            "rollback_report": rollback_report_path,
+            "vulnerability_scan_report": vulnerability_scan_report_path,
+            "restore_drill_report": restore_drill_report_path,
+        }
+        evidence_bundle_result = build_release_evidence_bundle(
+            output_dir=evidence_bundle_output_dir,
+            report_paths=report_paths,
+            directory_paths={
+                "sbom_artifacts": sbom_artifact_dir,
+                "vulnerability_raw_output": vulnerability_raw_output_dir,
+            },
+        )
+
     return {
         "final_status": certification_result.get("status"),
         "output_path": str(output_path),
+        "certification_output_path": None if effective_certification_output_path is None else str(effective_certification_output_path),
+        "evidence_bundle_result": evidence_bundle_result,
         "local_result": local_result,
         "performance_result": performance_result,
         "operational_alert_result": operational_alert_result,
@@ -567,6 +612,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path produced by verify_release_rollback.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
     parser.add_argument("--restore-drill-report", help="Optional JSON restore-drill report path produced by run_restore_drill.py.")
+    parser.add_argument("--certification-output-path", help="Optional JSON file path where the certification result should be written.")
+    parser.add_argument("--evidence-bundle-output-dir", help="Optional directory where a release evidence bundle should be assembled.")
+    parser.add_argument("--sbom-artifact-dir", help="Optional directory containing raw SBOM artifacts to include in the evidence bundle.")
+    parser.add_argument("--vulnerability-raw-output-dir", help="Optional directory containing raw vulnerability scan output to include in the evidence bundle.")
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
     parser.add_argument("--skip-local-verification", action="store_true", help="Skip the local verify_control_plane.py run.")
     parser.add_argument("--skip-performance-validation", action="store_true", help="Skip the local performance validation run.")
@@ -598,6 +647,10 @@ def main() -> None:
         rollback_report_path=Path(args.rollback_report) if args.rollback_report else None,
         vulnerability_scan_report_path=Path(args.vulnerability_scan_report) if args.vulnerability_scan_report else None,
         restore_drill_report_path=Path(args.restore_drill_report) if args.restore_drill_report else None,
+        certification_output_path=Path(args.certification_output_path) if args.certification_output_path else None,
+        evidence_bundle_output_dir=Path(args.evidence_bundle_output_dir) if args.evidence_bundle_output_dir else None,
+        sbom_artifact_dir=Path(args.sbom_artifact_dir) if args.sbom_artifact_dir else None,
+        vulnerability_raw_output_dir=Path(args.vulnerability_raw_output_dir) if args.vulnerability_raw_output_dir else None,
         bearer_token=args.bearer_token,
         run_local_verification=not args.skip_local_verification,
         run_performance_validation=not args.skip_performance_validation,

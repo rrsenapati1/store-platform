@@ -1,6 +1,6 @@
 # Control-Plane Production Deployment
 
-Updated: 2026-04-18
+Updated: 2026-04-19
 
 ## Topology
 
@@ -352,6 +352,46 @@ If release certification is run with `certify_release_candidate.py`, also pass:
 - `--vulnerability-scan-report <vulnerability-report.json>`
 
 Release certification should now block if the vulnerability report is missing or failed.
+
+## Evidence Bundle Assembly
+
+Before handing a release candidate to human sign-off, assemble one evidence pack instead of passing around individual files:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.19 `
+  --output-path docs/launch/evidence/prod-rc-evidence.md `
+  --certification-output-path docs/launch/evidence/prod-certification-report.json `
+  --vulnerability-scan-report docs/launch/evidence/prod-vulnerability-report.json `
+  --sbom-report docs/launch/evidence/prod-sbom-report.json `
+  --sbom-artifact-dir docs/launch/evidence/prod-sbom-artifacts `
+  --evidence-bundle-output-dir docs/launch/evidence/prod-evidence-bundle
+```
+
+The bundle directory is deterministic and contains:
+
+- the release-candidate evidence markdown
+- the certification JSON result
+- every supplied machine-readable evidence report
+- copied raw artifact directories such as SBOM output
+- `bundle-manifest.json` with hashes and copied-path metadata
+- `bundle-index.md` as the operator-facing table of contents
+
+If the markdown evidence already exists, you can also assemble the bundle separately with:
+
+```powershell
+python services/control-plane-api/scripts/build_release_evidence_bundle.py `
+  --output-dir docs/launch/evidence/prod-evidence-bundle `
+  --release-evidence docs/launch/evidence/prod-rc-evidence.md `
+  --certification-report docs/launch/evidence/prod-certification-report.json `
+  --vulnerability-scan-report docs/launch/evidence/prod-vulnerability-report.json `
+  --sbom-report docs/launch/evidence/prod-sbom-report.json `
+  --sbom-artifact-dir docs/launch/evidence/prod-sbom-artifacts
+```
+
+Treat `bundle-manifest.json` as the authoritative inventory of what evidence was actually packaged for approval.
 
 ## Failure Posture
 

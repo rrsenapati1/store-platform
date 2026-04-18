@@ -946,3 +946,84 @@ def test_generate_release_candidate_evidence_renders_sbom_posture(tmp_path: Path
     assert "failing surfaces: owner_web" in content
     assert "control plane api: passed" in content
     assert "owner web: tool-unavailable" in content
+
+
+def test_generate_release_candidate_evidence_writes_certification_report_and_bundle(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence.md"
+    certification_output_path = tmp_path / "certification-report.json"
+    evidence_bundle_output_dir = tmp_path / "evidence-bundle"
+    vulnerability_report_path = tmp_path / "vulnerability-report.json"
+    vulnerability_report_path.write_text(
+        json.dumps(
+            {
+                "status": "passed",
+                "surfaces": {
+                    "python": {"status": "passed"},
+                    "node": {"status": "passed"},
+                },
+                "failing_surfaces": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    sbom_artifact_dir = tmp_path / "sbom-artifacts"
+    sbom_artifact_dir.mkdir()
+    (sbom_artifact_dir / "control-plane-api.cdx.json").write_text('{"bomFormat":"CycloneDX"}', encoding="utf-8")
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.19-rc1",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "approved",
+            "environment": "staging",
+            "release_version": "2026.04.19-rc1",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.19-rc1",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        vulnerability_scan_report_path=vulnerability_report_path,
+        certification_output_path=certification_output_path,
+        evidence_bundle_output_dir=evidence_bundle_output_dir,
+        sbom_artifact_dir=sbom_artifact_dir,
+        date_text="2026-04-19",
+    )
+
+    assert result["final_status"] == "approved"
+    assert json.loads(certification_output_path.read_text(encoding="utf-8"))["status"] == "approved"
+    evidence_bundle_result = result["evidence_bundle_result"]
+    assert evidence_bundle_result is not None
+    assert evidence_bundle_result["status"] == "passed"
+    bundle_manifest = json.loads((evidence_bundle_output_dir / "bundle-manifest.json").read_text(encoding="utf-8"))
+    assert bundle_manifest["reports"]["release_candidate_evidence"]["bundle_path"].endswith(
+        "reports/release-candidate-evidence.md"
+    )
+    assert bundle_manifest["reports"]["certification_report"]["bundle_path"].endswith(
+        "reports/certification-report.json"
+    )
+    assert bundle_manifest["directories"]["sbom_artifacts"]["file_count"] == 1
