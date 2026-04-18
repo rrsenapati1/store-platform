@@ -33,6 +33,8 @@ def certify_release_candidate(
     expected_release_version: str | None = None,
     bearer_token: str | None = None,
     performance_result: dict[str, object] | None = None,
+    vulnerability_scan_result: dict[str, object] | None = None,
+    require_vulnerability_scan: bool = True,
     verify_deployed: VerifyDeployedCallable | None = None,
 ) -> dict[str, object]:
     verification = verify_deployed or _load_verify_script_module().verify_deployed_control_plane
@@ -58,6 +60,9 @@ def certify_release_candidate(
       "legacy_remaining_domains_cleared": len(legacy_remaining_domains) == 0,
       "security_controls_verified": not security_result or security_result.get("status") == "passed",
       "performance_budgets_passed": performance_result is None or performance_result.get("status") == "passed",
+      "vulnerability_scans_passed": (not require_vulnerability_scan) or (
+          vulnerability_scan_result is not None and vulnerability_scan_result.get("status") == "passed"
+      ),
     }
     overall_status = "approved" if all(gates.values()) else "blocked"
     return {
@@ -69,6 +74,8 @@ def certify_release_candidate(
       "security_result_status": security_result.get("status"),
       "performance_result_status": None if performance_result is None else performance_result.get("status"),
       "performance_failing_scenarios": [] if performance_result is None else list(performance_result.get("failing_scenarios") or []),
+      "vulnerability_result_status": None if vulnerability_scan_result is None else vulnerability_scan_result.get("status"),
+      "vulnerability_failing_surfaces": [] if vulnerability_scan_result is None else list(vulnerability_scan_result.get("failing_surfaces") or []),
       "gates": gates,
     }
 
@@ -80,6 +87,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-release-version", help="Expected release version reported by the deployment.")
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
     parser.add_argument("--performance-report", help="Optional JSON performance report path produced by validate_performance_foundation.py.")
+    parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
     return parser.parse_args()
 
 
@@ -88,12 +96,16 @@ def main() -> None:
     performance_result = None
     if args.performance_report:
         performance_result = json.loads(Path(args.performance_report).read_text(encoding="utf-8"))
+    vulnerability_scan_result = None
+    if args.vulnerability_scan_report:
+        vulnerability_scan_result = json.loads(Path(args.vulnerability_scan_report).read_text(encoding="utf-8"))
     result = certify_release_candidate(
         base_url=args.base_url,
         expected_environment=args.expected_environment,
         expected_release_version=args.expected_release_version,
         bearer_token=args.bearer_token,
         performance_result=performance_result,
+        vulnerability_scan_result=vulnerability_scan_result,
     )
     print(json.dumps(result, indent=2))
 

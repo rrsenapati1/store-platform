@@ -93,6 +93,7 @@ def _render_markdown(
     date_text: str,
     local_result: dict[str, object],
     performance_result: dict[str, object],
+    vulnerability_scan_result: dict[str, object] | None,
     restore_drill_result: dict[str, object] | None,
     deployed_result: dict[str, object],
     certification_result: dict[str, object],
@@ -114,6 +115,25 @@ def _render_markdown(
             f"- secure headers: {dict(security_result.get('secure_headers') or {}).get('status') or 'unknown'}",
             f"- auth rate limit: {dict(security_result.get('auth_rate_limit') or {}).get('status') or 'unknown'}",
             f"- webhook rate limit: {dict(security_result.get('webhook_rate_limit') or {}).get('status') or 'unknown'}",
+            "",
+        ]
+    vulnerability_lines = [
+        "## Vulnerability Scan Evidence",
+        "",
+        "- Vulnerability scan status: not-run",
+        "",
+    ]
+    if vulnerability_scan_result is not None:
+        vulnerability_surfaces = dict(vulnerability_scan_result.get("surfaces") or {})
+        vulnerability_lines = [
+            "## Vulnerability Scan Evidence",
+            "",
+            f"- overall scan status: {vulnerability_scan_result.get('status')}",
+            f"- python: {dict(vulnerability_surfaces.get('python') or {}).get('status') or 'unknown'}",
+            f"- node: {dict(vulnerability_surfaces.get('node') or {}).get('status') or 'unknown'}",
+            f"- rust: {dict(vulnerability_surfaces.get('rust') or {}).get('status') or 'unknown'}",
+            f"- images: {dict(vulnerability_surfaces.get('images') or {}).get('status') or 'unknown'}",
+            f"- failing surfaces: {_stringify_domains(list(vulnerability_scan_result.get('failing_surfaces') or []))}",
             "",
         ]
     restore_drill_lines = [
@@ -163,6 +183,7 @@ def _render_markdown(
             f"  - result: {certification_result.get('status')}",
             "",
             *security_lines,
+            *vulnerability_lines,
             *restore_drill_lines,
             "## Authority / Cutover Evidence",
             "",
@@ -185,6 +206,7 @@ def generate_release_candidate_evidence(
     expected_release_version: str | None = None,
     release_owner: str | None = None,
     output_path: Path,
+    vulnerability_scan_report_path: Path | None = None,
     restore_drill_report_path: Path | None = None,
     bearer_token: str | None = None,
     run_local_verification: bool = True,
@@ -217,6 +239,11 @@ def generate_release_candidate_evidence(
         if run_performance_validation
         else {"status": "skipped", "command": "not-run", "summary": "not-run"}
     )
+    vulnerability_scan_result = (
+        json.loads(vulnerability_scan_report_path.read_text(encoding="utf-8"))
+        if vulnerability_scan_report_path is not None
+        else None
+    )
     restore_drill_result = (
         json.loads(restore_drill_report_path.read_text(encoding="utf-8"))
         if restore_drill_report_path is not None
@@ -234,6 +261,7 @@ def generate_release_candidate_evidence(
         expected_release_version=expected_release_version,
         bearer_token=bearer_token,
         performance_result=None if performance_result.get("status") == "skipped" else performance_result,
+        vulnerability_scan_result=vulnerability_scan_result,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -245,6 +273,7 @@ def generate_release_candidate_evidence(
             date_text=effective_date_text,
             local_result=local_result,
             performance_result=performance_result,
+            vulnerability_scan_result=vulnerability_scan_result,
             restore_drill_result=restore_drill_result,
             deployed_result=deployed_result,
             certification_result=certification_result,
@@ -257,6 +286,7 @@ def generate_release_candidate_evidence(
         "output_path": str(output_path),
         "local_result": local_result,
         "performance_result": performance_result,
+        "vulnerability_scan_result": vulnerability_scan_result,
         "restore_drill_result": restore_drill_result,
         "deployed_result": deployed_result,
         "certification_result": certification_result,
@@ -270,6 +300,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-release-version", help="Expected release version reported by the deployment.")
     parser.add_argument("--release-owner", help="Release owner recorded in the evidence file.")
     parser.add_argument("--output-path", help="Markdown file path for the generated evidence document.")
+    parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
     parser.add_argument("--restore-drill-report", help="Optional JSON restore-drill report path produced by run_restore_drill.py.")
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
     parser.add_argument("--skip-local-verification", action="store_true", help="Skip the local verify_control_plane.py run.")
@@ -292,6 +323,7 @@ def main() -> None:
         expected_release_version=args.expected_release_version,
         release_owner=args.release_owner,
         output_path=output_path,
+        vulnerability_scan_report_path=Path(args.vulnerability_scan_report) if args.vulnerability_scan_report else None,
         restore_drill_report_path=Path(args.restore_drill_report) if args.restore_drill_report else None,
         bearer_token=args.bearer_token,
         run_local_verification=not args.skip_local_verification,

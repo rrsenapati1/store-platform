@@ -37,7 +37,7 @@ def test_generate_release_candidate_evidence_writes_markdown_with_verification_r
 
     def fake_certify(**_: object) -> dict[str, object]:
         return {
-            "status": "approved",
+            "status": "blocked",
             "environment": "staging",
             "release_version": "2026.04.15-rc1",
             "legacy_write_mode": "cutover",
@@ -48,6 +48,7 @@ def test_generate_release_candidate_evidence_writes_markdown_with_verification_r
                 "release_version_match": True,
                 "legacy_write_mode_cutover": True,
                 "legacy_remaining_domains_cleared": True,
+                "vulnerability_scans_passed": False,
             },
         }
 
@@ -73,7 +74,7 @@ def test_generate_release_candidate_evidence_writes_markdown_with_verification_r
         date_text="2026-04-15",
     )
 
-    assert result["final_status"] == "approved"
+    assert result["final_status"] == "blocked"
     assert result["output_path"] == str(output_path)
     content = output_path.read_text(encoding="utf-8")
     assert "Version: 2026.04.15-rc1" in content
@@ -85,7 +86,7 @@ def test_generate_release_candidate_evidence_writes_markdown_with_verification_r
     assert "Security verification status: not-run" in content
     assert "`legacy_write_mode`: cutover" in content
     assert "`legacy_remaining_domains`: none" in content
-    assert "Status: approved" in content
+    assert "Status: blocked" in content
 
 
 def test_generate_release_candidate_evidence_records_blocked_state_and_skipped_local_verification(tmp_path: Path) -> None:
@@ -114,6 +115,7 @@ def test_generate_release_candidate_evidence_records_blocked_state_and_skipped_l
                 "release_version_match": True,
                 "legacy_write_mode_cutover": False,
                 "legacy_remaining_domains_cleared": False,
+                "vulnerability_scans_passed": False,
             },
         }
 
@@ -161,7 +163,7 @@ def test_generate_release_candidate_evidence_renders_security_posture(tmp_path: 
 
     def fake_certify(**_: object) -> dict[str, object]:
         return {
-            "status": "approved",
+            "status": "blocked",
             "environment": "staging",
             "release_version": "2026.04.18-rc1",
             "legacy_write_mode": "cutover",
@@ -173,6 +175,7 @@ def test_generate_release_candidate_evidence_renders_security_posture(tmp_path: 
                 "legacy_write_mode_cutover": True,
                 "legacy_remaining_domains_cleared": True,
                 "security_controls_verified": True,
+                "vulnerability_scans_passed": False,
             },
         }
 
@@ -189,11 +192,12 @@ def test_generate_release_candidate_evidence_renders_security_posture(tmp_path: 
         date_text="2026-04-18",
     )
 
-    assert result["final_status"] == "approved"
+    assert result["final_status"] == "blocked"
     content = output_path.read_text(encoding="utf-8")
     assert "Security verification status: passed" in content
     assert "auth rate limit: passed" in content
     assert "webhook rate limit: passed" in content
+    assert "Vulnerability scan status: not-run" in content
 
 
 def test_generate_release_candidate_evidence_renders_restore_drill_report(tmp_path: Path) -> None:
@@ -236,7 +240,7 @@ def test_generate_release_candidate_evidence_renders_restore_drill_report(tmp_pa
 
     def fake_certify(**_: object) -> dict[str, object]:
         return {
-            "status": "approved",
+            "status": "blocked",
             "environment": "staging",
             "release_version": "2026.04.18-rc1",
             "legacy_write_mode": "cutover",
@@ -247,6 +251,7 @@ def test_generate_release_candidate_evidence_renders_restore_drill_report(tmp_pa
                 "release_version_match": True,
                 "legacy_write_mode_cutover": True,
                 "legacy_remaining_domains_cleared": True,
+                "vulnerability_scans_passed": False,
             },
         }
 
@@ -264,9 +269,78 @@ def test_generate_release_candidate_evidence_renders_restore_drill_report(tmp_pa
         date_text="2026-04-18",
     )
 
-    assert result["final_status"] == "approved"
+    assert result["final_status"] == "blocked"
     content = output_path.read_text(encoding="utf-8")
     assert "## Recovery Evidence" in content
     assert "restore drill status: passed" in content
     assert "control-plane/staging/postgres-backups/restore.dump" in content
     assert "2026.04.18-rc1" in content
+
+
+def test_generate_release_candidate_evidence_renders_vulnerability_scan_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-vulnerability.md"
+    vulnerability_report_path = tmp_path / "vulnerability-report.json"
+    vulnerability_report_path.write_text(
+        json.dumps(
+            {
+                "status": "passed",
+                "surfaces": {
+                    "python": {"status": "passed"},
+                    "node": {"status": "passed"},
+                    "rust": {"status": "passed"},
+                    "images": {"status": "passed"},
+                },
+                "failing_surfaces": [],
+                "summary": "4 surfaces passed",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc2",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "approved",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc2",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc2",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        vulnerability_scan_report_path=vulnerability_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "approved"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Vulnerability Scan Evidence" in content
+    assert "overall scan status: passed" in content
+    assert "python: passed" in content
+    assert "images: passed" in content
