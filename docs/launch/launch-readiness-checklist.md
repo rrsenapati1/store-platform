@@ -1,6 +1,6 @@
 # Launch Readiness Checklist
 
-Updated: 2026-04-15
+Updated: 2026-04-19
 
 Use this checklist before declaring a release candidate operationally ready for public launch.
 
@@ -13,15 +13,12 @@ Use this checklist before declaring a release candidate operationally ready for 
 
 ## Verification Gates
 
-- [ ] Local control-plane verification passes
+- [ ] Strict release gate reports `passed`
   - evidence:
-    - `python services/control-plane-api/scripts/verify_control_plane.py`
-- [ ] Deployed environment verification passes
+    - `python services/control-plane-api/scripts/run_release_gate.py --base-url ... --expected-environment ... --expected-release-version ...`
+- [ ] Launch-readiness report reports `ready`
   - evidence:
-    - `python services/control-plane-api/scripts/verify_deployed_control_plane.py --base-url ... --expected-environment ... --expected-release-version ...`
-- [ ] Release-candidate certification reports `approved`
-  - evidence:
-    - `python services/control-plane-api/scripts/certify_release_candidate.py --base-url ... --expected-environment ... --expected-release-version ...`
+    - `python services/control-plane-api/scripts/build_launch_readiness_report.py --launch-manifest ... --release-gate-report ...`
 
 ## Authority / Cutover Gates
 
@@ -31,13 +28,8 @@ Use this checklist before declaring a release candidate operationally ready for 
 
 ## Security / Operations Gates
 
-- [ ] security/observability posture is healthy
-  - secure headers
-  - rate limiting
-  - Sentry/project wiring
-  - platform observability summary
-- [ ] backup freshness is acceptable
-- [ ] release artifacts exist and match the target version
+- [ ] strict release gate includes healthy security, vulnerability, load, rollback, restore-drill, SBOM, license, TLS, environment-drift, and evidence-retention posture
+- [ ] release artifacts exist and match the target version used in the launch-readiness manifest
 
 ## Product / Runtime Gates
 
@@ -50,6 +42,7 @@ Use this checklist before declaring a release candidate operationally ready for 
 ## Beta Exit Gates
 
 - [ ] beta pilot exit criteria are satisfied
+- [ ] at least one packaged branch pilot is recorded in the launch-readiness manifest
 - [ ] no unresolved severity-1 launch blockers remain
 - [ ] accepted severity-2/severity-3 issues are documented with owner and follow-up release target
 
@@ -63,7 +56,7 @@ Use this checklist before declaring a release candidate operationally ready for 
 ## Final Sign-Off
 
 - [ ] backend owner
-- [ ] desktop/runtime owner
+- [ ] runtime owner
 - [ ] infra/operator owner
 - [ ] support owner
 - [ ] release owner

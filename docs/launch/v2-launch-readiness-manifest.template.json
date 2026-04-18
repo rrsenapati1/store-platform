@@ -1,0 +1,58 @@
+{
+  "release_version": "2026.04.19",
+  "environment": "prod",
+  "release_owner": "release@store.korsenex.com",
+  "beta_owner": "beta@store.korsenex.com",
+  "candidate_date": "2026-04-19",
+  "pilots": [
+    {
+      "tenant_id": "tenant-demo",
+      "branch_id": "branch-flagship",
+      "outcome": "passed",
+      "surface_checks": {
+        "owner_web_onboarding": "passed",
+        "desktop_install_activation": "passed",
+        "runtime_hardware_validation": "passed",
+        "offline_continuity_reviewed": true
+      },
+      "notes": "Packaged Store Desktop pilot completed on target hardware."
+    }
+  ],
+  "issues": [
+    {
+      "id": "ISSUE-21",
+      "severity": "sev2",
+      "status": "accepted",
+      "owner": "support@store.korsenex.com",
+      "workaround": "Retry the queue from the runtime dashboard.",
+      "target_release": "2026.04.20"
+    }
+  ],
+  "sign_offs": {
+    "backend_owner": {
+      "status": "approved",
+      "approver": "backend@store.korsenex.com",
+      "date": "2026-04-19"
+    },
+    "runtime_owner": {
+      "status": "approved",
+      "approver": "runtime@store.korsenex.com",
+      "date": "2026-04-19"
+    },
+    "infra_owner": {
+      "status": "approved",
+      "approver": "infra@store.korsenex.com",
+      "date": "2026-04-19"
+    },
+    "support_owner": {
+      "status": "approved",
+      "approver": "support@store.korsenex.com",
+      "date": "2026-04-19"
+    },
+    "release_owner": {
+      "status": "approved",
+      "approver": "release@store.korsenex.com",
+      "date": "2026-04-19"
+    }
+  }
+}

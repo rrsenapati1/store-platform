@@ -1,8 +1,16 @@
 # Beta Pilot Exit Criteria
 
-Updated: 2026-04-15
+Updated: 2026-04-19
 
 Use this document to decide whether beta/pilot operation is strong enough to move into public release.
+
+For `V2-010`, record the pilot and sign-off inputs in [v2-launch-readiness-manifest.template.json](./v2-launch-readiness-manifest.template.json) and validate them with:
+
+```powershell
+python services/control-plane-api/scripts/build_launch_readiness_report.py `
+  --launch-manifest docs/launch/v2-launch-readiness-manifest.json `
+  --release-gate-report D:/ops/release-gate-report.json
+```
 
 ## Beta Exit Conditions
 
@@ -28,6 +36,9 @@ Record at least:
 - branch runtime outcome
 - print/scanner/runtime notes if relevant
 - offline continuity or replay notes if exercised
+- operator who ran the pilot
+- runtime hardware validation outcome
+- whether the pilot is being accepted as `passed` or held for follow-up
 
 ## Failure Conditions
 
@@ -48,3 +59,5 @@ Do not exit beta if:
   - `pass`
   - `hold`
 - Notes:
+
+In the repo-owned `V2-010` flow, these same values should also appear in the launch-readiness manifest so the beta exit decision can be validated together with the strict release-gate report.

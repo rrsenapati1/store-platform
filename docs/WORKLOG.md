@@ -2,6 +2,14 @@
 
 ## 2026-04-19
 
+- Started `V2-010` with beta readiness evidence foundation:
+  - added `store_control_plane.launch_readiness` to validate a structured launch manifest against the strict `run_release_gate.py` output instead of relying on disconnected Markdown templates
+  - added `build_launch_readiness_report.py` so operators can turn beta-pilot evidence, known issues, and final sign-offs into one machine-readable JSON report plus a Markdown companion
+  - enriched `release_gate_orchestration.py` so the strict gate report now carries explicit `environment`, `release_version`, and `release_owner` metadata for downstream launch sign-off tooling
+  - refreshed `docs/launch/` for the V2 path with a repo-owned launch-readiness manifest template and updated beta/checklist/go-live guidance
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_launch_readiness.py services/control-plane-api/tests/test_build_launch_readiness_report_script.py services/control-plane-api/tests/test_release_gate_orchestration.py -q`
+
 - Completed `V2-009` release-gate orchestration and track closure:
   - added strict release-gate orchestration in `services/control-plane-api/store_control_plane/release_gate_orchestration.py`
   - added one-shot operator CLI `services/control-plane-api/scripts/run_release_gate.py`

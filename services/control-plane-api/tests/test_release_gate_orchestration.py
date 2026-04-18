@@ -158,8 +158,13 @@ def test_run_release_gate_writes_passed_report_with_retrieval_verification(tmp_p
     assert result["status"] == "passed"
     assert result["certification_status"] == "approved"
     assert result["retained_evidence_status"] == "passed"
+    assert result["environment"] == "prod"
+    assert result["release_version"] == "2026.04.19"
+    assert result["release_owner"] == "ops@store.korsenex.com"
     report_payload = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
     assert report_payload["status"] == "passed"
+    assert report_payload["environment"] == "prod"
+    assert report_payload["release_version"] == "2026.04.19"
     assert report_payload["report_paths"]["vulnerability_scan_report"].endswith("vulnerability-scan-report.json")
 
 

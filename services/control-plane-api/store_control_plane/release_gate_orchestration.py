@@ -367,6 +367,9 @@ def run_release_gate(
     report_payload = {
         "status": final_status,
         "summary": "; ".join(summary_parts),
+        "environment": expected_environment,
+        "release_version": expected_release_version,
+        "release_owner": release_owner,
         "output_dir": str(output_dir),
         "report_paths": {
             "vulnerability_scan_report": str(vulnerability_scan_report_path),

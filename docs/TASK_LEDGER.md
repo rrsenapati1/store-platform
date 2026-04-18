@@ -63,7 +63,7 @@ Updated: 2026-04-19
 | V2-007 | P1 | Done | V2 launch program | Reporting + decision support | Add advanced analytics, operator dashboards, branch performance views, and replenishment/purchase decision support. | Owners and operators can use the platform for management and decision support, not only transaction processing. |
 | V2-008 | P1 | Done | V2 launch program | Vertical extensions | Add pharmacy/prescription controls, serial-number/IMEI tracking, and category-specific compliance modules as isolated vertical capabilities. | Regulated/vertical-specific flows exist without leaking category-specific complexity into the generic retail core. |
 | V2-009 | P0 | Done | V2 launch program | Hardening + scale | Add deeper security, recovery, performance/load validation, operational maturity, and launch-grade hardening across the expanded suite. | The broadened V2 suite meets stronger security, scale, backup/restore, observability, and performance expectations than the smaller release target. |
-| V2-010 | P0 | Todo | V2 launch program | V2 launch readiness + cutover | Run the V2 beta program, certification, cutover reviews, and final launch sign-off for the full enterprise physical-retail suite. | V2 beta evidence exists, parallel required lanes are complete, launch checklists are signed off, and the V2 release candidate is operationally approved. |
+| V2-010 | P0 | In Progress | V2 launch program | V2 launch readiness + cutover | Run the V2 beta program, certification, cutover reviews, and final launch sign-off for the full enterprise physical-retail suite. | V2 beta evidence exists, parallel required lanes are complete, launch checklists are signed off, and the V2 release candidate is operationally approved. |
 
 ## Future Work After V2
 
