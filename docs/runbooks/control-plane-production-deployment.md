@@ -393,6 +393,35 @@ python services/control-plane-api/scripts/build_release_evidence_bundle.py `
 
 Treat `bundle-manifest.json` as the authoritative inventory of what evidence was actually packaged for approval.
 
+## Evidence Publication And Retention
+
+After the evidence bundle is assembled, publish it into a retained release artifact pack:
+
+```powershell
+python services/control-plane-api/scripts/publish_release_evidence_bundle.py `
+  --bundle-dir docs/launch/evidence/prod-evidence-bundle `
+  --output-dir docs/launch/evidence/published `
+  --environment prod `
+  --release-version 2026.04.19
+```
+
+This produces:
+
+- `store-release-evidence-prod-2026.04.19.tar.gz`
+- `prod-2026.04.19.publication.json`
+- `release-evidence-catalog.json`
+
+The publication manifest is the operator-visible retention record for:
+
+- source bundle directory and bundle-manifest hash
+- certification status at publication time
+- archive SHA-256 and archive size
+- published environment and release version
+
+The catalog is the rolling local index of retained evidence packs. Re-publishing the same `environment + release_version` replaces that catalog entry instead of creating duplicates.
+
+This remains an operator-controlled step. The current repo still does not push published evidence packs to object storage or GitHub Releases automatically.
+
 ## Failure Posture
 
 - If pre-migration backup fails: stop deployment.

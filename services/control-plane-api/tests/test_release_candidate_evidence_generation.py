@@ -1027,3 +1027,69 @@ def test_generate_release_candidate_evidence_writes_certification_report_and_bun
         "reports/certification-report.json"
     )
     assert bundle_manifest["directories"]["sbom_artifacts"]["file_count"] == 1
+
+
+def test_generate_release_candidate_evidence_can_publish_bundle(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence.md"
+    evidence_bundle_output_dir = tmp_path / "evidence-bundle"
+    evidence_publication_output_dir = tmp_path / "published-evidence"
+    certification_output_path = tmp_path / "certification-report.json"
+    vulnerability_report_path = tmp_path / "vulnerability-report.json"
+    vulnerability_report_path.write_text(
+        json.dumps({"status": "passed", "surfaces": {}, "failing_surfaces": []}),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.19",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "approved",
+            "environment": "prod",
+            "release_version": "2026.04.19",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.19",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        vulnerability_scan_report_path=vulnerability_report_path,
+        evidence_bundle_output_dir=evidence_bundle_output_dir,
+        certification_output_path=certification_output_path,
+        evidence_publication_output_dir=evidence_publication_output_dir,
+        date_text="2026-04-19",
+    )
+
+    assert result["final_status"] == "approved"
+    publication_result = result["evidence_publication_result"]
+    assert publication_result is not None
+    assert publication_result["status"] == "published"
+    publication_manifest = json.loads(
+        Path(str(publication_result["publication_manifest_path"])).read_text(encoding="utf-8")
+    )
+    assert publication_manifest["environment"] == "prod"
+    assert publication_manifest["release_version"] == "2026.04.19"

@@ -16,6 +16,7 @@ if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
 from store_control_plane.release_evidence_bundle import build_release_evidence_bundle
+from store_control_plane.release_evidence_publication import publish_release_evidence_bundle
 
 
 VerifyCallable = Callable[..., dict[str, object]]
@@ -405,6 +406,7 @@ def generate_release_candidate_evidence(
     restore_drill_report_path: Path | None = None,
     certification_output_path: Path | None = None,
     evidence_bundle_output_dir: Path | None = None,
+    evidence_publication_output_dir: Path | None = None,
     sbom_artifact_dir: Path | None = None,
     vulnerability_raw_output_dir: Path | None = None,
     bearer_token: str | None = None,
@@ -547,8 +549,12 @@ def generate_release_candidate_evidence(
             encoding="utf-8",
         )
 
+    effective_evidence_bundle_output_dir = evidence_bundle_output_dir
+    if effective_evidence_bundle_output_dir is None and evidence_publication_output_dir is not None:
+        effective_evidence_bundle_output_dir = output_path.with_name(f"{output_path.stem}-bundle")
+
     evidence_bundle_result: dict[str, object] | None = None
-    if evidence_bundle_output_dir is not None:
+    if effective_evidence_bundle_output_dir is not None:
         report_paths: dict[str, Path | None] = {
             "release_candidate_evidence": output_path,
             "certification_report": effective_certification_output_path,
@@ -565,7 +571,7 @@ def generate_release_candidate_evidence(
             "restore_drill_report": restore_drill_report_path,
         }
         evidence_bundle_result = build_release_evidence_bundle(
-            output_dir=evidence_bundle_output_dir,
+            output_dir=effective_evidence_bundle_output_dir,
             report_paths=report_paths,
             directory_paths={
                 "sbom_artifacts": sbom_artifact_dir,
@@ -573,11 +579,23 @@ def generate_release_candidate_evidence(
             },
         )
 
+    evidence_publication_result: dict[str, object] | None = None
+    if evidence_publication_output_dir is not None and effective_evidence_bundle_output_dir is not None:
+        resolved_environment = expected_environment or str(deployed_result.get("environment") or "")
+        resolved_release_version = expected_release_version or str(deployed_result.get("release_version") or "")
+        evidence_publication_result = publish_release_evidence_bundle(
+            bundle_dir=effective_evidence_bundle_output_dir,
+            output_dir=evidence_publication_output_dir,
+            release_version=resolved_release_version,
+            environment=resolved_environment,
+        )
+
     return {
         "final_status": certification_result.get("status"),
         "output_path": str(output_path),
         "certification_output_path": None if effective_certification_output_path is None else str(effective_certification_output_path),
         "evidence_bundle_result": evidence_bundle_result,
+        "evidence_publication_result": evidence_publication_result,
         "local_result": local_result,
         "performance_result": performance_result,
         "operational_alert_result": operational_alert_result,
@@ -614,6 +632,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--restore-drill-report", help="Optional JSON restore-drill report path produced by run_restore_drill.py.")
     parser.add_argument("--certification-output-path", help="Optional JSON file path where the certification result should be written.")
     parser.add_argument("--evidence-bundle-output-dir", help="Optional directory where a release evidence bundle should be assembled.")
+    parser.add_argument("--evidence-publication-output-dir", help="Optional directory where the assembled evidence bundle should be archived and cataloged.")
     parser.add_argument("--sbom-artifact-dir", help="Optional directory containing raw SBOM artifacts to include in the evidence bundle.")
     parser.add_argument("--vulnerability-raw-output-dir", help="Optional directory containing raw vulnerability scan output to include in the evidence bundle.")
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
@@ -649,6 +668,7 @@ def main() -> None:
         restore_drill_report_path=Path(args.restore_drill_report) if args.restore_drill_report else None,
         certification_output_path=Path(args.certification_output_path) if args.certification_output_path else None,
         evidence_bundle_output_dir=Path(args.evidence_bundle_output_dir) if args.evidence_bundle_output_dir else None,
+        evidence_publication_output_dir=Path(args.evidence_publication_output_dir) if args.evidence_publication_output_dir else None,
         sbom_artifact_dir=Path(args.sbom_artifact_dir) if args.sbom_artifact_dir else None,
         vulnerability_raw_output_dir=Path(args.vulnerability_raw_output_dir) if args.vulnerability_raw_output_dir else None,
         bearer_token=args.bearer_token,

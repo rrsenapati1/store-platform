@@ -275,6 +275,37 @@ python services/control-plane-api/scripts/build_release_evidence_bundle.py `
   --sbom-artifact-dir docs\launch\evidence\prod-sbom-artifacts
 ```
 
+To archive that assembled pack into a versioned retained artifact with a publication manifest and rolling catalog, run:
+
+```powershell
+python services/control-plane-api/scripts/publish_release_evidence_bundle.py `
+  --bundle-dir docs\launch\evidence\prod-evidence-bundle `
+  --output-dir docs\launch\evidence\published `
+  --environment prod `
+  --release-version 2026.04.19
+```
+
+That publication step writes:
+
+- `store-release-evidence-<environment>-<version>.tar.gz`
+- `<environment>-<version>.publication.json`
+- `release-evidence-catalog.json`
+
+`generate_release_candidate_evidence.py` can also do bundle assembly and publication in one run with:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.19 `
+  --output-path docs\launch\evidence\prod-rc-evidence.md `
+  --certification-output-path docs\launch\evidence\prod-certification-report.json `
+  --evidence-bundle-output-dir docs\launch\evidence\prod-evidence-bundle `
+  --evidence-publication-output-dir docs\launch\evidence\published
+```
+
+If publication is requested and no explicit bundle directory is supplied, the script now creates an adjacent bundle directory automatically before publishing it.
+
 `certify_release_candidate.py` can also consume a saved performance report directly:
 
 ```powershell

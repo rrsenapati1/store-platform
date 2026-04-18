@@ -1,6 +1,6 @@
 # GitHub Actions Release Automation
 
-Updated: 2026-04-18
+Updated: 2026-04-19
 
 ## Purpose
 
@@ -11,6 +11,12 @@ Updated: 2026-04-18
 - GitHub Release attachment for backend, web, and desktop artifacts
 
 This automation does **not** deploy directly to your VMs and does **not** publish to object storage. Operators still control promotion from GitHub artifacts into the existing `CP-024` and `CP-022` deployment runbooks.
+
+This automation also does **not** publish post-deploy release-evidence packs. Those are generated and retained after deployment verification through:
+
+- `generate_release_candidate_evidence.py`
+- `build_release_evidence_bundle.py`
+- `publish_release_evidence_bundle.py`
 
 ## Workflows
 
@@ -179,5 +185,6 @@ This task deliberately stops before:
 - uploading to object storage from GitHub
 - applying migrations from GitHub Actions
 - restarting production services from GitHub Actions
+- publishing post-deploy evidence packs from GitHub Actions
 
 That boundary remains manual until you explicitly choose to trust GitHub as part of the deployment authority path.

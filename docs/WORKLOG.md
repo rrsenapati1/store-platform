@@ -1021,6 +1021,15 @@
   - `python -m pytest services/control-plane-api/tests/test_release_evidence_bundle.py services/control-plane-api/tests/test_build_release_evidence_bundle_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py -q`
   - `python services/control-plane-api/scripts/build_release_evidence_bundle.py --help`
   - `git -c core.safecrlf=false diff --check`
+- Added V2-009 release evidence publication foundation:
+  - archived evidence publication in `store_control_plane/release_evidence_publication.py`
+  - standalone `publish_release_evidence_bundle.py` CLI
+  - optional one-shot publication from `generate_release_candidate_evidence.py`
+  - publication manifest + rolling catalog for retained evidence packs
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_release_evidence_publication.py services/control-plane-api/tests/test_publish_release_evidence_bundle_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py -q`
+  - `python services/control-plane-api/scripts/publish_release_evidence_bundle.py --help`
+  - `git -c core.safecrlf=false diff --check`
 - 2026-04-18: Completed `V2-009` alert verification foundation.
   - Added `store_control_plane.operational_alerts` to normalize release-blocking alert checks from observability and deployed security posture.
   - Added `scripts/verify_operational_alert_posture.py` to emit machine-readable operational alert evidence with release-safe exit status.
