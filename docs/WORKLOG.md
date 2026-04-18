@@ -2,6 +2,21 @@
 
 ## 2026-04-19
 
+- Closed `V2-004` end-to-end on current `main`:
+  - verified the full store-operations depth track now exists across control-plane authority, owner-web, store-desktop, and the shared Android mobile/tablet runtime: reviewed receiving, reviewed stock counts, reviewed expiry disposition, replenishment policy, shelf/backroom restock tasks, assisted restock, and replenishment-board-driven execution
+  - fixed stale backend expiry-flow coverage so it now opens a branch cashier session before posting the sale that drains batch lots, matching the `V2-006` cashier-session governance contract already required by billing
+  - marked `V2-004` complete in `docs/TASK_LEDGER.md`
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_replenishment_flow.py services/control-plane-api/tests/test_receiving_foundation_flow.py services/control-plane-api/tests/test_batch_expiry_flow.py services/control-plane-api/tests/test_inventory_control_flow.py services/control-plane-api/tests/test_restock_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- OwnerWorkspace.replenishment.test.tsx OwnerWorkspace.receiving.test.tsx OwnerWorkspace.batch-expiry.test.tsx OwnerWorkspace.inventory-control.test.tsx OwnerWorkspace.restock.test.tsx`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop -- client.receiving.test.ts client.batch-expiry.test.ts client.stock-count.test.ts StoreRuntimeWorkspace.receiving.test.tsx StoreRuntimeWorkspace.batch-expiry.test.tsx StoreRuntimeWorkspace.stock-count.test.tsx StoreRuntimeWorkspace.restock.test.tsx StoreReceivingSection.test.tsx StoreStockCountSection.test.tsx StoreRestockSection.test.tsx`
+  - `npm run ci:store-mobile`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+
 - Extended `V2-010` with launch-artifact bundle integration:
   - extended the release evidence bundle CLI and publication surface so the `V2` launch-readiness report and manifest can travel in the same archived evidence pack as the strict technical gate
   - surfaced `launch_readiness_status` in the publication manifest and rolling evidence catalog so downstream launch tooling can tell whether a retained pack included a ready launch decision

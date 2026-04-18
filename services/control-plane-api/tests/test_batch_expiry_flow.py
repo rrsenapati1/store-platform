@@ -20,6 +20,65 @@ def _exchange(client: TestClient, *, subject: str, email: str, name: str) -> dic
     return response.json()
 
 
+def _open_cashier_session(
+    client: TestClient,
+    *,
+    tenant_id: str,
+    branch_id: str,
+    owner_headers: dict[str, str],
+    cashier_headers: dict[str, str],
+) -> str:
+    staff_profile = client.post(
+        f"/v1/tenants/{tenant_id}/staff-profiles",
+        headers=owner_headers,
+        json={
+            "email": "cashier@acme.local",
+            "full_name": "Counter Cashier",
+            "phone_number": "9876543210",
+            "primary_branch_id": branch_id,
+        },
+    )
+    assert staff_profile.status_code == 200
+    staff_profile_id = staff_profile.json()["id"]
+
+    device = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/devices",
+        headers=owner_headers,
+        json={
+            "device_name": "Counter Desktop 1",
+            "device_code": "BLR-POS-01",
+            "session_surface": "store_desktop",
+            "assigned_staff_profile_id": staff_profile_id,
+        },
+    )
+    assert device.status_code == 200
+    device_id = device.json()["id"]
+
+    attendance_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/attendance-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": device_id,
+            "staff_profile_id": staff_profile_id,
+            "clock_in_note": "Morning shift attendance",
+        },
+    )
+    assert attendance_session.status_code == 200
+
+    cashier_session = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/cashier-sessions",
+        headers=cashier_headers,
+        json={
+            "device_registration_id": device_id,
+            "staff_profile_id": staff_profile_id,
+            "opening_float_amount": 500.0,
+            "opening_note": "Morning shift",
+        },
+    )
+    assert cashier_session.status_code == 200
+    return cashier_session.json()["id"]
+
+
 def test_owner_records_goods_receipt_batch_lots_and_approves_reviewed_expiry_write_off() -> None:
     database_url = sqlite_test_database_url("batch-expiry-foundation")
     client = TestClient(
@@ -146,10 +205,28 @@ def test_owner_records_goods_receipt_batch_lots_and_approves_reviewed_expiry_wri
     assert initial_report.json()["tracked_lot_count"] == 2
     assert initial_report.json()["expiring_soon_count"] == 1
 
+    branch_membership = client.post(
+        f"/v1/tenants/{tenant_id}/branches/{branch_id}/memberships",
+        headers=owner_headers,
+        json={"email": "cashier@acme.local", "full_name": "Counter Cashier", "role_name": "cashier"},
+    )
+    assert branch_membership.status_code == 200
+
+    cashier_session = _exchange(client, subject="cashier-1", email="cashier@acme.local", name="Counter Cashier")
+    cashier_headers = {"authorization": f"Bearer {cashier_session['access_token']}"}
+    cashier_session_id = _open_cashier_session(
+        client,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        owner_headers=owner_headers,
+        cashier_headers=cashier_headers,
+    )
+
     sale = client.post(
         f"/v1/tenants/{tenant_id}/branches/{branch_id}/sales",
-        headers=owner_headers,
+        headers=cashier_headers,
         json={
+            "cashier_session_id": cashier_session_id,
             "customer_name": "Walk In",
             "customer_gstin": None,
             "payment_method": "Cash",
