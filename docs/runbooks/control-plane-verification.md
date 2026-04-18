@@ -73,6 +73,68 @@ Optional:
 
 - pass `--bearer-token <token>` if you also want the script to verify `/v1/auth/me`
 
+## Run The Launch-Foundation Performance Validation Lane
+
+From `services/control-plane-api/` or repo root with the database URL available:
+
+```powershell
+python scripts/validate_performance_foundation.py `
+  --database-url postgresql+asyncpg://postgres:postgres@localhost:54321/store_control_plane `
+  --iterations 3 `
+  --output-path ..\..\docs\launch\evidence\performance-launch-foundation.json
+```
+
+What this validates:
+
+- checkout price preview
+- direct sale creation
+- checkout payment-session creation
+- offline sale replay
+- reviewed receiving creation
+- restock task lifecycle
+- reviewed stock count lifecycle
+- branch reporting dashboard read
+
+The output is a machine-readable JSON report with:
+
+- `status`
+- `scenario_set`
+- `scenario_results`
+- `passing_scenarios`
+- `failing_scenarios`
+- `total_iterations`
+- `total_failures`
+
+This lane is the first bounded performance gate for the broadened V2 suite. It is intentionally an in-process validation harness, not an internet-scale external load test.
+
+## Release Evidence Integration
+
+`generate_release_candidate_evidence.py` now runs the performance-validation lane by default unless you explicitly pass:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --skip-performance-validation
+```
+
+If you do not skip it, the evidence markdown records:
+
+- the performance validation command
+- the result status
+- a compact scenario summary
+
+`certify_release_candidate.py` can also consume a saved performance report directly:
+
+```powershell
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --performance-report docs\launch\evidence\performance-launch-foundation.json
+```
+
 ## Expected Success Signal
 
 The script exits `0` and prints a JSON summary with:
@@ -90,6 +152,7 @@ The script exits `0` and prints a JSON summary with:
 - If backend pytest fails, treat the backend as unhealthy even if the smoke passes.
 - If app-flow tests fail, do not mark the current UI/runtime surface healthy.
 - If the smoke fails after tests pass, treat it as an integration regression between control-plane modules.
+- If performance validation fails, treat the release evidence as incomplete until the failing scenarios are understood and the budgets are re-met or intentionally revised.
 
 ## Cleanup
 

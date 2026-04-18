@@ -18,6 +18,7 @@ if str(SERVICE_ROOT) not in sys.path:
 
 VerifyCallable = Callable[..., dict[str, object]]
 LocalVerifyCallable = Callable[[], dict[str, object]]
+PerformanceVerifyCallable = Callable[[], dict[str, object]]
 
 
 def _load_script_module(script_name: str, module_name: str):
@@ -46,6 +47,40 @@ def _default_local_verify() -> dict[str, object]:
     }
 
 
+def _default_performance_validate(*, output_path: Path) -> dict[str, object]:
+    command = [
+        sys.executable,
+        str(SERVICE_ROOT / "scripts" / "validate_performance_foundation.py"),
+        "--iterations",
+        "3",
+        "--output-path",
+        str(output_path),
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    summary = (completed.stdout or completed.stderr).strip() or f"exit code {completed.returncode}"
+    payload: dict[str, object]
+    if output_path.exists():
+        payload = json.loads(output_path.read_text(encoding="utf-8"))
+    else:
+        payload = {"status": "failed" if completed.returncode != 0 else "passed"}
+    payload["status"] = "passed" if completed.returncode == 0 and payload.get("status") == "passed" else "failed"
+    payload["command"] = " ".join(command)
+    failing_scenarios = list(payload.get("failing_scenarios") or [])
+    scenario_results = list(payload.get("scenario_results") or [])
+    payload["summary"] = payload.get("summary") or (
+        f"{len(scenario_results)} scenarios passed"
+        if not failing_scenarios and scenario_results
+        else f"{len(failing_scenarios)} scenarios failed: {', '.join(failing_scenarios)}"
+    )
+    return payload
+
+
 def _stringify_domains(domains: list[str]) -> str:
     return ", ".join(domains) if domains else "none"
 
@@ -57,6 +92,7 @@ def _render_markdown(
     release_owner: str | None,
     date_text: str,
     local_result: dict[str, object],
+    performance_result: dict[str, object],
     deployed_result: dict[str, object],
     certification_result: dict[str, object],
 ) -> str:
@@ -80,6 +116,9 @@ def _render_markdown(
             f"- Local verification command: {local_result.get('command') or 'not-run'}",
             f"  - result: {local_result.get('status')}",
             f"  - summary: {local_result.get('summary') or 'not-run'}",
+            f"- Performance validation command: {performance_result.get('command') or 'not-run'}",
+            f"  - result: {performance_result.get('status')}",
+            f"  - summary: {performance_result.get('summary') or 'not-run'}",
             "- Deployed verification command: python services/control-plane-api/scripts/verify_deployed_control_plane.py --base-url ... --expected-environment ... --expected-release-version ...",
             f"  - result: {deployed_result.get('status')}",
             f"  - summary: environment={deployed_result.get('environment')} release_version={deployed_result.get('release_version')}",
@@ -109,7 +148,9 @@ def generate_release_candidate_evidence(
     output_path: Path,
     bearer_token: str | None = None,
     run_local_verification: bool = True,
+    run_performance_validation: bool = True,
     local_verify: LocalVerifyCallable | None = None,
+    performance_validate: PerformanceVerifyCallable | None = None,
     verify_deployed: VerifyCallable | None = None,
     certify_release_candidate: VerifyCallable | None = None,
     date_text: str | None = None,
@@ -130,6 +171,12 @@ def generate_release_candidate_evidence(
         if run_local_verification
         else {"status": "skipped", "command": "not-run", "summary": "not-run"}
     )
+    performance_output_path = output_path.with_name(f"{output_path.stem}-performance.json")
+    performance_result = (
+        (performance_validate or (lambda: _default_performance_validate(output_path=performance_output_path)))()
+        if run_performance_validation
+        else {"status": "skipped", "command": "not-run", "summary": "not-run"}
+    )
     deployed_result = deployed_verifier(
         base_url=base_url,
         expected_environment=expected_environment,
@@ -141,6 +188,7 @@ def generate_release_candidate_evidence(
         expected_environment=expected_environment,
         expected_release_version=expected_release_version,
         bearer_token=bearer_token,
+        performance_result=None if performance_result.get("status") == "skipped" else performance_result,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -151,6 +199,7 @@ def generate_release_candidate_evidence(
             release_owner=release_owner,
             date_text=effective_date_text,
             local_result=local_result,
+            performance_result=performance_result,
             deployed_result=deployed_result,
             certification_result=certification_result,
         ),
@@ -161,6 +210,7 @@ def generate_release_candidate_evidence(
         "final_status": certification_result.get("status"),
         "output_path": str(output_path),
         "local_result": local_result,
+        "performance_result": performance_result,
         "deployed_result": deployed_result,
         "certification_result": certification_result,
     }
@@ -175,6 +225,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-path", help="Markdown file path for the generated evidence document.")
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
     parser.add_argument("--skip-local-verification", action="store_true", help="Skip the local verify_control_plane.py run.")
+    parser.add_argument("--skip-performance-validation", action="store_true", help="Skip the local performance validation run.")
     return parser.parse_args()
 
 
@@ -195,6 +246,7 @@ def main() -> None:
         output_path=output_path,
         bearer_token=args.bearer_token,
         run_local_verification=not args.skip_local_verification,
+        run_performance_validation=not args.skip_performance_validation,
     )
     print(json.dumps(result, indent=2))
 

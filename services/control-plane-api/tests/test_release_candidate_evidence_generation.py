@@ -50,6 +50,15 @@ def test_generate_release_candidate_evidence_writes_markdown_with_verification_r
             },
         }
 
+    def fake_performance_validate() -> dict[str, object]:
+        return {
+            "status": "passed",
+            "command": "python services/control-plane-api/scripts/validate_performance_foundation.py",
+            "summary": "8 scenarios passed",
+            "scenario_set": "launch-foundation",
+            "failing_scenarios": [],
+        }
+
     result = module.generate_release_candidate_evidence(
         base_url="https://control.staging.store.korsenex.com",
         expected_environment="staging",
@@ -59,6 +68,7 @@ def test_generate_release_candidate_evidence_writes_markdown_with_verification_r
         local_verify=fake_local_verify,
         verify_deployed=fake_verify_deployed,
         certify_release_candidate=fake_certify,
+        performance_validate=fake_performance_validate,
         date_text="2026-04-15",
     )
 
@@ -69,6 +79,8 @@ def test_generate_release_candidate_evidence_writes_markdown_with_verification_r
     assert "Environment: staging" in content
     assert "Release owner: ops@store.korsenex.com" in content
     assert "local verification passed" in content
+    assert "python services/control-plane-api/scripts/validate_performance_foundation.py" in content
+    assert "8 scenarios passed" in content
     assert "`legacy_write_mode`: cutover" in content
     assert "`legacy_remaining_domains`: none" in content
     assert "Status: approved" in content
@@ -110,6 +122,7 @@ def test_generate_release_candidate_evidence_records_blocked_state_and_skipped_l
         release_owner="release@store.korsenex.com",
         output_path=output_path,
         run_local_verification=False,
+        run_performance_validation=False,
         verify_deployed=fake_verify_deployed,
         certify_release_candidate=fake_certify,
         date_text="2026-04-15",
@@ -118,6 +131,7 @@ def test_generate_release_candidate_evidence_records_blocked_state_and_skipped_l
     assert result["final_status"] == "blocked"
     content = output_path.read_text(encoding="utf-8")
     assert "result: skipped" in content
+    assert "Performance validation command: not-run" in content
     assert "`legacy_write_mode`: shadow" in content
     assert "`legacy_remaining_domains`: legacy_customer_reads" in content
     assert "Status: blocked" in content

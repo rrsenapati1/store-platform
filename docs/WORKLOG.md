@@ -2,6 +2,18 @@
 
 ## 2026-04-18
 
+- Started `V2-009` with performance/load validation foundation:
+  - added a reusable control-plane performance budget engine for launch-foundation scenario evaluation, including p95 latency, error-rate, and throughput checks
+  - added an in-process performance workload runner for the highest-risk V2 paths: checkout preview, direct sale creation, payment-session creation, offline replay, reviewed receiving, restock, reviewed stock count, and branch reporting dashboard reads
+  - added `validate_performance_foundation.py` to generate machine-readable JSON evidence for the launch-foundation scenario set
+  - extended release-candidate evidence generation and certification so performance posture can be recorded and treated as a release gate when supplied
+  - updated the control-plane verification runbook with the new performance-validation and certification path
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_performance_validation.py -q`
+  - `python -m pytest services/control-plane-api/tests/test_release_candidate_evidence_generation.py -q`
+  - `python -m pytest services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `python services/control-plane-api/scripts/validate_performance_foundation.py --database-url sqlite+aiosqlite:///D:/codes/.runtime/temp/v2-009-performance-foundation.sqlite --iterations 1 --output-path D:/codes/.runtime/temp/v2-009-performance-report.json`
+
 - Completed `V2-008` end-to-end with serialized inventory, prescription capture, and regulated checkout compliance:
   - added control-plane serialized inventory authority with receipt-time serial capture, serialized-unit availability, sale-time serial enforcement, and sale-line snapshots that preserve compliance posture alongside IMEI or serial allocations
   - extended catalog and barcode foundations with isolated `compliance_profile` and `compliance_config` support so vertical-specific product rules stay modular instead of leaking pharmacy or age-restriction logic into generic pricing and inventory paths
