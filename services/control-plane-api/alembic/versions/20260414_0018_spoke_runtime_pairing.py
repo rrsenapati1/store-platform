@@ -22,7 +22,20 @@ def upgrade() -> None:
         "device_registrations",
         sa.Column("runtime_profile", sa.String(length=64), nullable=False, server_default="desktop_spoke"),
     )
+    op.add_column(
+        "device_registrations",
+        sa.Column("is_branch_hub", sa.Boolean(), nullable=False, server_default=sa.false()),
+    )
+    op.add_column(
+        "device_registrations",
+        sa.Column("sync_secret_hash", sa.String(length=128), nullable=True),
+    )
+    op.add_column(
+        "device_registrations",
+        sa.Column("sync_secret_issued_at", sa.DateTime(), nullable=True),
+    )
     op.alter_column("device_registrations", "runtime_profile", server_default=None)
+    op.alter_column("device_registrations", "is_branch_hub", server_default=None)
 
     op.execute("UPDATE device_registrations SET runtime_profile = 'branch_hub' WHERE is_branch_hub = true")
 
@@ -101,4 +114,7 @@ def downgrade() -> None:
     op.drop_index("ix_spoke_runtime_activations_branch_id", table_name="spoke_runtime_activations")
     op.drop_index("ix_spoke_runtime_activations_tenant_id", table_name="spoke_runtime_activations")
     op.drop_table("spoke_runtime_activations")
+    op.drop_column("device_registrations", "sync_secret_issued_at")
+    op.drop_column("device_registrations", "sync_secret_hash")
+    op.drop_column("device_registrations", "is_branch_hub")
     op.drop_column("device_registrations", "runtime_profile")

@@ -18,21 +18,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "sales",
-        sa.Column(
-            "customer_voucher_id",
-            sa.String(length=32),
-            sa.ForeignKey("customer_voucher_assignments.id", ondelete="SET NULL"),
-            nullable=True,
-        ),
-    )
-    op.add_column("sales", sa.Column("customer_voucher_name", sa.String(length=255), nullable=True))
-    op.add_column("sales", sa.Column("customer_voucher_discount_total", sa.Float(), nullable=False, server_default="0"))
-    op.create_index("ix_sales_customer_voucher_id", "sales", ["customer_voucher_id"])
-
-    op.add_column("sale_lines", sa.Column("customer_voucher_discount_amount", sa.Float(), nullable=False, server_default="0"))
-
     op.create_table(
         "customer_voucher_assignments",
         sa.Column("id", sa.String(length=32), primary_key=True),
@@ -76,6 +61,21 @@ def upgrade() -> None:
     op.create_index("ix_customer_voucher_assignments_voucher_code", "customer_voucher_assignments", ["voucher_code"])
     op.create_index("ix_customer_voucher_assignments_status", "customer_voucher_assignments", ["status"])
     op.create_index("ix_customer_voucher_assignments_redeemed_sale_id", "customer_voucher_assignments", ["redeemed_sale_id"])
+
+    op.add_column(
+        "sales",
+        sa.Column(
+            "customer_voucher_id",
+            sa.String(length=32),
+            sa.ForeignKey("customer_voucher_assignments.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+    op.add_column("sales", sa.Column("customer_voucher_name", sa.String(length=255), nullable=True))
+    op.add_column("sales", sa.Column("customer_voucher_discount_total", sa.Float(), nullable=False, server_default="0"))
+    op.create_index("ix_sales_customer_voucher_id", "sales", ["customer_voucher_id"])
+
+    op.add_column("sale_lines", sa.Column("customer_voucher_discount_amount", sa.Float(), nullable=False, server_default="0"))
 
 
 def downgrade() -> None:
