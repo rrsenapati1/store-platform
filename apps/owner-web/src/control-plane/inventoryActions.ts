@@ -22,7 +22,12 @@ export async function runCreateGoodsReceipt(params: {
   branchId: string;
   purchaseOrderId: string;
   note: string;
-  lines: Array<{ product_id: string; received_quantity: number; discrepancy_note: string }>;
+  lines: Array<{
+    product_id: string;
+    received_quantity: number;
+    discrepancy_note: string;
+    serial_numbers: string[];
+  }>;
   setIsBusy: (value: boolean) => void;
   setErrorMessage: SetString;
   setLatestGoodsReceipt: (value: ControlPlaneGoodsReceipt | null) => void;
@@ -59,6 +64,7 @@ export async function runCreateGoodsReceipt(params: {
         product_id: line.product_id,
         received_quantity: line.received_quantity,
         discrepancy_note: line.discrepancy_note || null,
+        serial_numbers: line.serial_numbers.length ? line.serial_numbers : null,
       })),
     });
     const [goodsReceiptList, board, ledger, snapshot] = await Promise.all([

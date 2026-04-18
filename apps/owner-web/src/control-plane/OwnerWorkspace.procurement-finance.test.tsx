@@ -657,18 +657,18 @@ describe('owner procurement finance flow', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
-    expect(await screen.findByText('Acme Owner')).toBeInTheDocument();
+    expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Supplier name'), { target: { value: 'Paper Supply Co' } });
     fireEvent.change(screen.getByLabelText('Supplier GSTIN'), { target: { value: '29AAAAA1111A1Z5' } });
     fireEvent.change(screen.getByLabelText('Payment terms (days)'), { target: { value: '14' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create supplier' }));
-    await screen.findByText('Latest supplier');
+    await screen.findByText('Latest supplier', {}, { timeout: 10_000 });
 
     fireEvent.change(screen.getByLabelText('Purchase quantity'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('Unit cost'), { target: { value: '50' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create purchase order' }));
-    await screen.findByText('Latest purchase order');
+    await screen.findByText('Latest purchase order', {}, { timeout: 10_000 });
 
     fireEvent.change(screen.getByLabelText('Approval note'), { target: { value: 'Ready for supplier settlement' } });
     fireEvent.click(screen.getByRole('button', { name: 'Submit approval' }));

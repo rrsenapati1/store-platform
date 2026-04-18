@@ -22,6 +22,9 @@ class BarcodeScanLookupResponse(BaseModel):
     selling_price: float
     stock_on_hand: float
     availability_status: str
+    tracking_mode: str
+    compliance_profile: str
+    compliance_config: dict[str, object]
     reorder_point: float | None = None
     target_stock: float | None = None
     automatic_discount_hint: dict[str, object] | None = None

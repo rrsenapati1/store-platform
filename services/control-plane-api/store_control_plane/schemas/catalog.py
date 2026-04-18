@@ -14,6 +14,9 @@ class CatalogProductCreateRequest(BaseModel):
     mrp: float | None = Field(default=None, gt=0)
     category_code: str | None = None
     selling_price: float = Field(gt=0)
+    tracking_mode: str = "STANDARD"
+    compliance_profile: str = "NONE"
+    compliance_config: dict[str, object] = Field(default_factory=dict)
 
 
 class CatalogProductResponse(BaseModel):
@@ -27,6 +30,9 @@ class CatalogProductResponse(BaseModel):
     mrp: float
     category_code: str | None = None
     selling_price: float
+    tracking_mode: str
+    compliance_profile: str
+    compliance_config: dict[str, object]
     status: str
 
 
@@ -41,6 +47,9 @@ class CatalogProductRecord(BaseModel):
     mrp: float
     category_code: str | None = None
     selling_price: float
+    tracking_mode: str
+    compliance_profile: str
+    compliance_config: dict[str, object]
     status: str
 
 
@@ -68,6 +77,9 @@ class BranchCatalogItemResponse(BaseModel):
     gst_rate: float
     mrp: float
     category_code: str | None = None
+    tracking_mode: str
+    compliance_profile: str
+    compliance_config: dict[str, object]
     base_selling_price: float
     selling_price_override: float | None
     effective_selling_price: float

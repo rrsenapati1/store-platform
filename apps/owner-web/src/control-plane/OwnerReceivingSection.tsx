@@ -70,6 +70,8 @@ export function OwnerReceivingSection({ workspace }: { workspace: OwnerWorkspace
 
         {workspace.latestPurchaseOrder?.lines.map((line) => {
           const reviewedLine = workspace.receivingLineDrafts.find((entry) => entry.product_id === line.product_id);
+          const branchCatalogItem = workspace.branchCatalogItems.find((entry) => entry.product_id === line.product_id);
+          const isSerialized = branchCatalogItem?.tracking_mode === 'SERIALIZED';
           const receivedQuantity = Number(reviewedLine?.received_quantity ?? line.quantity) || 0;
           const varianceQuantity = Math.max(line.quantity - receivedQuantity, 0);
           return (
@@ -100,6 +102,16 @@ export function OwnerReceivingSection({ workspace }: { workspace: OwnerWorkspace
                 onChange={(value) => workspace.setReceivingLineDiscrepancyNote(line.product_id, value)}
                 placeholder="Short shipment, damaged cartons, supplier holdback"
               />
+              {isSerialized ? (
+                <FormField
+                  id={`receiving-serial-numbers-${line.product_id}`}
+                  label={`Serial / IMEI numbers for ${line.product_name}`}
+                  value={reviewedLine?.serial_numbers ?? ''}
+                  onChange={(value) => workspace.setReceivingLineSerialNumbers(line.product_id, value)}
+                  placeholder="One serial per line or comma separated"
+                  multiline
+                />
+              ) : null}
               <p style={{ margin: 0, color: '#4e5871' }}>Variance: {varianceQuantity}</p>
             </div>
           );
@@ -166,6 +178,7 @@ export function OwnerReceivingSection({ workspace }: { workspace: OwnerWorkspace
                 <li key={line.product_id}>
                   {line.product_name} :: received {line.quantity} / ordered {line.ordered_quantity ?? line.quantity} :: variance {line.variance_quantity ?? Math.max((line.ordered_quantity ?? line.quantity) - line.quantity, 0)}
                   {line.discrepancy_note ? ` :: ${line.discrepancy_note}` : ''}
+                  {line.serial_numbers?.length ? ` :: serials ${line.serial_numbers.join(', ')}` : ''}
                 </li>
               ))}
             </ul>

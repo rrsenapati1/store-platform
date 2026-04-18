@@ -15,6 +15,7 @@ class GoodsReceiptLineReceiveRequest(BaseModel):
     product_id: str
     received_quantity: float
     discrepancy_note: str | None = None
+    serial_numbers: list[str] | None = None
 
 
 class StockAdjustmentCreateRequest(BaseModel):
@@ -142,6 +143,7 @@ class GoodsReceiptLineResponse(BaseModel):
     unit_cost: float
     line_total: float
     discrepancy_note: str | None = None
+    serial_numbers: list[str] = []
 
 
 class GoodsReceiptResponse(BaseModel):

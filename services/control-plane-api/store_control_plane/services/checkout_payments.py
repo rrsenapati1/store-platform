@@ -367,7 +367,15 @@ class CheckoutPaymentsService:
         )
         return {
             **preview,
-            "requested_lines": [{"product_id": str(line["product_id"]), "quantity": float(line["quantity"])} for line in lines],
+            "requested_lines": [
+                {
+                    "product_id": str(line["product_id"]),
+                    "quantity": float(line["quantity"]),
+                    "serial_numbers": list(line.get("serial_numbers") or []),
+                    "compliance_capture": dict(preview_line.get("compliance_capture") or {}),
+                }
+                for line, preview_line in zip(lines, preview["lines"], strict=False)
+            ],
         }
 
     async def _create_payment_session_record(

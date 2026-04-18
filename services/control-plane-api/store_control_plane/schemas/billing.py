@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 class SaleLineCreateRequest(BaseModel):
     product_id: str
     quantity: float = Field(gt=0)
+    serial_numbers: list[str] | None = None
+    compliance_capture: dict[str, object] | None = None
 
 
 class SaleCreateRequest(BaseModel):
@@ -106,6 +108,9 @@ class CheckoutPricePreviewLineResponse(BaseModel):
     product_name: str
     sku_code: str
     quantity: float
+    serial_numbers: list[str] | None = None
+    compliance_profile: str = "NONE"
+    compliance_capture: dict[str, object] | None = None
     mrp: float
     unit_selling_price: float
     automatic_discount_amount: float = 0
@@ -202,6 +207,9 @@ class SaleLineResponse(BaseModel):
     sku_code: str
     hsn_sac_code: str
     quantity: float
+    serial_numbers: list[str] | None = None
+    compliance_profile: str = "NONE"
+    compliance_capture: dict[str, object] | None = None
     mrp: float = 0
     unit_selling_price: float = 0
     unit_price: float

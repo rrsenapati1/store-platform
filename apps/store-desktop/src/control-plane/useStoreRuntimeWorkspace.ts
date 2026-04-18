@@ -92,6 +92,8 @@ import { runLoadSelectedCustomerCommercialState } from './storeCustomerCommercia
 import { normalizeGiftCardCodeInput, resolveGiftCardCodePayload } from './storeGiftCardActions';
 import { normalizePromotionCodeInput, resolvePromotionCodePayload } from './storePromotionActions';
 import { runLoadCheckoutPricePreview } from './storePricingPreviewActions';
+import type { StoreSaleComplianceDraft } from './storeSaleComplianceActions';
+import { buildSerializedSaleLineInput, isSerializedCatalogItem } from './storeSerializedSaleActions';
 import {
   runApproveStockCountSession,
   runCancelStockCountSession,
@@ -224,6 +226,12 @@ export function useStoreRuntimeWorkspace() {
   const [storeCreditAmount, setStoreCreditAmount] = useState('');
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState('');
   const [saleQuantity, setSaleQuantity] = useState('1');
+  const [saleSerialNumbers, setSaleSerialNumbers] = useState('');
+  const [salePrescriptionNumber, setSalePrescriptionNumber] = useState('');
+  const [salePatientName, setSalePatientName] = useState('');
+  const [salePrescriberName, setSalePrescriberName] = useState('');
+  const [saleAgeVerified, setSaleAgeVerified] = useState(false);
+  const [saleAgeVerificationId, setSaleAgeVerificationId] = useState('');
   const [scannedBarcode, setScannedBarcode] = useState('');
   const [restockRequestedQuantity, setRestockRequestedQuantity] = useState('');
   const [restockPickedQuantity, setRestockPickedQuantity] = useState('');
@@ -273,13 +281,20 @@ export function useStoreRuntimeWorkspace() {
 
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? actor?.branch_memberships[0]?.tenant_id ?? '';
   const branchId = actor?.branch_memberships[0]?.branch_id ?? branches[0]?.branch_id ?? '';
-  const selectedCatalogItem = branchCatalogItems[0] ?? null;
-  const selectedRuntimeDevice = runtimeDevices.find((device) => device.id === selectedRuntimeDeviceId) ?? runtimeDevices[0] ?? null;
-  const parsedGiftCardAmount = Number(giftCardAmount || 0);
-  const parsedStoreCreditAmount = selectedCustomerProfile ? Number(storeCreditAmount || 0) : 0;
-  const parsedLoyaltyPointsToRedeem = selectedCustomerProfile ? Number(loyaltyPointsToRedeem || 0) : 0;
-  const selectedCustomerVoucher = selectedCustomerVouchers.find((record) => record.id === selectedCustomerVoucherId) ?? null;
-  const runtimeHardware = useStoreRuntimeHardwareIntegration({
+const selectedCatalogItem = branchCatalogItems[0] ?? null;
+const selectedRuntimeDevice = runtimeDevices.find((device) => device.id === selectedRuntimeDeviceId) ?? runtimeDevices[0] ?? null;
+const parsedGiftCardAmount = Number(giftCardAmount || 0);
+const parsedStoreCreditAmount = selectedCustomerProfile ? Number(storeCreditAmount || 0) : 0;
+const parsedLoyaltyPointsToRedeem = selectedCustomerProfile ? Number(loyaltyPointsToRedeem || 0) : 0;
+const selectedCustomerVoucher = selectedCustomerVouchers.find((record) => record.id === selectedCustomerVoucherId) ?? null;
+const saleComplianceDraft: StoreSaleComplianceDraft = {
+  salePrescriptionNumber,
+  salePatientName,
+  salePrescriberName,
+  saleAgeVerified,
+  saleAgeVerificationId,
+};
+const runtimeHardware = useStoreRuntimeHardwareIntegration({
     runtimeShellKind: runtimeShellStatus?.runtime_kind ?? null,
     accessToken,
     tenantId,
@@ -360,6 +375,8 @@ export function useStoreRuntimeWorkspace() {
     loyaltyPointsToRedeem: parsedLoyaltyPointsToRedeem,
     storeCreditAmount: parsedStoreCreditAmount,
     saleQuantity,
+    saleSerialNumbers,
+    saleComplianceDraft,
     paymentMethod,
     isSessionLive,
     onError(message) {
@@ -384,6 +401,12 @@ export function useStoreRuntimeWorkspace() {
         setStoreCreditAmount('');
         setLoyaltyPointsToRedeem('');
         setSaleQuantity('1');
+        setSaleSerialNumbers('');
+        setSalePrescriptionNumber('');
+        setSalePatientName('');
+        setSalePrescriberName('');
+        setSaleAgeVerified(false);
+        setSaleAgeVerificationId('');
         setReturnQuantity('1');
         setRefundAmount(String(sale.payment.amount));
         setRefundMethod(sale.payment.payment_method);
@@ -441,6 +464,12 @@ export function useStoreRuntimeWorkspace() {
     loyaltyPointsToRedeem,
     promotionCode,
     saleQuantity,
+    saleSerialNumbers,
+    salePrescriptionNumber,
+    salePatientName,
+    salePrescriberName,
+    saleAgeVerified,
+    saleAgeVerificationId,
     selectedCatalogItem?.product_id,
     selectedCustomerProfile?.id,
     selectedCustomerVoucherId,
@@ -1704,6 +1733,12 @@ export function useStoreRuntimeWorkspace() {
     setIsBusy(true);
     setErrorMessage('');
     try {
+        const lineInput = buildSerializedSaleLineInput(
+          catalogItem,
+          saleQuantity,
+          saleSerialNumbers,
+          saleComplianceDraft,
+        );
         const draftPayload = {
           cashierSessionId: activeCashierSession.id,
           customerProfileId: selectedCustomerProfile?.id ?? null,
@@ -1716,7 +1751,7 @@ export function useStoreRuntimeWorkspace() {
           giftCardCode: parsedGiftCardCode,
           giftCardAmount: parsedGiftCardAmount,
           loyaltyPointsToRedeem: parsedLoyaltyRedemption,
-          lineInputs: [{ product_id: catalogItem.product_id, quantity: Number(saleQuantity) }],
+          lineInputs: [lineInput],
         };
 
       if (!accessToken || !tenantId || !branchId) {
@@ -1736,6 +1771,10 @@ export function useStoreRuntimeWorkspace() {
             setErrorMessage('Gift cards require a live online runtime session.');
             return;
           }
+          if (isSerializedCatalogItem(catalogItem)) {
+            setErrorMessage('Serialized sales require a live online runtime session.');
+            return;
+          }
           if (!offlineContinuity.isReady) {
             return;
           }
@@ -1753,6 +1792,12 @@ export function useStoreRuntimeWorkspace() {
             setGiftCardAmountState('');
             setStoreCreditAmount('');
             setSaleQuantity('1');
+            setSaleSerialNumbers('');
+            setSalePrescriptionNumber('');
+            setSalePatientName('');
+            setSalePrescriberName('');
+            setSaleAgeVerified(false);
+            setSaleAgeVerificationId('');
           setReturnQuantity('1');
           setRefundAmount(String(offlineSale.grand_total));
           setRefundMethod(offlineSale.payment_method);
@@ -1776,7 +1821,7 @@ export function useStoreRuntimeWorkspace() {
             gift_card_code: parsedGiftCardCode,
             gift_card_amount: parsedGiftCardAmount,
             loyalty_points_to_redeem: parsedLoyaltyRedemption,
-            lines: [{ product_id: catalogItem.product_id, quantity: Number(saleQuantity) }],
+            lines: [lineInput],
           });
         const [salesResponse, snapshotResponse] = await Promise.all([
           storeControlPlaneClient.listSales(accessToken, tenantId, branchId),
@@ -1801,6 +1846,12 @@ export function useStoreRuntimeWorkspace() {
           setStoreCreditAmount('');
           setLoyaltyPointsToRedeem('');
           setSaleQuantity('1');
+          setSaleSerialNumbers('');
+          setSalePrescriptionNumber('');
+          setSalePatientName('');
+          setSalePrescriberName('');
+          setSaleAgeVerified(false);
+          setSaleAgeVerificationId('');
           setReturnQuantity('1');
           setRefundAmount(String(sale.payment.amount));
           setRefundMethod(sale.payment.payment_method);
@@ -1815,6 +1866,7 @@ export function useStoreRuntimeWorkspace() {
             || parsedLoyaltyRedemption > 0
             || parsedGiftCardCode
             || parsedGiftCardAmount > 0
+            || isSerializedCatalogItem(catalogItem)
             || !offlineContinuity.isReady
             || !shouldQueueRuntimeOutboxMutation(error)
           ) {
@@ -1837,6 +1889,12 @@ export function useStoreRuntimeWorkspace() {
             setStoreCreditAmount('');
             setLoyaltyPointsToRedeem('');
           setSaleQuantity('1');
+          setSaleSerialNumbers('');
+          setSalePrescriptionNumber('');
+          setSalePatientName('');
+          setSalePrescriberName('');
+          setSaleAgeVerified(false);
+          setSaleAgeVerificationId('');
           setReturnQuantity('1');
           setRefundAmount(String(offlineSale.grand_total));
           setRefundMethod(offlineSale.payment_method);
@@ -1944,6 +2002,8 @@ export function useStoreRuntimeWorkspace() {
           loyaltyPointsToRedeem: parsedLoyaltyPointsToRedeem,
           storeCreditAmount: parsedStoreCreditAmount,
           saleQuantity,
+          saleSerialNumbers,
+          saleComplianceDraft,
         });
       applyStateTransition(() => {
         setCheckoutPricePreview(preview);
@@ -2666,6 +2726,11 @@ export function useStoreRuntimeWorkspace() {
     confirmPin,
     activationCode,
     scannedBarcode,
+    salePrescriptionNumber,
+    salePatientName,
+    salePrescriberName,
+    saleAgeVerified,
+    saleAgeVerificationId,
     activateDesktopAccess,
     enrollRuntimePin,
     createExchange,
@@ -2858,10 +2923,11 @@ export function useStoreRuntimeWorkspace() {
     completeActiveRestockTaskForLatestScanLookup,
     cancelActiveRestockTaskForLatestScanLookup,
     returnQuantity,
-      saleQuantity,
-      sales,
+    saleQuantity,
+    saleSerialNumbers,
+    sales,
     sessionExpiresAt,
-      promotionCode,
+    promotionCode,
     selectedRuntimeDeviceId,
     selectedStockCountProductId,
     shiftClosingNote,
@@ -2909,7 +2975,13 @@ export function useStoreRuntimeWorkspace() {
     setRefundAmount,
     setRefundMethod,
     setReturnQuantity,
+    setSalePrescriptionNumber,
+    setSalePatientName,
+    setSalePrescriberName,
+    setSaleAgeVerified,
+    setSaleAgeVerificationId,
     setSaleQuantity,
+    setSaleSerialNumbers,
     setReceivingLineQuantity,
     setReceivingLineDiscrepancyNote,
     setGoodsReceiptNote,
@@ -2921,9 +2993,9 @@ export function useStoreRuntimeWorkspace() {
     stockCountBoard,
     stockCountNote,
     stockCountReviewNote,
-      storeCreditAmount,
-      loyaltyPointsToRedeem,
-      clearPromotionCode,
+    storeCreditAmount,
+    loyaltyPointsToRedeem,
+    clearPromotionCode,
     clearSelectedCustomerVoucher,
     tenantId,
     tenant,

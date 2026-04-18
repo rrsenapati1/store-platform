@@ -20,7 +20,7 @@ from .customers import (
 )
 from .identity import AppSession, PlatformAdminAccount, User
 from .operations import OperationsJob
-from .inventory import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, RestockTaskSession, StockAdjustment, StockCountReviewSession, StockCountSession, TransferOrder
+from .inventory import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, RestockTaskSession, SerializedInventoryUnit, StockAdjustment, StockCountReviewSession, StockCountSession, TransferOrder
 from .membership import BranchMembership, TenantMembership
 from .procurement_finance import PurchaseInvoice, PurchaseInvoiceLine, SupplierPayment, SupplierReturn, SupplierReturnLine
 from .promotions import CustomerVoucherAssignment, PromotionCampaign, PromotionCode
@@ -75,6 +75,7 @@ __all__ = [
     "HubSpokeObservation",
     "InventoryLedgerEntry",
     "RestockTaskSession",
+    "SerializedInventoryUnit",
     "OwnerInvite",
     "OperationsJob",
     "Payment",

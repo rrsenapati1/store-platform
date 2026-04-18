@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import AuditRepository, CatalogRepository, TenantRepository
+from .product_compliance import normalize_product_compliance
 
 
 class CatalogService:
@@ -26,11 +27,21 @@ class CatalogService:
         mrp: float | None,
         category_code: str | None,
         selling_price: float,
+        tracking_mode: str,
+        compliance_profile: str,
+        compliance_config: dict[str, object],
     ):
         tenant = await self._tenant_repo.get_tenant(tenant_id)
         if tenant is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
         resolved_mrp = mrp if mrp is not None else selling_price
+        resolved_tracking_mode = tracking_mode.strip().upper()
+        if resolved_tracking_mode not in {"STANDARD", "SERIALIZED"}:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported tracking mode")
+        resolved_compliance_profile, resolved_compliance_config = normalize_product_compliance(
+            compliance_profile=compliance_profile,
+            compliance_config=compliance_config,
+        )
         product = await self._catalog_repo.create_product(
             tenant_id=tenant_id,
             name=name,
@@ -41,6 +52,9 @@ class CatalogService:
             mrp=resolved_mrp,
             category_code=(category_code.strip().upper() if category_code and category_code.strip() else None),
             selling_price=selling_price,
+            tracking_mode=resolved_tracking_mode,
+            compliance_profile=resolved_compliance_profile,
+            compliance_config=resolved_compliance_config,
         )
         await self._audit_repo.record(
             tenant_id=tenant_id,
@@ -71,6 +85,9 @@ class CatalogService:
                 "mrp": product.mrp,
                 "category_code": product.category_code,
                 "selling_price": product.selling_price,
+                "tracking_mode": product.tracking_mode,
+                "compliance_profile": product.compliance_profile,
+                "compliance_config": dict(product.compliance_config or {}),
                 "status": product.status,
             }
             for product in products
@@ -135,6 +152,9 @@ class CatalogService:
             "gst_rate": product.gst_rate,
             "mrp": product.mrp,
             "category_code": product.category_code,
+            "tracking_mode": product.tracking_mode,
+            "compliance_profile": product.compliance_profile,
+            "compliance_config": dict(product.compliance_config or {}),
             "base_selling_price": product.selling_price,
             "selling_price_override": item.selling_price_override,
             "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,
@@ -170,6 +190,9 @@ class CatalogService:
                     "gst_rate": product.gst_rate,
                     "mrp": product.mrp,
                     "category_code": product.category_code,
+                    "tracking_mode": product.tracking_mode,
+                    "compliance_profile": product.compliance_profile,
+                    "compliance_config": dict(product.compliance_config or {}),
                     "base_selling_price": product.selling_price,
                     "selling_price_override": item.selling_price_override,
                     "effective_selling_price": item.selling_price_override if item.selling_price_override is not None else product.selling_price,

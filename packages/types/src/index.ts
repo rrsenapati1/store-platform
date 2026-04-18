@@ -674,6 +674,9 @@ export interface ControlPlaneCatalogProduct {
   gst_rate: number;
   mrp: number;
   category_code?: string | null;
+  tracking_mode: string;
+  compliance_profile?: string | null;
+  compliance_config?: Record<string, unknown> | null;
   selling_price: number;
   status: string;
 }
@@ -688,6 +691,9 @@ export interface ControlPlaneCatalogProductRecord {
   gst_rate: number;
   mrp: number;
   category_code?: string | null;
+  tracking_mode: string;
+  compliance_profile?: string | null;
+  compliance_config?: Record<string, unknown> | null;
   selling_price: number;
   status: string;
 }
@@ -714,6 +720,9 @@ export interface ControlPlaneBarcodeScanLookup {
   selling_price: number;
   stock_on_hand: number;
   availability_status: string;
+  tracking_mode: string;
+  compliance_profile?: string | null;
+  compliance_config?: Record<string, unknown> | null;
   reorder_point?: number | null;
   target_stock?: number | null;
   automatic_discount_hint?: ControlPlaneBarcodeAutomaticDiscountHint | null;
@@ -739,6 +748,9 @@ export interface ControlPlaneBranchCatalogItem {
   gst_rate: number;
   mrp: number;
   category_code?: string | null;
+  tracking_mode: string;
+  compliance_profile?: string | null;
+  compliance_config?: Record<string, unknown> | null;
   base_selling_price: number;
   selling_price_override?: number | null;
   effective_selling_price: number;
@@ -1256,6 +1268,7 @@ export interface ControlPlaneGoodsReceiptLine {
   unit_cost: number;
   line_total: number;
   discrepancy_note?: string | null;
+  serial_numbers?: string[] | null;
 }
 
 export interface ControlPlaneGoodsReceipt {
@@ -1544,6 +1557,9 @@ export interface ControlPlaneSaleLine {
   sku_code: string;
   hsn_sac_code: string;
   quantity: number;
+  serial_numbers?: string[] | null;
+  compliance_profile?: string | null;
+  compliance_capture?: Record<string, unknown> | null;
   mrp?: number;
   unit_selling_price?: number;
   unit_price: number;
@@ -1774,6 +1790,9 @@ export interface ControlPlaneCheckoutPricePreviewLine {
   product_name: string;
   sku_code: string;
   quantity: number;
+  serial_numbers?: string[] | null;
+  compliance_profile?: string | null;
+  compliance_capture?: Record<string, unknown> | null;
   mrp: number;
   unit_selling_price: number;
   automatic_discount_amount: number;

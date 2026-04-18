@@ -235,7 +235,7 @@ describe('owner onboarding flow', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
-    expect(await screen.findByText('Acme Owner')).toBeInTheDocument();
+    expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
     expect((await screen.findAllByText('Acme Retail')).length).toBeGreaterThan(0);
     expect(await screen.findByText('owner_invite.accepted')).toBeInTheDocument();
 

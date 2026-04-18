@@ -60,7 +60,17 @@ type ReceivingLineDraft = {
   product_id: string;
   received_quantity: string;
   discrepancy_note: string;
+  serial_numbers: string;
 };
+
+function buildReceivingLineDrafts(purchaseOrder: ControlPlanePurchaseOrder) {
+  return purchaseOrder.lines.map((line) => ({
+    product_id: line.product_id,
+    received_quantity: String(line.quantity),
+    discrepancy_note: '',
+    serial_numbers: '',
+  }));
+}
 
 export function useOwnerWorkspace() {
   const [korsenexToken, setKorsenexToken] = useState('');
@@ -101,6 +111,9 @@ export function useOwnerWorkspace() {
   const [productGstRate, setProductGstRate] = useState('5');
   const [productMrp, setProductMrp] = useState('');
   const [productCategoryCode, setProductCategoryCode] = useState('');
+  const [productTrackingMode, setProductTrackingMode] = useState('STANDARD');
+  const [productComplianceProfile, setProductComplianceProfile] = useState('NONE');
+  const [productMinimumAge, setProductMinimumAge] = useState('');
   const [productSellingPrice, setProductSellingPrice] = useState('');
   const [branchCatalogPriceOverride, setBranchCatalogPriceOverride] = useState('');
   const [priceTierCode, setPriceTierCode] = useState('');
@@ -192,13 +205,7 @@ export function useOwnerWorkspace() {
       return;
     }
     setGoodsReceiptNote('');
-    setReceivingLineDrafts(
-      latestPurchaseOrder.lines.map((line) => ({
-        product_id: line.product_id,
-        received_quantity: String(line.quantity),
-        discrepancy_note: '',
-      })),
-    );
+    setReceivingLineDrafts(buildReceivingLineDrafts(latestPurchaseOrder));
   }, [latestPurchaseOrder?.id]);
 
   function setReceivingLineQuantity(productId: string, value: string) {
@@ -210,6 +217,12 @@ export function useOwnerWorkspace() {
   function setReceivingLineDiscrepancyNote(productId: string, value: string) {
     setReceivingLineDrafts((current) =>
       current.map((line) => (line.product_id === productId ? { ...line, discrepancy_note: value } : line)),
+    );
+  }
+
+  function setReceivingLineSerialNumbers(productId: string, value: string) {
+    setReceivingLineDrafts((current) =>
+      current.map((line) => (line.product_id === productId ? { ...line, serial_numbers: value } : line)),
     );
   }
 
@@ -368,6 +381,11 @@ export function useOwnerWorkspace() {
       gstRate: Number(productGstRate),
       mrp: Number(productMrp),
       categoryCode: productCategoryCode.trim() || null,
+      trackingMode: productTrackingMode,
+      complianceProfile: productComplianceProfile,
+      complianceConfig: productComplianceProfile === 'AGE_RESTRICTED' && productMinimumAge.trim()
+        ? { minimum_age: Number(productMinimumAge) }
+        : {},
       sellingPrice: Number(productSellingPrice),
       setIsBusy,
       setErrorMessage,
@@ -381,6 +399,9 @@ export function useOwnerWorkspace() {
         setProductGstRate('5');
         setProductMrp('');
         setProductCategoryCode('');
+        setProductTrackingMode('STANDARD');
+        setProductComplianceProfile('NONE');
+        setProductMinimumAge('');
         setProductSellingPrice('');
       },
     });
@@ -637,6 +658,10 @@ export function useOwnerWorkspace() {
         product_id: line.product_id,
         received_quantity: Number(line.received_quantity),
         discrepancy_note: line.discrepancy_note,
+        serial_numbers: line.serial_numbers
+          .split(/\r?\n|,/)
+          .map((value) => value.trim())
+          .filter(Boolean),
       })),
       setIsBusy,
       setErrorMessage,
@@ -647,13 +672,7 @@ export function useOwnerWorkspace() {
       setInventorySnapshot,
       resetForm: () => {
         setGoodsReceiptNote('');
-        setReceivingLineDrafts(
-          latestPurchaseOrder.lines.map((line) => ({
-            product_id: line.product_id,
-            received_quantity: String(line.quantity),
-            discrepancy_note: '',
-          })),
-        );
+        setReceivingLineDrafts(buildReceivingLineDrafts(latestPurchaseOrder));
       },
     });
   }
@@ -1240,11 +1259,15 @@ export function useOwnerWorkspace() {
     setLotBQuantity,
     setReceivingLineDiscrepancyNote,
     setReceivingLineQuantity,
+    setReceivingLineSerialNumbers,
     setProductBarcode,
     setProductGstRate,
     setProductHsnSacCode,
     setProductMrp,
     setProductCategoryCode,
+    setProductTrackingMode,
+    setProductComplianceProfile,
+    setProductMinimumAge,
     setProductName,
     setProductSellingPrice,
     setProductSkuCode,
@@ -1302,6 +1325,9 @@ export function useOwnerWorkspace() {
     productHsnSacCode,
     productMrp,
     productCategoryCode,
+    productTrackingMode,
+    productComplianceProfile,
+    productMinimumAge,
     productName,
     productSellingPrice,
     productSkuCode,

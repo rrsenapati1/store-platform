@@ -23,6 +23,9 @@ class CatalogRepository:
         mrp: float,
         category_code: str | None,
         selling_price: float,
+        tracking_mode: str,
+        compliance_profile: str,
+        compliance_config: dict[str, object],
     ) -> CatalogProduct:
         product = CatalogProduct(
             id=new_id(),
@@ -35,6 +38,9 @@ class CatalogRepository:
             mrp=mrp,
             category_code=category_code,
             selling_price=selling_price,
+            tracking_mode=tracking_mode,
+            compliance_profile=compliance_profile,
+            compliance_config=compliance_config,
             status="ACTIVE",
         )
         self._session.add(product)

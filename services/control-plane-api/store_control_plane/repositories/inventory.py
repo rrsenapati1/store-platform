@@ -5,7 +5,7 @@ from collections import defaultdict
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, RestockTaskSession, StockAdjustment, StockCountReviewSession, StockCountSession, TransferOrder
+from ..models import GoodsReceipt, GoodsReceiptLine, InventoryLedgerEntry, RestockTaskSession, SerializedInventoryUnit, StockAdjustment, StockCountReviewSession, StockCountSession, TransferOrder
 from ..utils import new_id
 
 
@@ -84,10 +84,100 @@ class InventoryRepository:
                     unit_cost=float(line["unit_cost"]),
                     line_total=float(line["line_total"]),
                     discrepancy_note=str(line["discrepancy_note"]) if line.get("discrepancy_note") is not None else None,
+                    serial_numbers=list(line.get("serial_numbers") or []),
                 )
             )
         await self._session.flush()
         return goods_receipt
+
+    async def create_serialized_inventory_units(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        product_id: str,
+        goods_receipt_id: str,
+        goods_receipt_line_id: str,
+        serial_numbers: list[str],
+    ) -> list[SerializedInventoryUnit]:
+        created: list[SerializedInventoryUnit] = []
+        for serial_number in serial_numbers:
+            record = SerializedInventoryUnit(
+                id=new_id(),
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                product_id=product_id,
+                goods_receipt_id=goods_receipt_id,
+                goods_receipt_line_id=goods_receipt_line_id,
+                serial_number=serial_number,
+                status="AVAILABLE",
+            )
+            self._session.add(record)
+            created.append(record)
+        await self._session.flush()
+        return created
+
+    async def list_available_serialized_units(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        product_id: str,
+        serial_numbers: list[str],
+    ) -> list[SerializedInventoryUnit]:
+        if not serial_numbers:
+            return []
+        statement = (
+            select(SerializedInventoryUnit)
+            .where(
+                SerializedInventoryUnit.tenant_id == tenant_id,
+                SerializedInventoryUnit.branch_id == branch_id,
+                SerializedInventoryUnit.product_id == product_id,
+                SerializedInventoryUnit.status == "AVAILABLE",
+                SerializedInventoryUnit.serial_number.in_(serial_numbers),
+            )
+            .order_by(SerializedInventoryUnit.created_at.asc(), SerializedInventoryUnit.id.asc())
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def list_serialized_units(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        product_id: str,
+        serial_numbers: list[str],
+    ) -> list[SerializedInventoryUnit]:
+        if not serial_numbers:
+            return []
+        statement = (
+            select(SerializedInventoryUnit)
+            .where(
+                SerializedInventoryUnit.tenant_id == tenant_id,
+                SerializedInventoryUnit.branch_id == branch_id,
+                SerializedInventoryUnit.product_id == product_id,
+                SerializedInventoryUnit.serial_number.in_(serial_numbers),
+            )
+            .order_by(SerializedInventoryUnit.created_at.asc(), SerializedInventoryUnit.id.asc())
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def mark_serialized_units_sold(
+        self,
+        *,
+        unit_ids: list[str],
+        sale_id: str,
+        sale_line_id: str,
+    ) -> None:
+        if not unit_ids:
+            return
+        statement = select(SerializedInventoryUnit).where(SerializedInventoryUnit.id.in_(unit_ids))
+        records = list((await self._session.scalars(statement)).all())
+        for record in records:
+            record.status = "SOLD"
+            record.sale_id = sale_id
+            record.sale_line_id = sale_line_id
+        await self._session.flush()
 
     async def list_branch_goods_receipts(self, *, tenant_id: str, branch_id: str) -> list[GoodsReceipt]:
         statement = (

@@ -5,6 +5,8 @@ import type {
 import { storeControlPlaneClient } from './client';
 import { resolveGiftCardCodePayload } from './storeGiftCardActions';
 import { resolvePromotionCodePayload } from './storePromotionActions';
+import type { StoreSaleComplianceDraft } from './storeSaleComplianceActions';
+import { buildSerializedSaleLineInput } from './storeSerializedSaleActions';
 
 type LoadCheckoutPricePreviewArgs = {
   accessToken: string;
@@ -22,6 +24,8 @@ type LoadCheckoutPricePreviewArgs = {
   loyaltyPointsToRedeem: number;
   storeCreditAmount: number;
   saleQuantity: string;
+  saleSerialNumbers: string;
+  saleComplianceDraft: StoreSaleComplianceDraft;
 };
 
 export async function runLoadCheckoutPricePreview({
@@ -40,13 +44,11 @@ export async function runLoadCheckoutPricePreview({
   loyaltyPointsToRedeem,
   storeCreditAmount,
   saleQuantity,
+  saleSerialNumbers,
+  saleComplianceDraft,
 }: LoadCheckoutPricePreviewArgs): Promise<ControlPlaneCheckoutPricePreview> {
   if (!selectedCatalogItem) {
     throw new Error('Select a billable catalog item before refreshing checkout pricing.');
-  }
-  const quantity = Number(saleQuantity);
-  if (!Number.isFinite(quantity) || quantity <= 0) {
-    throw new Error('Sale quantity must be a positive number.');
   }
   return storeControlPlaneClient.getCheckoutPricePreview(accessToken, tenantId, branchId, {
     cashier_session_id: cashierSessionId,
@@ -59,6 +61,6 @@ export async function runLoadCheckoutPricePreview({
     store_credit_amount: storeCreditAmount,
     gift_card_code: resolveGiftCardCodePayload(giftCardCode),
     gift_card_amount: giftCardAmount,
-    lines: [{ product_id: selectedCatalogItem.product_id, quantity }],
+    lines: [buildSerializedSaleLineInput(selectedCatalogItem, saleQuantity, saleSerialNumbers, saleComplianceDraft)],
   });
 }

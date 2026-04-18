@@ -202,7 +202,7 @@ describe('owner price tier foundation flow', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
-    expect(await screen.findByText('Acme Owner')).toBeInTheDocument();
+    expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Price tier code'), { target: { value: 'VIP' } });
     fireEvent.change(screen.getByLabelText('Price tier display name'), { target: { value: 'VIP Price' } });

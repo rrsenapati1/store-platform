@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, Date, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, TimestampMixin
@@ -36,6 +36,25 @@ class GoodsReceiptLine(Base, TimestampMixin):
     unit_cost: Mapped[float] = mapped_column(default=0.0)
     line_total: Mapped[float] = mapped_column(default=0.0)
     discrepancy_note: Mapped[str | None] = mapped_column(String(1024), default=None)
+    serial_numbers: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+
+class SerializedInventoryUnit(Base, TimestampMixin):
+    __tablename__ = "serialized_inventory_units"
+    __table_args__ = (
+        UniqueConstraint("branch_id", "product_id", "serial_number", name="uq_serialized_inventory_units_branch_product_serial"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    goods_receipt_id: Mapped[str | None] = mapped_column(ForeignKey("goods_receipts.id", ondelete="SET NULL"), default=None, index=True)
+    goods_receipt_line_id: Mapped[str | None] = mapped_column(ForeignKey("goods_receipt_lines.id", ondelete="SET NULL"), default=None, index=True)
+    sale_id: Mapped[str | None] = mapped_column(ForeignKey("sales.id", ondelete="SET NULL"), default=None, index=True)
+    sale_line_id: Mapped[str | None] = mapped_column(ForeignKey("sale_lines.id", ondelete="SET NULL"), default=None, index=True)
+    serial_number: Mapped[str] = mapped_column(String(255), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="AVAILABLE", index=True)
 
 
 class InventoryLedgerEntry(Base, TimestampMixin):

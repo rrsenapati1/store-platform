@@ -2,6 +2,21 @@
 
 ## 2026-04-18
 
+- Completed `V2-008` end-to-end with serialized inventory, prescription capture, and regulated checkout compliance:
+  - added control-plane serialized inventory authority with receipt-time serial capture, serialized-unit availability, sale-time serial enforcement, and sale-line snapshots that preserve compliance posture alongside IMEI or serial allocations
+  - extended catalog and barcode foundations with isolated `compliance_profile` and `compliance_config` support so vertical-specific product rules stay modular instead of leaking pharmacy or age-restriction logic into generic pricing and inventory paths
+  - added regulated checkout enforcement for `RX_REQUIRED` and `AGE_RESTRICTED` products through centralized control-plane normalization, authoritative checkout preview validation, owner-web regulated product setup, and Store Desktop runtime capture for prescription details or age verification before billing
+  - closed the `V2-008` ledger row now that serialized product handling, pharmacy-style prescription capture, and category-specific compliance modules exist across owner-web, store-desktop, and control-plane authority without introducing a separate vertical-only core
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_serialized_inventory_flow.py services/control-plane-api/tests/test_billing_foundation_flow.py services/control-plane-api/tests/test_checkout_payment_sessions.py services/control-plane-api/tests/test_checkout_price_preview_flow.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 - Started `V2-006` with cashier session governance as the first live branch-operations authority boundary:
   - added control-plane-owned branch cashier sessions with `OPEN`, `CLOSED`, and `FORCED_CLOSED` lifecycle support tied to tenant, branch, device registration, staff profile, and runtime actor, and linked sales, returns, checkout payment sessions, and offline replay records to `cashier_session_id`
   - extended Store Desktop runtime governance so operators must open a cashier session before billing or processing returns, can close the session from the terminal, and carry cashier-session authority through checkout pricing preview, direct billing, provider-backed checkout, and branch-hub offline continuity

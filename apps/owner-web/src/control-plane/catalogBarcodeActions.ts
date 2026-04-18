@@ -21,6 +21,9 @@ export async function runCreateCatalogProduct(params: {
   gstRate: number;
   mrp: number;
   categoryCode?: string | null;
+  trackingMode: string;
+  complianceProfile: string;
+  complianceConfig: Record<string, unknown>;
   sellingPrice: number;
   setIsBusy: (value: boolean) => void;
   setErrorMessage: SetString;
@@ -38,6 +41,9 @@ export async function runCreateCatalogProduct(params: {
     gstRate,
     mrp,
     categoryCode,
+    trackingMode,
+    complianceProfile,
+    complianceConfig,
     sellingPrice,
     setIsBusy,
     setErrorMessage,
@@ -57,6 +63,9 @@ export async function runCreateCatalogProduct(params: {
       gst_rate: gstRate,
       mrp,
       category_code: categoryCode || null,
+      tracking_mode: trackingMode,
+      compliance_profile: complianceProfile,
+      compliance_config: complianceConfig,
       selling_price: sellingPrice,
     });
     const productCatalog = await ownerControlPlaneClient.listCatalogProducts(accessToken, tenantId);

@@ -11,6 +11,7 @@ from .customer_profiles import CustomerProfileService
 from .gift_cards import GiftCardService
 from .loyalty import LoyaltyService
 from .promotions import PromotionService
+from .product_compliance import normalize_sale_line_compliance
 from .purchase_policy import money
 from .store_credit import StoreCreditService
 
@@ -118,6 +119,40 @@ class CheckoutPricingService:
             )
         except ValueError as error:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+        for line in draft.lines:
+            product = products[line.product_id]
+            line.compliance_profile, line.compliance_capture = normalize_sale_line_compliance(
+                compliance_profile=product.compliance_profile,
+                compliance_config=dict(product.compliance_config or {}),
+                compliance_capture=line.compliance_capture,
+            )
+            if product.tracking_mode != "SERIALIZED":
+                line.serial_numbers = []
+                continue
+            normalized_serial_numbers = self._normalize_serial_numbers(line.serial_numbers)
+            if not normalized_serial_numbers:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Serial numbers are required for serialized products",
+                )
+            if round(float(line.quantity), 2) != round(float(len(normalized_serial_numbers)), 2):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Serialized product quantity must match serial number count",
+                )
+            available_units = await self._inventory_repo.list_available_serialized_units(
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                product_id=line.product_id,
+                serial_numbers=normalized_serial_numbers,
+            )
+            if len({unit.serial_number for unit in available_units}) != len(normalized_serial_numbers):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more serialized units are not available for sale",
+                )
+            line.serial_numbers = normalized_serial_numbers
 
         if validate_stock:
             for line in draft.lines:
@@ -250,6 +285,9 @@ class CheckoutPricingService:
                     "sku_code": line.sku_code,
                     "hsn_sac_code": line.hsn_sac_code,
                     "quantity": line.quantity,
+                    "serial_numbers": line.serial_numbers or None,
+                    "compliance_profile": line.compliance_profile,
+                    "compliance_capture": line.compliance_capture or None,
                     "mrp": mrp,
                     "unit_selling_price": line.unit_price,
                     "unit_price": line.unit_price,
@@ -392,6 +430,24 @@ class CheckoutPricingService:
             "loyalty_points_to_redeem": loyalty_points_redeemed,
             "loyalty_points_earned": loyalty_points_earned,
         }
+
+    @staticmethod
+    def _normalize_serial_numbers(serial_numbers: list[str] | None) -> list[str]:
+        normalized: list[str] = []
+        for serial_number in serial_numbers or []:
+            resolved = str(serial_number).strip()
+            if not resolved:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Serial numbers must not be blank",
+                )
+            normalized.append(resolved)
+        if len(set(normalized)) != len(normalized):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Serial numbers must be unique",
+            )
+        return normalized
 
     async def describe_scan_automatic_discount_hint(
         self,

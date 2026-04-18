@@ -218,6 +218,21 @@ export function OwnerWorkspace() {
         <FormField id="product-gst-rate" label="GST rate" value={workspace.productGstRate} onChange={workspace.setProductGstRate} />
         <FormField id="product-mrp" label="MRP" value={workspace.productMrp} onChange={workspace.setProductMrp} />
         <FormField id="product-category-code" label="Category code" value={workspace.productCategoryCode} onChange={workspace.setProductCategoryCode} />
+        <FormField id="product-tracking-mode" label="Tracking mode" value={workspace.productTrackingMode} onChange={workspace.setProductTrackingMode} />
+        <FormField
+          id="product-compliance-profile"
+          label="Compliance profile"
+          value={workspace.productComplianceProfile}
+          onChange={workspace.setProductComplianceProfile}
+        />
+        {workspace.productComplianceProfile === 'AGE_RESTRICTED' ? (
+          <FormField
+            id="product-minimum-age"
+            label="Minimum age"
+            value={workspace.productMinimumAge}
+            onChange={workspace.setProductMinimumAge}
+          />
+        ) : null}
         <FormField id="product-selling-price" label="Selling price" value={workspace.productSellingPrice} onChange={workspace.setProductSellingPrice} />
         <ActionButton
           onClick={() => void workspace.createCatalogProduct()}
@@ -229,6 +244,7 @@ export function OwnerWorkspace() {
             !workspace.productBarcode ||
             !workspace.productHsnSacCode ||
             !workspace.productMrp ||
+            (workspace.productComplianceProfile === 'AGE_RESTRICTED' && !workspace.productMinimumAge) ||
             !workspace.productSellingPrice
           }
         >
@@ -244,6 +260,12 @@ export function OwnerWorkspace() {
                 { label: 'SKU', value: workspace.latestCatalogProduct.sku_code },
                 { label: 'MRP', value: String(workspace.latestCatalogProduct.mrp) },
                 { label: 'Category', value: workspace.latestCatalogProduct.category_code ?? 'Unspecified' },
+                { label: 'Tracking mode', value: workspace.latestCatalogProduct.tracking_mode },
+                { label: 'Compliance profile', value: workspace.latestCatalogProduct.compliance_profile ?? 'NONE' },
+                {
+                  label: 'Minimum age',
+                  value: String((workspace.latestCatalogProduct.compliance_config?.minimum_age as number | undefined) ?? 'Not required'),
+                },
                 { label: 'Status', value: <StatusBadge label={workspace.latestCatalogProduct.status} tone="success" /> },
               ]}
             />
@@ -253,7 +275,7 @@ export function OwnerWorkspace() {
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
           {catalogProducts.map((product) => (
             <li key={product.product_id}>
-              {product.name} ({product.sku_code}) :: MRP {product.mrp} :: {product.category_code ?? 'NO_CATEGORY'}
+              {product.name} ({product.sku_code}) :: MRP {product.mrp} :: {product.category_code ?? 'NO_CATEGORY'} :: {product.tracking_mode}
             </li>
           ))}
         </ul>
@@ -282,6 +304,7 @@ export function OwnerWorkspace() {
                 { label: 'Product', value: workspace.latestBranchCatalogItem.product_name },
                 { label: 'MRP', value: String(workspace.latestBranchCatalogItem.mrp) },
                 { label: 'Category', value: workspace.latestBranchCatalogItem.category_code ?? 'Unspecified' },
+                { label: 'Tracking mode', value: workspace.latestBranchCatalogItem.tracking_mode },
                 { label: 'Effective price', value: String(workspace.latestBranchCatalogItem.effective_selling_price) },
                 { label: 'Status', value: <StatusBadge label={workspace.latestBranchCatalogItem.availability_status} tone="success" /> },
               ]}

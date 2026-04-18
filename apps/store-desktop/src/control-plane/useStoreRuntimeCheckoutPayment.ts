@@ -9,6 +9,8 @@ import type {
 import { storeControlPlaneClient } from './client';
 import { resolveGiftCardCodePayload } from './storeGiftCardActions';
 import { resolvePromotionCodePayload } from './storePromotionActions';
+import type { StoreSaleComplianceDraft } from './storeSaleComplianceActions';
+import { buildSerializedSaleLineInput } from './storeSerializedSaleActions';
 
 const CASHFREE_POLL_INTERVAL_MS = 2500;
 
@@ -28,6 +30,8 @@ interface UseStoreRuntimeCheckoutPaymentArgs {
   loyaltyPointsToRedeem: number;
   storeCreditAmount: number;
   saleQuantity: string;
+  saleSerialNumbers: string;
+  saleComplianceDraft: StoreSaleComplianceDraft;
   paymentMethod: string;
   isSessionLive: boolean;
   onError(message: string): void;
@@ -94,6 +98,8 @@ export function useStoreRuntimeCheckoutPayment({
   loyaltyPointsToRedeem,
   storeCreditAmount,
   saleQuantity,
+  saleSerialNumbers,
+  saleComplianceDraft,
   paymentMethod,
   isSessionLive,
   onError,
@@ -170,15 +176,16 @@ export function useStoreRuntimeCheckoutPayment({
       onError('Open a cashier session before billing.');
       return;
     }
-    const quantity = Number(saleQuantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      onError('Sale quantity must be a positive number.');
-      return;
-    }
     const methodConfiguration = resolveCheckoutMethodConfiguration(paymentMethod);
     setIsBusy(true);
     try {
       finalizedSessionRef.current = null;
+      const lineInput = buildSerializedSaleLineInput(
+        selectedCatalogItem,
+        saleQuantity,
+        saleSerialNumbers,
+        saleComplianceDraft,
+      );
       const session = await storeControlPlaneClient.createCheckoutPaymentSession(accessToken, tenantId, branchId, {
         provider_name: 'cashfree',
         payment_method: paymentMethod,
@@ -194,7 +201,7 @@ export function useStoreRuntimeCheckoutPayment({
         store_credit_amount: storeCreditAmount,
         gift_card_code: resolveGiftCardCodePayload(giftCardCode),
         gift_card_amount: giftCardAmount,
-        lines: [{ product_id: selectedCatalogItem.product_id, quantity }],
+        lines: [lineInput],
       });
       setCheckoutPaymentSession(session);
       await listCheckoutPaymentHistory();

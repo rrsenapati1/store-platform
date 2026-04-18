@@ -229,6 +229,9 @@ export const ownerControlPlaneClient = {
       gst_rate: number;
       mrp: number;
       category_code?: string | null;
+      tracking_mode?: string;
+      compliance_profile?: string;
+      compliance_config?: Record<string, unknown>;
       selling_price: number;
     },
   ) {
@@ -602,7 +605,12 @@ export const ownerControlPlaneClient = {
     payload: {
       purchase_order_id: string;
       note?: string | null;
-      lines?: Array<{ product_id: string; received_quantity: number; discrepancy_note?: string | null }>;
+      lines?: Array<{
+        product_id: string;
+        received_quantity: number;
+        discrepancy_note?: string | null;
+        serial_numbers?: string[] | null;
+      }>;
     },
   ) {
     return request<ControlPlaneGoodsReceipt>(

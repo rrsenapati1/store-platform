@@ -240,7 +240,12 @@ export const storeControlPlaneClient = {
     payload: {
       purchase_order_id: string;
       note?: string | null;
-      lines?: Array<{ product_id: string; received_quantity: number; discrepancy_note?: string | null }>;
+      lines?: Array<{
+        product_id: string;
+        received_quantity: number;
+        discrepancy_note?: string | null;
+        serial_numbers?: string[] | null;
+      }>;
     },
   ) {
     return request<ControlPlaneGoodsReceipt>(
@@ -536,7 +541,12 @@ export const storeControlPlaneClient = {
       store_credit_amount?: number;
       gift_card_code?: string | null;
       gift_card_amount?: number;
-      lines: Array<{ product_id: string; quantity: number }>;
+      lines: Array<{
+        product_id: string;
+        quantity: number;
+        serial_numbers?: string[];
+        compliance_capture?: Record<string, unknown>;
+      }>;
     },
   ) {
     return request<ControlPlaneCheckoutPricePreview>(
@@ -862,7 +872,12 @@ export const storeControlPlaneClient = {
       gift_card_code?: string | null;
       gift_card_amount?: number;
       loyalty_points_to_redeem?: number;
-      lines: Array<{ product_id: string; quantity: number }>;
+      lines: Array<{
+        product_id: string;
+        quantity: number;
+        serial_numbers?: string[];
+        compliance_capture?: Record<string, unknown>;
+      }>;
     },
   ) {
     return request<ControlPlaneSale>(
@@ -893,7 +908,12 @@ export const storeControlPlaneClient = {
       store_credit_amount?: number;
       gift_card_code?: string | null;
       gift_card_amount?: number;
-      lines: Array<{ product_id: string; quantity: number }>;
+      lines: Array<{
+        product_id: string;
+        quantity: number;
+        serial_numbers?: string[];
+        compliance_capture?: Record<string, unknown>;
+      }>;
     },
   ) {
     return request<ControlPlaneCheckoutPaymentSession>(

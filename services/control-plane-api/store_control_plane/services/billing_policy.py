@@ -41,6 +41,9 @@ class SaleLineDraft:
     sku_code: str
     hsn_sac_code: str
     quantity: float
+    serial_numbers: list[str]
+    compliance_profile: str
+    compliance_capture: dict[str, object]
     unit_price: float
     gst_rate: float
     line_subtotal: float
@@ -125,6 +128,9 @@ def build_sale_draft(
                 sku_code=str(_value(product, "sku_code")),
                 hsn_sac_code=str(_value(product, "hsn_sac_code")),
                 quantity=quantity,
+                serial_numbers=list(line_input.get("serial_numbers") or []),
+                compliance_profile=str(_value(product, "compliance_profile") or "NONE"),
+                compliance_capture=dict(line_input.get("compliance_capture") or {}),
                 unit_price=unit_price,
                 gst_rate=gst_rate,
                 line_subtotal=line_subtotal,

@@ -92,6 +92,43 @@ class InventoryService:
             reviewed_lines=lines,
             products_by_id=products_by_id,
         )
+        seen_serials_by_product_id: dict[str, set[str]] = {}
+        for line in line_drafts:
+            product = products_by_id[line.product_id]
+            if product.tracking_mode != "SERIALIZED":
+                line.serial_numbers = []
+                continue
+            normalized_serial_numbers = self._normalize_serial_numbers(line.serial_numbers)
+            if line.quantity > 0 and not normalized_serial_numbers:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Serial numbers are required for serialized products",
+                )
+            if normalized_serial_numbers and round(float(line.quantity), 2) != round(float(len(normalized_serial_numbers)), 2):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Serialized product receipt quantity must match serial number count",
+                )
+            seen_serials = seen_serials_by_product_id.setdefault(line.product_id, set())
+            duplicate_serials = seen_serials.intersection(normalized_serial_numbers)
+            if duplicate_serials:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Serial numbers must be unique within a goods receipt",
+                )
+            seen_serials.update(normalized_serial_numbers)
+            existing_units = await self._inventory_repo.list_serialized_units(
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                product_id=line.product_id,
+                serial_numbers=normalized_serial_numbers,
+            )
+            if existing_units:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Serial numbers already exist for serialized stock",
+                )
+            line.serial_numbers = normalized_serial_numbers
         sequence_number = await self._inventory_repo.next_branch_goods_receipt_sequence(
             tenant_id=tenant_id,
             branch_id=branch_id,
@@ -112,10 +149,29 @@ class InventoryService:
                     "unit_cost": line.unit_cost,
                     "line_total": line.line_total,
                     "discrepancy_note": line.discrepancy_note,
+                    "serial_numbers": line.serial_numbers,
                 }
                 for line in line_drafts
             ],
         )
+        created_receipt_lines = (
+            await self._inventory_repo.list_goods_receipt_lines_for_receipts(goods_receipt_ids=[goods_receipt.id])
+        ).get(goods_receipt.id, [])
+        created_receipt_lines_by_product_id = {line.product_id: line for line in created_receipt_lines}
+        for line in line_drafts:
+            if not line.serial_numbers:
+                continue
+            created_line = created_receipt_lines_by_product_id.get(line.product_id)
+            if created_line is None:
+                continue
+            await self._inventory_repo.create_serialized_inventory_units(
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                product_id=line.product_id,
+                goods_receipt_id=goods_receipt.id,
+                goods_receipt_line_id=created_line.id,
+                serial_numbers=line.serial_numbers,
+            )
         await self._inventory_repo.create_inventory_ledger_entries(
             entries=[
                 {
@@ -172,6 +228,7 @@ class InventoryService:
                     "unit_cost": line.unit_cost,
                     "line_total": line.line_total,
                     "discrepancy_note": line.discrepancy_note,
+                    "serial_numbers": line.serial_numbers,
                 }
                 for line in line_drafts
             ],
@@ -1025,6 +1082,24 @@ class InventoryService:
             }
             for purchase_order in purchase_orders
         ]
+
+    @staticmethod
+    def _normalize_serial_numbers(serial_numbers: list[str] | None) -> list[str]:
+        normalized: list[str] = []
+        for serial_number in serial_numbers or []:
+            resolved = str(serial_number).strip()
+            if not resolved:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Serial numbers must not be blank",
+                )
+            normalized.append(resolved)
+        if len(set(normalized)) != len(normalized):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Serial numbers must be unique",
+            )
+        return normalized
 
     def _serialize_stock_count_review_session(self, session) -> dict[str, object]:
         return {

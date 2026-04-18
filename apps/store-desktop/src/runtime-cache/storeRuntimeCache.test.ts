@@ -74,6 +74,7 @@ function buildSnapshot(): StoreRuntimeCacheSnapshot {
       gst_rate: 5,
       mrp: 120,
       category_code: 'TEA',
+      tracking_mode: 'STANDARD',
       base_selling_price: 92.5,
       selling_price_override: null,
       effective_selling_price: 92.5,

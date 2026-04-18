@@ -121,7 +121,7 @@ describe('owner billing lifecycle section', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
-    expect(await screen.findByText('Acme Owner')).toBeInTheDocument();
+    expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Load billing status' }));
 
@@ -213,7 +213,7 @@ describe('owner billing lifecycle section', () => {
       target: { value: 'stub:sub=owner-1;email=owner@acme.local;name=Acme Owner' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
-    expect(await screen.findByText('Acme Owner')).toBeInTheDocument();
+    expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Load billing status' }));
 

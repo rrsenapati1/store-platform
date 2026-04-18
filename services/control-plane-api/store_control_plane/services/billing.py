@@ -163,6 +163,26 @@ class BillingService:
             lines=preview_lines,
             tax_lines=preview_tax_lines,
         )
+        for preview_line, persisted_line in zip(preview_lines, persisted.lines, strict=False):
+            serial_numbers = list(preview_line.get("serial_numbers") or [])
+            if not serial_numbers:
+                continue
+            available_units = await self._inventory_repo.list_available_serialized_units(
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                product_id=str(preview_line["product_id"]),
+                serial_numbers=serial_numbers,
+            )
+            if len({unit.serial_number for unit in available_units}) != len(serial_numbers):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more serialized units are not available for sale",
+                )
+            await self._inventory_repo.mark_serialized_units_sold(
+                unit_ids=[unit.id for unit in available_units],
+                sale_id=persisted.sale.id,
+                sale_line_id=persisted_line.id,
+            )
         if promotion_code_campaign is not None:
             await self._promotion_service.mark_code_redeemed(
                 tenant_id=tenant_id,
@@ -948,6 +968,9 @@ class BillingService:
                     "sku_code": products_by_id[line.product_id].sku_code,
                     "hsn_sac_code": products_by_id[line.product_id].hsn_sac_code,
                     "quantity": line.quantity,
+                    "serial_numbers": line.serial_numbers or None,
+                    "compliance_profile": line.compliance_profile,
+                    "compliance_capture": line.compliance_capture or None,
                     "mrp": line.mrp,
                     "unit_selling_price": line.unit_selling_price,
                     "unit_price": line.unit_price,

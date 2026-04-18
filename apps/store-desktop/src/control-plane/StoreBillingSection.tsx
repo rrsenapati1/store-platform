@@ -5,6 +5,12 @@ import type {
 } from '@store/types';
 import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@store/ui';
 import { PaymentQrCode, usePaymentQrExpiry } from '../customer-display/paymentQr';
+import {
+  hasValidSaleComplianceInput,
+  isAgeRestrictedCatalogItem,
+  isRxRequiredCatalogItem,
+  resolveMinimumAge,
+} from './storeSaleComplianceActions';
 import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
 
 function isProviderBackedPaymentMethod(paymentMethod: string) {
@@ -135,6 +141,23 @@ function describePreviewLineDiscountSource(
 
 export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const selectedItem = workspace.branchCatalogItems[0];
+  const selectedItemIsSerialized = selectedItem?.tracking_mode === 'SERIALIZED';
+  const saleSerialNumbers = workspace.saleSerialNumbers ?? '';
+  const parsedSaleSerialNumbers = saleSerialNumbers
+    .split(/\r?\n|,/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const expectedSaleQuantity = Number(workspace.saleQuantity || 0);
+  const hasValidSerializedSaleInput = !selectedItemIsSerialized
+    || (Number.isFinite(expectedSaleQuantity) && expectedSaleQuantity > 0 && parsedSaleSerialNumbers.length === expectedSaleQuantity);
+  const minimumAge = resolveMinimumAge(selectedItem);
+  const hasValidComplianceInput = hasValidSaleComplianceInput(selectedItem, {
+    salePrescriptionNumber: workspace.salePrescriptionNumber ?? '',
+    salePatientName: workspace.salePatientName ?? '',
+    salePrescriberName: workspace.salePrescriberName ?? '',
+    saleAgeVerified: workspace.saleAgeVerified ?? false,
+    saleAgeVerificationId: workspace.saleAgeVerificationId ?? '',
+  });
   const hasSelectedCustomerProfile = workspace.selectedCustomerProfile !== null;
   const selectedCustomerVouchers = workspace.selectedCustomerVouchers;
   const selectedCustomerVoucher = workspace.selectedCustomerVoucher;
@@ -160,6 +183,8 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
     || !workspace.actor
     || !selectedItem
     || !workspace.saleQuantity
+    || !hasValidSerializedSaleInput
+    || !hasValidComplianceInput
     || !workspace.paymentMethod
     || (isDigitalCheckout && !workspace.isSessionLive);
 
@@ -330,6 +355,63 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
           disabled={hasSelectedCustomerProfile}
         />
         <FormField id="runtime-sale-quantity" label="Sale quantity" value={workspace.saleQuantity} onChange={workspace.setSaleQuantity} />
+        {selectedItemIsSerialized ? (
+          <FormField
+            id="runtime-sale-serial-numbers"
+            label="Serial / IMEI numbers"
+            value={saleSerialNumbers}
+            onChange={workspace.setSaleSerialNumbers}
+            placeholder="One serial per line or comma separated"
+            multiline
+          />
+        ) : null}
+        {isRxRequiredCatalogItem(selectedItem) ? (
+          <>
+            <FormField
+              id="runtime-sale-prescription-number"
+              label="Prescription number"
+              value={workspace.salePrescriptionNumber ?? ''}
+              onChange={workspace.setSalePrescriptionNumber}
+            />
+            <FormField
+              id="runtime-sale-patient-name"
+              label="Patient name"
+              value={workspace.salePatientName ?? ''}
+              onChange={workspace.setSalePatientName}
+            />
+            <FormField
+              id="runtime-sale-prescriber-name"
+              label="Prescriber name"
+              value={workspace.salePrescriberName ?? ''}
+              onChange={workspace.setSalePrescriberName}
+            />
+          </>
+        ) : null}
+        {isAgeRestrictedCatalogItem(selectedItem) ? (
+          <>
+            <p style={{ marginTop: 0, marginBottom: '14px', color: '#4e5871' }}>
+              {minimumAge
+                ? `Age verification required (${minimumAge}+)`
+                : 'Age verification required'}
+            </p>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+              <ActionButton onClick={() => workspace.setSaleAgeVerified(true)} disabled={workspace.isBusy}>
+                {minimumAge ? `Mark age verified (${minimumAge}+)` : 'Mark age verified'}
+              </ActionButton>
+              {workspace.saleAgeVerified ? (
+                <ActionButton onClick={() => workspace.setSaleAgeVerified(false)} disabled={workspace.isBusy}>
+                  Clear age verification
+                </ActionButton>
+              ) : null}
+            </div>
+            <FormField
+              id="runtime-sale-age-verification-id"
+              label="Age verification ID reference"
+              value={workspace.saleAgeVerificationId ?? ''}
+              onChange={workspace.setSaleAgeVerificationId}
+            />
+          </>
+        ) : null}
         <FormField id="runtime-payment-method" label="Payment method" value={workspace.paymentMethod} onChange={workspace.setPaymentMethod} />
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {['Cash', 'UPI', 'CASHFREE_UPI_QR', 'CASHFREE_HOSTED_TERMINAL', 'CASHFREE_HOSTED_PHONE'].map((paymentChoice) => (
@@ -347,6 +429,8 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
               || !workspace.actor
               || !selectedItem
               || !workspace.saleQuantity
+              || !hasValidSerializedSaleInput
+              || !hasValidComplianceInput
             }
           >
             Refresh checkout pricing
@@ -444,6 +528,9 @@ export function StoreBillingSection({ workspace }: { workspace: StoreRuntimeWork
                   <strong>{`${line.product_name} x ${line.quantity}`}</strong>
                   <DetailList
                     items={[
+                      ...(line.serial_numbers?.length
+                        ? [{ label: 'Serial numbers', value: line.serial_numbers.join(', ') }]
+                        : []),
                       { label: 'MRP posture', value: `Rs. ${line.mrp.toFixed(2)}` },
                       { label: 'Selling posture', value: `Rs. ${line.unit_selling_price.toFixed(2)}` },
                       {

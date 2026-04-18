@@ -48,6 +48,9 @@ async def create_catalog_product(
         mrp=payload.mrp,
         category_code=payload.category_code,
         selling_price=payload.selling_price,
+        tracking_mode=payload.tracking_mode,
+        compliance_profile=payload.compliance_profile,
+        compliance_config=payload.compliance_config,
     )
     return CatalogProductResponse.model_validate(product, from_attributes=True)
 

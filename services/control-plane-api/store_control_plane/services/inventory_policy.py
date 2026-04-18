@@ -251,6 +251,7 @@ class GoodsReceiptLineDraft:
     unit_cost: float
     line_total: float
     discrepancy_note: str | None
+    serial_numbers: list[str]
 
 
 def build_goods_receipt_lines(
@@ -280,6 +281,7 @@ def build_goods_receipt_lines(
         ordered_quantity = money(float(purchase_order_line.quantity))
         quantity = ordered_quantity
         discrepancy_note = None
+        serial_numbers: list[str] = []
         if reviewed_by_product_id is not None:
             reviewed_line = reviewed_by_product_id[str(purchase_order_line.product_id)]
             quantity = money(float(reviewed_line["received_quantity"]))
@@ -288,6 +290,7 @@ def build_goods_receipt_lines(
             if quantity > ordered_quantity:
                 raise ValueError("Received quantity exceeds ordered quantity")
             discrepancy_note = str(reviewed_line["discrepancy_note"]).strip() or None if reviewed_line.get("discrepancy_note") is not None else None
+            serial_numbers = list(reviewed_line.get("serial_numbers") or [])
         unit_cost = money(float(purchase_order_line.unit_cost))
         variance_quantity = money(ordered_quantity - quantity)
         total_received_quantity = money(total_received_quantity + quantity)
@@ -302,6 +305,7 @@ def build_goods_receipt_lines(
                 unit_cost=unit_cost,
                 line_total=money(quantity * unit_cost),
                 discrepancy_note=discrepancy_note,
+                serial_numbers=serial_numbers,
             )
         )
     if total_received_quantity <= 0:

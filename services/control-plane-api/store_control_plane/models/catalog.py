@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Float, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Float, ForeignKey, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, TimestampMixin
@@ -23,6 +23,9 @@ class CatalogProduct(Base, TimestampMixin):
     mrp: Mapped[float] = mapped_column(Float(), default=0.0)
     category_code: Mapped[str | None] = mapped_column(String(64), default=None)
     selling_price: Mapped[float] = mapped_column(default=0.0)
+    tracking_mode: Mapped[str] = mapped_column(String(32), default="STANDARD")
+    compliance_profile: Mapped[str] = mapped_column(String(32), default="NONE")
+    compliance_config: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(32), default="ACTIVE")
 
 

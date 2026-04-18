@@ -21,6 +21,9 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
         base_selling_price: 92.5,
         selling_price_override: null,
         effective_selling_price: 92.5,
+        tracking_mode: 'STANDARD',
+        compliance_profile: 'NONE',
+        compliance_config: {},
         availability_status: 'ACTIVE',
       },
     ],
@@ -105,6 +108,7 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     storeCreditAmount: '10',
     loyaltyPointsToRedeem: '200',
     saleQuantity: '1',
+    saleSerialNumbers: '',
     paymentMethod: 'UPI',
     setCustomerProfileSearchQuery: vi.fn(),
     loadCustomerProfiles: vi.fn(),
@@ -122,6 +126,7 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     setCustomerName: vi.fn(),
     setCustomerGstin: vi.fn(),
     setSaleQuantity: vi.fn(),
+    setSaleSerialNumbers: vi.fn(),
     setPaymentMethod: vi.fn(),
     createSalesInvoice: vi.fn(),
     isBusy: false,
@@ -253,5 +258,124 @@ describe('store billing section pricing preview', () => {
     expect(pricingQueries.getByText('Discount source')).toBeInTheDocument();
     expect(pricingQueries.getByText('Tea Auto + WELCOME20 + VCH-0001')).toBeInTheDocument();
     expect(screen.getByText('Apply voucher VCH-0001')).toBeInTheDocument();
+  });
+
+  test('requires exact serial assignments for serialized checkout lines', () => {
+    render(
+      <StoreBillingSection
+        workspace={buildWorkspace({
+          branchCatalogItems: [
+            {
+              id: 'catalog-item-serial-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              product_id: 'product-serial-1',
+              product_name: 'Serialized Phone',
+              sku_code: 'phone-x1',
+              barcode: '8901234567001',
+              hsn_sac_code: '8517',
+              gst_rate: 18,
+              mrp: 15999,
+              base_selling_price: 14999,
+              selling_price_override: null,
+              effective_selling_price: 14999,
+              tracking_mode: 'SERIALIZED',
+              compliance_profile: 'NONE',
+              compliance_config: {},
+              availability_status: 'ACTIVE',
+            },
+          ],
+          saleQuantity: '2',
+          saleSerialNumbers: 'IMEI-0001',
+          checkoutPricePreview: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText('Serial / IMEI numbers')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh checkout pricing' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create sales invoice' })).toBeDisabled();
+  });
+
+  test('requires prescription capture for RX-required checkout lines', () => {
+    render(
+      <StoreBillingSection
+        workspace={buildWorkspace({
+          branchCatalogItems: [
+            {
+              id: 'catalog-item-rx-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              product_id: 'product-rx-1',
+              product_name: 'Prescription Tablet',
+              sku_code: 'rx-tablet-10',
+              barcode: '8901234567111',
+              hsn_sac_code: '3004',
+              gst_rate: 12,
+              mrp: 340,
+              base_selling_price: 320,
+              selling_price_override: null,
+              effective_selling_price: 320,
+              tracking_mode: 'STANDARD',
+              compliance_profile: 'RX_REQUIRED',
+              compliance_config: {},
+              availability_status: 'ACTIVE',
+            },
+          ],
+          saleQuantity: '1',
+          saleSerialNumbers: '',
+          checkoutPricePreview: null,
+          salePrescriptionNumber: '',
+          salePatientName: '',
+          salePrescriberName: '',
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText('Prescription number')).toBeInTheDocument();
+    expect(screen.getByLabelText('Patient name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Prescriber name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh checkout pricing' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create sales invoice' })).toBeDisabled();
+  });
+
+  test('requires age verification for age-restricted checkout lines', () => {
+    render(
+      <StoreBillingSection
+        workspace={buildWorkspace({
+          branchCatalogItems: [
+            {
+              id: 'catalog-item-age-1',
+              tenant_id: 'tenant-acme',
+              branch_id: 'branch-1',
+              product_id: 'product-age-1',
+              product_name: 'Reserve Beverage',
+              sku_code: 'bev-reserve-750',
+              barcode: '8901234567222',
+              hsn_sac_code: '2203',
+              gst_rate: 28,
+              mrp: 900,
+              base_selling_price: 850,
+              selling_price_override: null,
+              effective_selling_price: 850,
+              tracking_mode: 'STANDARD',
+              compliance_profile: 'AGE_RESTRICTED',
+              compliance_config: { minimum_age: 21 },
+              availability_status: 'ACTIVE',
+            },
+          ],
+          saleQuantity: '1',
+          saleSerialNumbers: '',
+          checkoutPricePreview: null,
+          saleAgeVerified: false,
+          saleAgeVerificationId: '',
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/Age verification required/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark age verified (21+)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh checkout pricing' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create sales invoice' })).toBeDisabled();
   });
 });
