@@ -4,6 +4,7 @@ import { OwnerAttendanceSection } from './OwnerAttendanceSection';
 import { OwnerBarcodeSection } from './OwnerBarcodeSection';
 import { OwnerBarcodePrintRuntimeSection } from './OwnerBarcodePrintRuntimeSection';
 import { OwnerBillingLifecycleSection } from './OwnerBillingLifecycleSection';
+import { OwnerBranchPerformanceSection } from './OwnerBranchPerformanceSection';
 import { OwnerCashierSessionSection } from './OwnerCashierSessionSection';
 import { OwnerComplianceSection } from './OwnerComplianceSection';
 import { OwnerCustomerInsightsSection } from './OwnerCustomerInsightsSection';
@@ -317,6 +318,7 @@ export function OwnerWorkspace() {
       <OwnerReturnApprovalsSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerComplianceSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerCustomerInsightsSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
+      <OwnerBranchPerformanceSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branches={branches} />
       <OwnerSupplierReportingSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerSyncRuntimeSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerRuntimePolicySection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />

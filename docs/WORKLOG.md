@@ -52,6 +52,15 @@
   - summarized trade posture, workforce/session posture, and runtime/offline health directly from live runtime state already loaded by the branch session
   - added a small dashboard loader that refreshes stock-operation exceptions from the existing replenishment, restock, receiving, stock-count, and batch-expiry control-plane reads without creating a new reporting authority path
   - added focused store-desktop coverage for the dashboard refresh flow and exception previews
+- Completed `V2-007` end-to-end with shared branch management reporting and decision-support surfaces:
+  - added a control-plane `management-dashboard` reporting route that composes trade, workforce, operations, procurement, and replenishment recommendation posture into one branch-safe decision-support read model
+  - extended `owner-web` with a branch performance section that aggregates seven-day sales, at-risk branch counts, and immediate reorder spend across all accessible branches without turning branch managers into owner-web users
+  - extended `store-desktop` with a decision-support section that shows approved pending receipts, outstanding payables, and immediate reorder posture from the same authoritative dashboard contract instead of duplicating procurement logic in runtime state
+  - closed the `V2-007` ledger row now that owner reporting, branch-runtime dashboards, and replenishment or purchase decision support all exist on control-plane authority
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_reporting_decision_support_flow.py -q`
+  - `npm run test --workspace @store/owner-web -- src/control-plane/OwnerBranchPerformanceSection.test.tsx`
+  - `npm run test --workspace @store/store-desktop -- src/control-plane/StoreBranchDecisionSupportSection.test.tsx`
 
 ## 2026-04-17
 

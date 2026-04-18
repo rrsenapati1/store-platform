@@ -4,6 +4,7 @@ import { StoreBarcodeLookupSection } from './StoreBarcodeLookupSection';
 import type { WorkspaceMetric } from '@store/types';
 import { StoreBillingSection } from './StoreBillingSection';
 import { StoreAttendanceSection } from './StoreAttendanceSection';
+import { StoreBranchDecisionSupportSection } from './StoreBranchDecisionSupportSection';
 import { StoreCashierSessionSection } from './StoreCashierSessionSection';
 import { StoreCustomerInsightsSection } from './StoreCustomerInsightsSection';
 import { StoreCustomerDisplaySection } from './StoreCustomerDisplaySection';
@@ -267,6 +268,13 @@ export function StoreRuntimeWorkspace() {
 
       {!isLocalAuthGateActive ? <StoreOfflineContinuitySection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreBranchOperationsDashboardSection workspace={workspace} /> : null}
+      {!isLocalAuthGateActive ? (
+        <StoreBranchDecisionSupportSection
+          accessToken={workspace.accessToken}
+          tenantId={workspace.tenantId}
+          branchId={workspace.branchId}
+        />
+      ) : null}
       {!isLocalAuthGateActive ? <StoreShiftSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreAttendanceSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreCashierSessionSection workspace={workspace} /> : null}

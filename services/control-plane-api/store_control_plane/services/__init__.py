@@ -33,6 +33,7 @@ from .onboarding import OnboardingService
 from .platform_observability import PlatformObservabilityService
 from .promotions import PromotionService
 from .price_tiers import PriceTierService
+from .reporting import ReportingService
 from .operations_queue import OperationsQueueService
 from .operations_worker import OperationsWorkerService
 from .procurement_finance import ProcurementFinanceService
@@ -70,6 +71,7 @@ __all__ = [
     "PlatformObservabilityService",
     "PriceTierService",
     "PromotionService",
+    "ReportingService",
     "ProcurementFinanceService",
     "PurchasingService",
     "OperationsQueueService",

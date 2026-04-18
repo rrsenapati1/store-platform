@@ -2028,6 +2028,69 @@ export interface ControlPlaneBranchCustomerReport {
   return_activity: ControlPlaneBranchCustomerReturnRecord[];
 }
 
+export interface ControlPlaneBranchManagementDashboardTrade {
+  sales_today_total: number;
+  sales_today_count: number;
+  sales_7d_total: number;
+  sales_7d_count: number;
+  returns_7d_total: number;
+  returns_7d_count: number;
+  average_basket_value_7d: number;
+}
+
+export interface ControlPlaneBranchManagementDashboardWorkforce {
+  open_shift_count: number;
+  open_attendance_count: number;
+  open_cashier_count: number;
+}
+
+export interface ControlPlaneBranchManagementDashboardOperations {
+  low_stock_count: number;
+  restock_open_count: number;
+  receiving_ready_count: number;
+  receiving_variance_count: number;
+  stock_count_open_count: number;
+  expiring_soon_count: number;
+  supplier_blocker_count: number;
+  overdue_supplier_invoice_count: number;
+  queued_operations_job_count: number;
+}
+
+export interface ControlPlaneBranchManagementDashboardProcurement {
+  approval_pending_count: number;
+  approved_pending_receipt_count: number;
+  approved_pending_receipt_total: number;
+  outstanding_payables_total: number;
+  blocked_release_total: number;
+}
+
+export interface ControlPlaneBranchManagementDashboardRecommendation {
+  product_id: string;
+  product_name: string;
+  sku_code: string;
+  stock_on_hand: number;
+  reorder_point: number;
+  target_stock: number;
+  suggested_reorder_quantity: number;
+  open_restock_quantity: number;
+  open_purchase_order_quantity: number;
+  net_recommended_order_quantity: number;
+  latest_purchase_unit_cost: number;
+  estimated_purchase_cost: number;
+  recommendation_status: string;
+}
+
+export interface ControlPlaneBranchManagementDashboard {
+  branch_id: string;
+  branch_name: string;
+  as_of_date: string;
+  trade: ControlPlaneBranchManagementDashboardTrade;
+  workforce: ControlPlaneBranchManagementDashboardWorkforce;
+  operations: ControlPlaneBranchManagementDashboardOperations;
+  procurement: ControlPlaneBranchManagementDashboardProcurement;
+  recommendations: ControlPlaneBranchManagementDashboardRecommendation[];
+}
+
 export interface ControlPlaneGstExportJob {
   id: string;
   sale_id: string;

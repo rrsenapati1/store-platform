@@ -9,7 +9,7 @@ from .config import build_settings
 from .db.session import bootstrap_database, create_session_factory
 from .logging import configure_logging
 from .middleware import RateLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
-from .routes import auth_router, batches_router, barcode_router, billing_router, catalog_router, commerce_router, compliance_router, customers_router, exchange_router, inventory_router, operations_router, platform_router, procurement_finance_router, promotions_router, purchasing_router, runtime_router, supplier_reporting_router, sync_runtime_router, system_router, tenant_router, workforce_router
+from .routes import auth_router, batches_router, barcode_router, billing_router, catalog_router, commerce_router, compliance_router, customers_router, exchange_router, inventory_router, operations_router, platform_router, procurement_finance_router, promotions_router, purchasing_router, reporting_router, runtime_router, supplier_reporting_router, sync_runtime_router, system_router, tenant_router, workforce_router
 from .sentry import initialize_sentry
 from .services import build_identity_provider
 
@@ -135,6 +135,7 @@ def create_app(
     app.include_router(customers_router)
     app.include_router(exchange_router)
     app.include_router(supplier_reporting_router)
+    app.include_router(reporting_router)
     app.include_router(runtime_router)
     app.include_router(sync_runtime_router)
     return app

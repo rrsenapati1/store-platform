@@ -9,6 +9,7 @@ import type {
   ControlPlaneBranchCatalogItem,
   ControlPlaneBranchRecord,
   ControlPlaneBranchCustomerReport,
+  ControlPlaneBranchManagementDashboard,
   ControlPlaneAttendanceSession,
   ControlPlaneCashierSession,
   ControlPlaneBranchRuntimePolicy,
@@ -623,6 +624,13 @@ export const storeControlPlaneClient = {
   getBranchCustomerReport(accessToken: string, tenantId: string, branchId: string) {
     return request<ControlPlaneBranchCustomerReport>(
       `/v1/tenants/${tenantId}/branches/${branchId}/customer-report`,
+      undefined,
+      accessToken,
+    );
+  },
+  getBranchManagementDashboard(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneBranchManagementDashboard>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/management-dashboard`,
       undefined,
       accessToken,
     );

@@ -13,6 +13,7 @@ from .platform import router as platform_router
 from .promotions import router as promotions_router
 from .procurement_finance import router as procurement_finance_router
 from .purchasing import router as purchasing_router
+from .reporting import router as reporting_router
 from .runtime import router as runtime_router
 from .sync_runtime import router as sync_runtime_router
 from .supplier_reporting import router as supplier_reporting_router
@@ -36,6 +37,7 @@ __all__ = [
     "promotions_router",
     "procurement_finance_router",
     "purchasing_router",
+    "reporting_router",
     "runtime_router",
     "sync_runtime_router",
     "supplier_reporting_router",
