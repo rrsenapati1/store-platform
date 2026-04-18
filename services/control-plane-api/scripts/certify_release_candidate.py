@@ -36,12 +36,14 @@ def certify_release_candidate(
     operational_alert_result: dict[str, object] | None = None,
     environment_drift_result: dict[str, object] | None = None,
     tls_posture_result: dict[str, object] | None = None,
+    sbom_result: dict[str, object] | None = None,
     deployed_load_result: dict[str, object] | None = None,
     rollback_result: dict[str, object] | None = None,
     vulnerability_scan_result: dict[str, object] | None = None,
     require_operational_alerts: bool = True,
     require_environment_drift: bool = True,
     require_tls_posture: bool = True,
+    require_sbom: bool = True,
     require_deployed_load: bool = False,
     require_rollback_verification: bool = False,
     require_vulnerability_scan: bool = True,
@@ -79,6 +81,9 @@ def certify_release_candidate(
       "tls_posture_verified": (not require_tls_posture) or (
           tls_posture_result is not None and tls_posture_result.get("status") == "passed"
       ),
+      "sbom_verified": (not require_sbom) or (
+          sbom_result is not None and sbom_result.get("status") == "passed"
+      ),
       "deployed_load_verified": (
           deployed_load_result.get("status") == "passed"
           if deployed_load_result is not None
@@ -109,6 +114,8 @@ def certify_release_candidate(
       "environment_drift_failing_checks": [] if environment_drift_result is None else list(environment_drift_result.get("failing_checks") or []),
       "tls_posture_result_status": None if tls_posture_result is None else tls_posture_result.get("status"),
       "tls_posture_failing_checks": [] if tls_posture_result is None else list(tls_posture_result.get("failing_checks") or []),
+      "sbom_result_status": None if sbom_result is None else sbom_result.get("status"),
+      "sbom_failing_surfaces": [] if sbom_result is None else list(sbom_result.get("failing_surfaces") or []),
       "deployed_load_result_status": None if deployed_load_result is None else deployed_load_result.get("status"),
       "deployed_load_failing_scenarios": [] if deployed_load_result is None else list(deployed_load_result.get("failing_scenarios") or []),
       "rollback_result_status": None if rollback_result is None else rollback_result.get("status"),
@@ -129,6 +136,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--operational-alert-report", help="Optional JSON operational alert report path produced by verify_operational_alert_posture.py.")
     parser.add_argument("--environment-drift-report", help="Optional JSON environment drift report path produced by verify_environment_drift.py.")
     parser.add_argument("--tls-posture-report", help="Optional JSON TLS posture report path produced by verify_tls_posture.py.")
+    parser.add_argument("--sbom-report", help="Optional JSON SBOM report path produced by generate_sbom_bundle.py.")
     parser.add_argument("--deployed-load-report", help="Optional JSON deployed load report path produced by verify_deployed_load_posture.py.")
     parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path produced by verify_release_rollback.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
@@ -149,6 +157,9 @@ def main() -> None:
     tls_posture_result = None
     if args.tls_posture_report:
         tls_posture_result = json.loads(Path(args.tls_posture_report).read_text(encoding="utf-8"))
+    sbom_result = None
+    if args.sbom_report:
+        sbom_result = json.loads(Path(args.sbom_report).read_text(encoding="utf-8"))
     deployed_load_result = None
     if args.deployed_load_report:
         deployed_load_result = json.loads(Path(args.deployed_load_report).read_text(encoding="utf-8"))
@@ -167,6 +178,7 @@ def main() -> None:
         operational_alert_result=operational_alert_result,
         environment_drift_result=environment_drift_result,
         tls_posture_result=tls_posture_result,
+        sbom_result=sbom_result,
         deployed_load_result=deployed_load_result,
         rollback_result=rollback_result,
         vulnerability_scan_result=vulnerability_scan_result,

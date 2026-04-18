@@ -100,6 +100,7 @@ def _render_markdown(
     operational_alert_result: dict[str, object] | None,
     environment_drift_result: dict[str, object] | None,
     tls_posture_result: dict[str, object] | None,
+    sbom_result: dict[str, object] | None,
     deployed_load_result: dict[str, object] | None,
     rollback_result: dict[str, object] | None,
     vulnerability_scan_result: dict[str, object] | None,
@@ -189,6 +190,26 @@ def _render_markdown(
                 f"- {_humanize_check_name(str(check_dict.get('name') or 'unknown'))}: {check_dict.get('status') or 'unknown'}"
             )
         tls_lines.append("")
+    sbom_lines = [
+        "## SBOM Evidence",
+        "",
+        "- SBOM status: not-run",
+        "",
+    ]
+    if sbom_result is not None:
+        sbom_surfaces = dict(sbom_result.get("surfaces") or {})
+        sbom_lines = [
+            "## SBOM Evidence",
+            "",
+            f"- sbom status: {sbom_result.get('status')}",
+            f"- failing surfaces: {_stringify_domains(list(sbom_result.get('failing_surfaces') or []))}",
+        ]
+        for surface_name, surface_result in sbom_surfaces.items():
+            surface_dict = dict(surface_result or {})
+            sbom_lines.append(
+                f"- {_humanize_check_name(str(surface_name))}: {surface_dict.get('status') or 'unknown'}"
+            )
+        sbom_lines.append("")
     deployed_load_lines = [
         "## Deployed Load Evidence",
         "",
@@ -299,6 +320,7 @@ def _render_markdown(
             *operational_alert_lines,
             *environment_drift_lines,
             *tls_lines,
+            *sbom_lines,
             *deployed_load_lines,
             *rollback_lines,
             *vulnerability_lines,
@@ -327,6 +349,7 @@ def generate_release_candidate_evidence(
     alert_report_path: Path | None = None,
     environment_drift_report_path: Path | None = None,
     tls_posture_report_path: Path | None = None,
+    sbom_report_path: Path | None = None,
     deployed_load_report_path: Path | None = None,
     rollback_report_path: Path | None = None,
     vulnerability_scan_report_path: Path | None = None,
@@ -377,6 +400,11 @@ def generate_release_candidate_evidence(
         if tls_posture_report_path is not None
         else None
     )
+    sbom_result = (
+        json.loads(sbom_report_path.read_text(encoding="utf-8"))
+        if sbom_report_path is not None
+        else None
+    )
     deployed_load_result = (
         json.loads(deployed_load_report_path.read_text(encoding="utf-8"))
         if deployed_load_report_path is not None
@@ -412,6 +440,7 @@ def generate_release_candidate_evidence(
         operational_alert_result=operational_alert_result,
         environment_drift_result=environment_drift_result,
         tls_posture_result=tls_posture_result,
+        sbom_result=sbom_result,
         deployed_load_result=deployed_load_result,
         rollback_result=rollback_result,
         vulnerability_scan_result=vulnerability_scan_result,
@@ -429,6 +458,7 @@ def generate_release_candidate_evidence(
             operational_alert_result=operational_alert_result,
             environment_drift_result=environment_drift_result,
             tls_posture_result=tls_posture_result,
+            sbom_result=sbom_result,
             deployed_load_result=deployed_load_result,
             rollback_result=rollback_result,
             vulnerability_scan_result=vulnerability_scan_result,
@@ -447,6 +477,7 @@ def generate_release_candidate_evidence(
         "operational_alert_result": operational_alert_result,
         "environment_drift_result": environment_drift_result,
         "tls_posture_result": tls_posture_result,
+        "sbom_result": sbom_result,
         "deployed_load_result": deployed_load_result,
         "rollback_result": rollback_result,
         "vulnerability_scan_result": vulnerability_scan_result,
@@ -466,6 +497,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--operational-alert-report", help="Optional JSON alert report path produced by verify_operational_alert_posture.py.")
     parser.add_argument("--environment-drift-report", help="Optional JSON environment drift report path produced by verify_environment_drift.py.")
     parser.add_argument("--tls-posture-report", help="Optional JSON TLS posture report path produced by verify_tls_posture.py.")
+    parser.add_argument("--sbom-report", help="Optional JSON SBOM report path produced by generate_sbom_bundle.py.")
     parser.add_argument("--deployed-load-report", help="Optional JSON deployed load report path produced by verify_deployed_load_posture.py.")
     parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path produced by verify_release_rollback.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
@@ -494,6 +526,7 @@ def main() -> None:
         alert_report_path=Path(args.operational_alert_report) if args.operational_alert_report else None,
         environment_drift_report_path=Path(args.environment_drift_report) if args.environment_drift_report else None,
         tls_posture_report_path=Path(args.tls_posture_report) if args.tls_posture_report else None,
+        sbom_report_path=Path(args.sbom_report) if args.sbom_report else None,
         deployed_load_report_path=Path(args.deployed_load_report) if args.deployed_load_report else None,
         rollback_report_path=Path(args.rollback_report) if args.rollback_report else None,
         vulnerability_scan_report_path=Path(args.vulnerability_scan_report) if args.vulnerability_scan_report else None,

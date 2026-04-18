@@ -177,6 +177,30 @@ If release certification is run with `certify_release_candidate.py`, also pass:
 
 Release certification should now block if the TLS posture report is missing or failed.
 
+## SBOM Evidence
+
+Before certifying a staging or production release candidate, generate SBOM evidence:
+
+```powershell
+python scripts/generate_sbom_bundle.py `
+  --output-path docs/launch/evidence/prod-sbom-report.json `
+  --raw-output-dir docs/launch/evidence/prod-sbom-artifacts `
+  --image-ref store-control-plane-api:prod `
+  --image-ref postgres:16
+```
+
+Keep that JSON report and the raw CycloneDX artifacts with the release notes or evidence bundle.
+
+If release evidence is generated with `generate_release_candidate_evidence.py`, also pass:
+
+- `--sbom-report <sbom-report.json>`
+
+If release certification is run with `certify_release_candidate.py`, also pass:
+
+- `--sbom-report <sbom-report.json>`
+
+Release certification should now block if the SBOM report is missing or failed.
+
 ## Operational Alert Evidence
 
 Before certifying a staging or production release candidate, generate operational alert posture evidence:

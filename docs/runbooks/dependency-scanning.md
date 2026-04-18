@@ -6,6 +6,43 @@ Updated: 2026-04-18
 
 `CP-025` established the baseline scan posture. `V2-009` turns that posture into a repo-owned execution path that writes normalized JSON evidence and can now block release certification when scan evidence is missing or failed.
 
+## SBOM Bundle Runner
+
+`V2-009` also adds first-class SBOM generation for the same release surfaces.
+
+From repo root, run:
+
+```powershell
+python services/control-plane-api/scripts/generate_sbom_bundle.py `
+  --output-path docs/launch/evidence/staging-sbom-report.json `
+  --raw-output-dir docs/launch/evidence/staging-sbom-artifacts `
+  --image-ref store-control-plane-api:staging `
+  --image-ref postgres:16
+```
+
+This runner writes:
+
+- one normalized JSON report
+- one raw CycloneDX JSON artifact per surface under the raw-output directory
+
+## SBOM Coverage
+
+The runner currently covers:
+
+- `services/control-plane-api`
+- `apps/platform-admin`
+- `apps/owner-web`
+- `apps/store-desktop`
+- `apps/store-mobile`
+- `apps/store-desktop/src-tauri`
+- explicitly provided container image references
+
+## SBOM Tooling
+
+The first foundation uses `syft` as the primary generator and expects CycloneDX JSON output.
+
+If `syft` is unavailable, the runner still writes a normalized report, but affected surfaces are marked `tool-unavailable` and release certification should block when that report is supplied or required.
+
 ## Primary Runner
 
 From repo root, run:
@@ -171,3 +208,33 @@ python services/control-plane-api/scripts/certify_release_candidate.py `
 ```
 
 Release certification should now block if the vulnerability report is missing or failed.
+
+## Minimum SBOM Evidence For A Release
+
+Keep the latest SBOM bundle report for the release candidate, for example:
+
+```powershell
+python services/control-plane-api/scripts/generate_sbom_bundle.py `
+  --output-path docs/launch/evidence/prod-sbom-report.json `
+  --raw-output-dir docs/launch/evidence/prod-sbom-artifacts `
+  --image-ref store-control-plane-api:prod `
+  --image-ref postgres:16
+```
+
+Then feed that report into release evidence or certification:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --sbom-report docs/launch/evidence/prod-sbom-report.json
+
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --sbom-report docs/launch/evidence/prod-sbom-report.json
+```
+
+Release certification should now block if the SBOM report is missing or failed.

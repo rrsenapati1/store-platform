@@ -718,3 +718,83 @@ def test_generate_release_candidate_evidence_renders_tls_posture(tmp_path: Path)
     assert "tls posture status: failed" in content
     assert "failing checks: certificate_validity_window" in content
     assert "certificate validity window: failed" in content
+
+
+def test_generate_release_candidate_evidence_renders_sbom_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-sbom.md"
+    sbom_report_path = tmp_path / "sbom-report.json"
+    sbom_report_path.write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "failing_surfaces": ["owner_web"],
+                "surfaces": {
+                    "control_plane_api": {
+                        "status": "passed",
+                        "format": "cyclonedx-json",
+                        "component_count": 42,
+                    },
+                    "owner_web": {
+                        "status": "tool-unavailable",
+                        "format": "cyclonedx-json",
+                        "component_count": 0,
+                    },
+                },
+                "summary": "1 surfaces failed: owner_web",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc11",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "blocked",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc11",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "operational_alerts_verified": True,
+                "environment_drift_verified": True,
+                "tls_posture_verified": True,
+                "sbom_verified": False,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc11",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        sbom_report_path=sbom_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "blocked"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## SBOM Evidence" in content
+    assert "sbom status: failed" in content
+    assert "failing surfaces: owner_web" in content
+    assert "control plane api: passed" in content
+    assert "owner web: tool-unavailable" in content

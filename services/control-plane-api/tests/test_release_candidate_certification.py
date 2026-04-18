@@ -24,6 +24,7 @@ def test_release_candidate_certification_approves_cutover_ready_deployment() -> 
         operational_alert_result={"status": "passed", "failing_checks": []},
         environment_drift_result={"status": "passed", "failing_checks": []},
         tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         verify_deployed=lambda **_: {
             "status": "ok",
@@ -108,6 +109,7 @@ def test_release_candidate_certification_approves_when_performance_budgets_pass(
         operational_alert_result={"status": "passed", "failing_checks": []},
         environment_drift_result={"status": "passed", "failing_checks": []},
         tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         verify_deployed=lambda **_: {
             "status": "ok",
@@ -287,6 +289,31 @@ def test_release_candidate_certification_blocks_missing_tls_posture_report_by_de
     assert result["gates"]["tls_posture_verified"] is False
 
 
+def test_release_candidate_certification_blocks_missing_sbom_report_by_default() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.18-rc11",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
+        tls_posture_result={"status": "passed", "failing_checks": []},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.18-rc11",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "blocked"
+    assert result["gates"]["sbom_verified"] is False
+
+
 def test_release_candidate_certification_approves_when_environment_drift_passes() -> None:
     module = _load_certification_script_module()
 
@@ -298,6 +325,7 @@ def test_release_candidate_certification_approves_when_environment_drift_passes(
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         environment_drift_result={"status": "passed", "failing_checks": []},
         tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
         verify_deployed=lambda **_: {
             "status": "ok",
             "environment": "prod",
@@ -352,6 +380,7 @@ def test_release_candidate_certification_approves_when_operational_alerts_pass()
         },
         environment_drift_result={"status": "passed", "failing_checks": []},
         tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
         verify_deployed=lambda **_: {
             "status": "ok",
             "environment": "prod",
@@ -376,6 +405,7 @@ def test_release_candidate_certification_blocks_failed_deployed_load_report() ->
         operational_alert_result={"status": "passed", "failing_checks": []},
         environment_drift_result={"status": "passed", "failing_checks": []},
         tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         deployed_load_result={
             "status": "failed",
@@ -405,6 +435,7 @@ def test_release_candidate_certification_approves_when_deployed_load_passes() ->
         operational_alert_result={"status": "passed", "failing_checks": []},
         environment_drift_result={"status": "passed", "failing_checks": []},
         tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         deployed_load_result={
             "status": "passed",
@@ -434,6 +465,7 @@ def test_release_candidate_certification_blocks_failed_rollback_report() -> None
         operational_alert_result={"status": "passed", "failing_checks": []},
         environment_drift_result={"status": "passed", "failing_checks": []},
         tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         rollback_result={
             "status": "failed",
@@ -464,6 +496,7 @@ def test_release_candidate_certification_approves_when_rollback_report_passes() 
         operational_alert_result={"status": "passed", "failing_checks": []},
         environment_drift_result={"status": "passed", "failing_checks": []},
         tls_posture_result={"status": "passed", "failing_checks": []},
+        sbom_result={"status": "passed", "failing_surfaces": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         rollback_result={
             "status": "passed",

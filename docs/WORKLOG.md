@@ -2,6 +2,16 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with SBOM generation and release-evidence foundation:
+  - added a `sbom_generation` domain module so Store release surfaces can produce normalized SBOM posture alongside raw CycloneDX artifacts instead of relying only on vulnerability scans
+  - added `generate_sbom_bundle.py` so operators can generate one SBOM summary report plus raw artifacts for the backend, web, desktop, mobile, native desktop runtime, and explicit image references
+  - extended release-candidate evidence generation and certification so SBOM posture is rendered explicitly and now blocks approval when the report is missing or failed
+  - updated dependency-scanning, verification, and production deployment runbooks to document the new SBOM generation path and how it feeds release readiness
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_sbom_generation.py services/control-plane-api/tests/test_generate_sbom_bundle_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `python services/control-plane-api/scripts/generate_sbom_bundle.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
 - Extended `V2-009` with TLS posture verification foundation:
   - added a `tls_verification` domain module so deployed certificate posture is evaluated as a normalized report instead of an ad hoc manual browser check
   - added `verify_tls_posture.py` so operators can verify HTTPS use, hostname match, certificate expiry, and remaining validity window against a deployed control-plane base URL
