@@ -2,6 +2,16 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with restore-drill automation foundation:
+  - added control-plane restore-drill orchestration on top of the existing Postgres restore flow so selected backup artifacts can be restored into an explicit target database, booted locally through the control plane, and verified through mandatory health plus optional bounded smoke checks
+  - added `run_restore_drill.py` as the operator-facing CLI that writes machine-readable JSON recovery evidence and returns a non-zero status on failed drills
+  - extended release-candidate evidence generation so restore-drill reports can be attached as recovery evidence without turning them into a certification gate yet
+  - updated backup/restore and production deployment runbooks to document the new restore-drill command and evidence posture
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_postgres_restore_drill_ops.py services/control-plane-api/tests/test_postgres_restore_drill_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_postgres_restore_ops.py services/control-plane-api/tests/test_deployment_ops.py -q`
+  - `python services/control-plane-api/scripts/run_restore_drill.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
 - Started `V2-009` with performance/load validation foundation:
   - added a reusable control-plane performance budget engine for launch-foundation scenario evaluation, including p95 latency, error-rate, and throughput checks
   - added an in-process performance workload runner for the highest-risk V2 paths: checkout preview, direct sale creation, payment-session creation, offline replay, reviewed receiving, restock, reviewed stock count, and branch reporting dashboard reads

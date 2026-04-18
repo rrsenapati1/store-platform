@@ -1,6 +1,6 @@
 # Control-Plane Backup And Restore
 
-Updated: 2026-04-14
+Updated: 2026-04-18
 
 ## Scope
 
@@ -52,7 +52,7 @@ Longer legal or accounting retention can be layered on later, but the first publ
 
 Run restore drills on staging or on an isolated restore target only.
 
-Dry-run validation:
+Low-level artifact validation:
 
 ```powershell
 python scripts/restore_postgres.py `
@@ -62,7 +62,7 @@ python scripts/restore_postgres.py `
   --dry-run
 ```
 
-Real restore:
+Low-level real restore:
 
 ```powershell
 python scripts/restore_postgres.py `
@@ -72,15 +72,40 @@ python scripts/restore_postgres.py `
   --yes
 ```
 
-## Restore Drill Exit Criteria
+Operational restore drill with mandatory health verification:
 
-After restore:
+```powershell
+python scripts/run_restore_drill.py `
+  --dump-key control-plane/prod/postgres-backups/20260414T103045Z/store-control-plane-prod-20260414T103045Z.dump `
+  --metadata-key control-plane/prod/postgres-backups/20260414T103045Z/metadata.json `
+  --target-database-url postgresql+asyncpg://store:secret@restore-db.internal:5432/store_control_plane_restore `
+  --output-path C:\store-control-plane\restore-drills\20260418-prod-restore-drill.json `
+  --yes
+```
 
-1. the restored database boots
-2. `GET /v1/system/health` is `ok`
-3. the reported release version and environment match the expected artifact
-4. owner auth still works
-5. worker can start against the restored database
+Operational restore drill with bounded smoke verification:
+
+```powershell
+python scripts/run_restore_drill.py `
+  --dump-key control-plane/prod/postgres-backups/20260414T103045Z/store-control-plane-prod-20260414T103045Z.dump `
+  --metadata-key control-plane/prod/postgres-backups/20260414T103045Z/metadata.json `
+  --target-database-url postgresql+asyncpg://store:secret@restore-db.internal:5432/store_control_plane_restore `
+  --output-path C:\store-control-plane\restore-drills\20260418-prod-restore-drill-smoke.json `
+  --verify-smoke `
+  --yes
+```
+
+The restore-drill CLI writes a JSON artifact with:
+
+- restore status
+- source bucket and artifact keys
+- redacted target database identifier
+- restored manifest environment, release version, and Alembic head
+- health verification result
+- optional smoke verification result
+- explicit failure reason when the drill fails
+
+Treat that JSON file as the recovery evidence artifact. Console output is only a summary.
 
 ## RPO And RTO
 

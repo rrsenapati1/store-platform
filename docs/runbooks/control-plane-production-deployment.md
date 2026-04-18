@@ -1,6 +1,6 @@
 # Control-Plane Production Deployment
 
-Updated: 2026-04-14
+Updated: 2026-04-18
 
 ## Topology
 
@@ -115,6 +115,14 @@ Required checks after deployment:
 7. worker service is active and logs show clean startup
 8. JSON request logs are being emitted on the app VM
 9. desktop release channel still points at the matching environment
+
+## Recovery Evidence
+
+Before certifying a staging or production release candidate, attach recent restore-drill evidence where possible:
+
+- run `python scripts/run_restore_drill.py ... --output-path <restore-drill-report.json> --yes`
+- keep the JSON restore-drill report with the release notes or evidence bundle
+- if release evidence is generated with `generate_release_candidate_evidence.py`, pass `--restore-drill-report <restore-drill-report.json>` so recovery posture is recorded alongside verification and performance evidence
 
 ## Failure Posture
 
