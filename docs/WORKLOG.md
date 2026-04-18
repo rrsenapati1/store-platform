@@ -941,6 +941,16 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+- Completed the next `V2-009` hardening slice:
+  - added `store_control_plane/vulnerability_scanning.py` as the normalized scan-policy and report engine for Python, Node, Rust, and image vulnerability posture
+  - added `scripts/run_vulnerability_scans.py` plus `docs/launch/security/vulnerability-exceptions.json` so operators can produce one machine-readable vulnerability report and track expiring accepted exceptions
+  - extended `generate_release_candidate_evidence.py` to render vulnerability scan evidence alongside performance, security, and recovery posture
+  - extended `certify_release_candidate.py` to block release approval when vulnerability scan evidence is missing or failed
+  - updated deployment and dependency-scanning runbooks to make the new runner the canonical promotion path
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_vulnerability_scanning.py services/control-plane-api/tests/test_run_vulnerability_scans_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py services/control-plane-api/tests/test_performance_validation.py services/control-plane-api/tests/test_security_headers.py -q`
+  - `python services/control-plane-api/scripts/run_vulnerability_scans.py --help`
+  - `git -c core.safecrlf=false diff --check`
 - Completed V2-005 customer-assigned vouchers on top of promotion foundations:
   - `ASSIGNED_VOUCHER` promotion campaigns with customer-specific voucher issuance, cancellation, and redemption authority
   - checkout pricing preview, direct sale, and Cashfree checkout session support for `customer_voucher_id`

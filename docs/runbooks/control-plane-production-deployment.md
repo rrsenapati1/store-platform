@@ -130,6 +130,30 @@ Also keep the deployed security verification result from:
 
 That verification now includes secure-header checks and bounded live auth/webhook throttle probes, and release certification should block if those controls fail.
 
+## Vulnerability Scan Evidence
+
+Before certifying a staging or production release candidate, generate a normalized vulnerability report:
+
+```powershell
+python scripts/run_vulnerability_scans.py `
+  --output-path docs/launch/evidence/prod-vulnerability-report.json `
+  --exceptions-path docs/launch/security/vulnerability-exceptions.json `
+  --image-ref store-control-plane-api:prod `
+  --image-ref postgres:16
+```
+
+Keep that JSON report with the release notes or evidence bundle.
+
+If release evidence is generated with `generate_release_candidate_evidence.py`, also pass:
+
+- `--vulnerability-scan-report <vulnerability-report.json>`
+
+If release certification is run with `certify_release_candidate.py`, also pass:
+
+- `--vulnerability-scan-report <vulnerability-report.json>`
+
+Release certification should now block if the vulnerability report is missing or failed.
+
 ## Failure Posture
 
 - If pre-migration backup fails: stop deployment.

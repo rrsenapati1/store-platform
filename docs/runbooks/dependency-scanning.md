@@ -1,10 +1,26 @@
 # Dependency And Image Scanning
 
-Updated: 2026-04-15
+Updated: 2026-04-18
 
 ## Purpose
 
-`CP-025` does not add a full CI vulnerability platform. It does establish a repo-owned minimum scanning posture that must run before public release and before high-risk dependency upgrades are shipped.
+`CP-025` established the baseline scan posture. `V2-009` turns that posture into a repo-owned execution path that writes normalized JSON evidence and can now block release certification when scan evidence is missing or failed.
+
+## Primary Runner
+
+From repo root, run:
+
+```powershell
+python services/control-plane-api/scripts/run_vulnerability_scans.py `
+  --output-path docs/launch/evidence/staging-vulnerability-report.json `
+  --exceptions-path docs/launch/security/vulnerability-exceptions.json `
+  --image-ref store-control-plane-api:staging `
+  --image-ref postgres:16
+```
+
+This runner executes the Python, Node, Rust, and image scan set and writes one normalized JSON report.
+
+Use `--raw-output-dir <path>` when you also want the underlying scanner JSON payloads preserved for operator review.
 
 ## Release-Blocker Policy
 
@@ -17,7 +33,24 @@ Treat these as release blockers until explicitly triaged:
 
 Document accepted exceptions in the release notes or deployment change log. Do not rely on memory.
 
-## Python Backend
+## What The Runner Covers
+
+The runner currently scans:
+
+- Python runtime dependencies for `services/control-plane-api`
+- Node runtime dependencies for:
+  - `@store/platform-admin`
+  - `@store/owner-web`
+  - `@store/store-desktop`
+  - `@store/store-mobile`
+- Rust native dependencies for `apps/store-desktop/src-tauri`
+- explicitly provided container image references
+
+## Underlying Commands
+
+The runner is the preferred path, but the underlying commands remain useful for debugging.
+
+### Python Backend
 
 From repo root:
 
@@ -28,7 +61,7 @@ python -m pip_audit -r services/control-plane-api/requirements.txt
 
 Use this before backend release preparation and after bumping backend dependencies.
 
-## Node Workspaces
+### Node Workspaces
 
 From repo root:
 
@@ -41,7 +74,7 @@ npm audit --workspace @store/store-desktop --omit=dev
 
 If you need to inspect dev-dependency exposure during toolchain upgrades, run the same commands without `--omit=dev`.
 
-## Rust Or Tauri Native Dependencies
+### Rust Or Tauri Native Dependencies
 
 Install `cargo-audit` once:
 
@@ -55,7 +88,7 @@ Then scan the packaged runtime:
 cargo audit --manifest-path apps/store-desktop/src-tauri/Cargo.toml
 ```
 
-## Container Images
+### Container Images
 
 For self-managed VM releases, scan both the app image and any helper image you publish.
 
@@ -67,6 +100,25 @@ trivy image postgres:16
 ```
 
 If your deployment stays process-based instead of container-based, still scan any base images used in CI packaging or release generation.
+
+## Exceptions File
+
+Approved temporary exceptions live in:
+
+- `docs/launch/security/vulnerability-exceptions.json`
+
+Each entry must include:
+
+- `surface`
+- `tool`
+- `package_or_identifier`
+- `advisory_id`
+- `expires_on`
+- `reason`
+- `mitigation`
+- `approved_by`
+
+Expired exceptions fail the runner. Do not carry release-risk exceptions indefinitely.
 
 ## When To Run
 
@@ -92,11 +144,30 @@ Run the baseline scan set:
 
 ## Minimum Evidence For A Release
 
-Keep the latest scan outputs or operator notes for:
+Keep the latest runner report for the release candidate, for example:
 
-- backend Python audit
-- Node workspace audit
-- desktop native audit
-- deployed app or base image scan
+```powershell
+python services/control-plane-api/scripts/run_vulnerability_scans.py `
+  --output-path docs/launch/evidence/prod-vulnerability-report.json `
+  --exceptions-path docs/launch/security/vulnerability-exceptions.json `
+  --image-ref store-control-plane-api:prod `
+  --image-ref postgres:16
+```
 
-This is the minimum posture until CI automation lands under `CP-026`.
+Then feed that report into release evidence or certification:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --vulnerability-scan-report docs/launch/evidence/prod-vulnerability-report.json
+
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --vulnerability-scan-report docs/launch/evidence/prod-vulnerability-report.json
+```
+
+Release certification should now block if the vulnerability report is missing or failed.
