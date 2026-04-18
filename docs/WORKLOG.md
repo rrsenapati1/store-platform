@@ -47,6 +47,12 @@
   - `npm run build --workspace @store/store-desktop`
   - `git -c core.safecrlf=false diff --check`
 
+- Started `V2-007` with a `store-desktop` branch manager operations dashboard:
+  - added a runtime-only dashboard section for branch managers instead of extending `owner-web`, keeping the first reporting slice aligned with the existing branch runtime access model
+  - summarized trade posture, workforce/session posture, and runtime/offline health directly from live runtime state already loaded by the branch session
+  - added a small dashboard loader that refreshes stock-operation exceptions from the existing replenishment, restock, receiving, stock-count, and batch-expiry control-plane reads without creating a new reporting authority path
+  - added focused store-desktop coverage for the dashboard refresh flow and exception previews
+
 ## 2026-04-17
 
 - Completed `V2-005` with gift-card foundation as the final commercial-control slice:
