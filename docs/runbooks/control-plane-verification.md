@@ -113,6 +113,37 @@ The output is a machine-readable JSON report with:
 - `failing_checks`
 - `summary`
 
+## Verify TLS Certificate Posture
+
+For staging or production before release certification:
+
+```powershell
+python services/control-plane-api/scripts/verify_tls_posture.py `
+  --base-url https://control.store.korsenex.com `
+  --output-path docs\launch\evidence\prod-tls-posture.json `
+  --min-days-remaining 30
+```
+
+What this validates:
+
+- HTTPS is in use for the deployed control-plane base URL
+- the certificate matches the requested hostname
+- the certificate is not expired
+- the remaining certificate validity window stays above the required minimum
+
+The output is a machine-readable JSON report with:
+
+- `status`
+- `scheme`
+- `host`
+- `port`
+- `protocol`
+- `cipher`
+- `days_remaining`
+- `checks`
+- `failing_checks`
+- `summary`
+
 ## Run The Launch-Foundation Performance Validation Lane
 
 From `services/control-plane-api/` or repo root with the database URL available:
@@ -202,6 +233,7 @@ If you do not skip it, the evidence markdown records:
 - a compact scenario summary
 - the deployed security verification status and throttle posture
 - environment drift posture when a `--environment-drift-report` is supplied
+- TLS posture when a `--tls-posture-report` is supplied
 - deployed load posture when a `--deployed-load-report` is supplied
 
 `certify_release_candidate.py` can also consume a saved performance report directly:
@@ -234,6 +266,16 @@ python services/control-plane-api/scripts/certify_release_candidate.py `
   --environment-drift-report docs\launch\evidence\prod-environment-drift.json
 ```
 
+It can also consume a saved TLS posture report directly:
+
+```powershell
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --tls-posture-report docs\launch\evidence\prod-tls-posture.json
+```
+
 ## Expected Success Signal
 
 The script exits `0` and prints a JSON summary with:
@@ -253,6 +295,7 @@ The script exits `0` and prints a JSON summary with:
 - If the smoke fails after tests pass, treat it as an integration regression between control-plane modules.
 - If performance validation fails, treat the release evidence as incomplete until the failing scenarios are understood and the budgets are re-met or intentionally revised.
 - If environment drift verification fails, treat the release candidate as blocked until deployed configuration matches the declared environment contract.
+- If TLS posture verification fails, treat the release candidate as blocked until certificate validity or hostname posture is corrected.
 - If deployed load verification fails, treat the staged release as not scale-ready until the failing HTTP scenarios are understood and reverified.
 - If deployed security verification fails, treat the release candidate as blocked until the secure-header or throttle mismatch is resolved.
 

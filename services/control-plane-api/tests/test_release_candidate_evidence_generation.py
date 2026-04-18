@@ -644,3 +644,77 @@ def test_generate_release_candidate_evidence_renders_environment_drift_posture(t
     assert "failing checks: log_format_json, sentry_configured" in content
     assert "deployment environment match: passed" in content
     assert "log format json: failed" in content
+
+
+def test_generate_release_candidate_evidence_renders_tls_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-tls.md"
+    tls_report_path = tmp_path / "tls-posture.json"
+    tls_report_path.write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "host": "control.store.korsenex.com",
+                "port": 443,
+                "scheme": "https",
+                "failing_checks": ["certificate_validity_window"],
+                "checks": [
+                    {"name": "https_required", "status": "passed"},
+                    {"name": "hostname_match", "status": "passed"},
+                    {"name": "certificate_validity_window", "status": "failed"},
+                ],
+                "summary": "1 checks failed: certificate_validity_window",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc10",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "blocked",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc10",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "operational_alerts_verified": True,
+                "environment_drift_verified": True,
+                "tls_posture_verified": False,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc10",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        tls_posture_report_path=tls_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "blocked"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## TLS Evidence" in content
+    assert "tls posture status: failed" in content
+    assert "failing checks: certificate_validity_window" in content
+    assert "certificate validity window: failed" in content

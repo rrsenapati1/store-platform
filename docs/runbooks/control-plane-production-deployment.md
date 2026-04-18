@@ -154,6 +154,29 @@ If release certification is run with `certify_release_candidate.py`, also pass:
 
 Release certification should now block if the environment-drift report is missing or failed.
 
+## TLS Evidence
+
+Before certifying a staging or production release candidate, generate TLS certificate posture evidence:
+
+```powershell
+python scripts/verify_tls_posture.py `
+  --base-url https://control.store.korsenex.com `
+  --output-path docs/launch/evidence/prod-tls-posture.json `
+  --min-days-remaining 30
+```
+
+Keep that JSON report with the release notes or evidence bundle.
+
+If release evidence is generated with `generate_release_candidate_evidence.py`, also pass:
+
+- `--tls-posture-report <tls-posture-report.json>`
+
+If release certification is run with `certify_release_candidate.py`, also pass:
+
+- `--tls-posture-report <tls-posture-report.json>`
+
+Release certification should now block if the TLS posture report is missing or failed.
+
 ## Operational Alert Evidence
 
 Before certifying a staging or production release candidate, generate operational alert posture evidence:

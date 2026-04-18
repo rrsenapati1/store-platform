@@ -2,6 +2,16 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with TLS posture verification foundation:
+  - added a `tls_verification` domain module so deployed certificate posture is evaluated as a normalized report instead of an ad hoc manual browser check
+  - added `verify_tls_posture.py` so operators can verify HTTPS use, hostname match, certificate expiry, and remaining validity window against a deployed control-plane base URL
+  - extended release-candidate evidence generation and certification so TLS posture is rendered explicitly and now blocks approval when the report is missing or failed
+  - updated deployment and verification runbooks to document the new TLS verification command and its role in release readiness
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_tls_verification.py services/control-plane-api/tests/test_verify_tls_posture.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `python services/control-plane-api/scripts/verify_tls_posture.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
 - Extended `V2-009` with environment drift verification foundation:
   - added a control-plane `GET /v1/system/environment-contract` read model so deployed verification can inspect the effective environment, base URL, release version, logging, Sentry, object storage, operations-worker, and security-control posture without guessing from host config
   - added an `environment_drift` domain module plus `verify_environment_drift.py` so operators can generate normalized machine-readable drift evidence against the declared production contract
