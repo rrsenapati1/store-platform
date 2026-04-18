@@ -8,6 +8,7 @@ import { StoreCashierSessionSection } from './StoreCashierSessionSection';
 import { StoreCustomerInsightsSection } from './StoreCustomerInsightsSection';
 import { StoreCustomerDisplaySection } from './StoreCustomerDisplaySection';
 import { StoreOfflineContinuitySection } from './StoreOfflineContinuitySection';
+import { StoreShiftSection } from './StoreShiftSection';
 import { StoreRuntimeCacheSection } from './StoreRuntimeCacheSection';
 import { StoreRuntimeOutboxSection } from './StoreRuntimeOutboxSection';
 import { StoreExchangeSection } from './StoreExchangeSection';
@@ -264,6 +265,7 @@ export function StoreRuntimeWorkspace() {
       </SectionCard>
 
       {!isLocalAuthGateActive ? <StoreOfflineContinuitySection workspace={workspace} /> : null}
+      {!isLocalAuthGateActive ? <StoreShiftSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreAttendanceSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreCashierSessionSection workspace={workspace} /> : null}
       {!isLocalAuthGateActive ? <StoreCustomerDisplaySection workspace={workspace} /> : null}

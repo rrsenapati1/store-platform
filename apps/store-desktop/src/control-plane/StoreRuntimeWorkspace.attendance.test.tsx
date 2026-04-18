@@ -303,7 +303,7 @@ describe('store runtime attendance foundation', () => {
     fireEvent.change(screen.getByLabelText('Opening note'), { target: { value: 'Morning float' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
 
-    expect(await screen.findByText('Open an attendance session before opening a cashier session.')).toBeInTheDocument();
+    expect(await screen.findByText(/Open an attendance session before opening a cashier session/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
     fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));

@@ -6,11 +6,18 @@ export function StoreCashierSessionSection({ workspace }: { workspace: StoreRunt
     ?? workspace.runtimeDevices[0]
     ?? null;
   const activeCashierSession = workspace.activeCashierSession;
+  const requiresAttendance = workspace.branchRuntimePolicy?.require_attendance_for_cashier ?? true;
+  const attendanceGateSatisfied = !requiresAttendance || Boolean(workspace.activeAttendanceSession);
   const canOpenCashierSession = Boolean(
     workspace.isSessionLive
       && selectedRuntimeDevice?.assigned_staff_profile_id
       && workspace.cashierOpeningFloatAmount !== '',
-  );
+  ) && attendanceGateSatisfied;
+  const cashierIntro = selectedRuntimeDevice?.assigned_staff_profile_id
+    ? requiresAttendance && !workspace.activeAttendanceSession
+      ? 'Open an attendance session before opening a cashier session on this terminal.'
+      : 'Open a cashier session before billing or processing returns on this terminal.'
+    : 'Assign this runtime device to a staff profile before opening a cashier session.';
 
   return (
     <SectionCard eyebrow="Checkout authority" title="Cashier session">
@@ -46,15 +53,17 @@ export function StoreCashierSessionSection({ workspace }: { workspace: StoreRunt
       ) : (
         <>
           <p style={{ marginTop: 0, color: '#4e5871' }}>
-            {selectedRuntimeDevice?.assigned_staff_profile_id
-              ? 'Open a cashier session before billing or processing returns on this terminal.'
-              : 'Assign this runtime device to a staff profile before opening a cashier session.'}
+            {cashierIntro}
           </p>
           <DetailList
             items={[
               { label: 'Selected device', value: selectedRuntimeDevice?.device_name ?? 'None' },
               { label: 'Device code', value: selectedRuntimeDevice?.device_code ?? 'None' },
               { label: 'Assigned cashier', value: selectedRuntimeDevice?.assigned_staff_full_name ?? 'Not assigned' },
+              {
+                label: 'Attendance gate',
+                value: <StatusBadge label={requiresAttendance ? 'REQUIRED' : 'OPTIONAL'} tone={requiresAttendance ? 'warning' : 'neutral'} />,
+              },
             ]}
           />
           <div style={{ marginTop: '16px' }}>

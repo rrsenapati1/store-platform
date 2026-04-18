@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_actor, get_session
-from ..schemas import AttendanceSessionCloseRequest, AttendanceSessionCreateRequest, AttendanceSessionForceCloseRequest, AttendanceSessionListResponse, AttendanceSessionResponse, CashierSessionCloseRequest, CashierSessionCreateRequest, CashierSessionForceCloseRequest, CashierSessionListResponse, CashierSessionResponse, DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, RuntimeActivationIssueResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse
+from ..schemas import AttendanceSessionCloseRequest, AttendanceSessionCreateRequest, AttendanceSessionForceCloseRequest, AttendanceSessionListResponse, AttendanceSessionResponse, AuditListResponse, AuditRecord, BranchRuntimePolicyResponse, BranchRuntimePolicyUpsertRequest, CashierSessionCloseRequest, CashierSessionCreateRequest, CashierSessionForceCloseRequest, CashierSessionListResponse, CashierSessionResponse, DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, RuntimeActivationIssueResponse, ShiftSessionCloseRequest, ShiftSessionCreateRequest, ShiftSessionForceCloseRequest, ShiftSessionListResponse, ShiftSessionResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse, WorkforceAuditExportResponse
 from ..services import ActorContext, WorkforceService, assert_branch_any_capability, assert_tenant_capability
 
 router = APIRouter(prefix="/v1/tenants", tags=["workforce"])
@@ -78,6 +78,156 @@ async def list_branch_devices(
     service = WorkforceService(session)
     records = await service.list_branch_devices(tenant_id=tenant_id, branch_id=branch_id)
     return DeviceRegistrationListResponse(records=[DeviceRegistrationRecord(**record) for record in records])
+
+
+@router.get("/{tenant_id}/branches/{branch_id}/runtime-policy", response_model=BranchRuntimePolicyResponse)
+async def get_branch_runtime_policy(
+    tenant_id: str,
+    branch_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> BranchRuntimePolicyResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("branch.manage",))
+    service = WorkforceService(session)
+    record = await service.get_branch_runtime_policy(tenant_id=tenant_id, branch_id=branch_id)
+    return BranchRuntimePolicyResponse(**record)
+
+
+@router.put("/{tenant_id}/branches/{branch_id}/runtime-policy", response_model=BranchRuntimePolicyResponse)
+async def update_branch_runtime_policy(
+    tenant_id: str,
+    branch_id: str,
+    payload: BranchRuntimePolicyUpsertRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> BranchRuntimePolicyResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("branch.manage",))
+    service = WorkforceService(session)
+    record = await service.update_branch_runtime_policy(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        actor_user_id=actor.user_id,
+        require_shift_for_attendance=payload.require_shift_for_attendance,
+        require_attendance_for_cashier=payload.require_attendance_for_cashier,
+        require_assigned_staff_for_device=payload.require_assigned_staff_for_device,
+        allow_offline_sales=payload.allow_offline_sales,
+        max_pending_offline_sales=payload.max_pending_offline_sales,
+    )
+    return BranchRuntimePolicyResponse(**record)
+
+
+@router.get("/{tenant_id}/branches/{branch_id}/shift-sessions", response_model=ShiftSessionListResponse)
+async def list_branch_shift_sessions(
+    tenant_id: str,
+    branch_id: str,
+    status: str | None = None,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> ShiftSessionListResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        capabilities=("branch.manage", "sales.bill", "sales.return"),
+    )
+    service = WorkforceService(session)
+    records = await service.list_branch_shift_sessions(tenant_id=tenant_id, branch_id=branch_id, status=status)
+    return ShiftSessionListResponse(records=[ShiftSessionResponse(**record) for record in records])
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/shift-sessions", response_model=ShiftSessionResponse)
+async def create_branch_shift_session(
+    tenant_id: str,
+    branch_id: str,
+    payload: ShiftSessionCreateRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> ShiftSessionResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        capabilities=("branch.manage", "sales.bill", "sales.return"),
+    )
+    service = WorkforceService(session)
+    shift_session = await service.create_shift_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        actor_user_id=actor.user_id,
+        shift_name=payload.shift_name,
+        opening_note=payload.opening_note,
+    )
+    return ShiftSessionResponse(**shift_session)
+
+
+@router.get("/{tenant_id}/branches/{branch_id}/shift-sessions/{shift_session_id}", response_model=ShiftSessionResponse)
+async def get_branch_shift_session(
+    tenant_id: str,
+    branch_id: str,
+    shift_session_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> ShiftSessionResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        capabilities=("branch.manage", "sales.bill", "sales.return"),
+    )
+    service = WorkforceService(session)
+    shift_session = await service.get_shift_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        shift_session_id=shift_session_id,
+    )
+    return ShiftSessionResponse(**shift_session)
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/shift-sessions/{shift_session_id}/close", response_model=ShiftSessionResponse)
+async def close_branch_shift_session(
+    tenant_id: str,
+    branch_id: str,
+    shift_session_id: str,
+    payload: ShiftSessionCloseRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> ShiftSessionResponse:
+    assert_branch_any_capability(
+        actor,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        capabilities=("branch.manage", "sales.bill", "sales.return"),
+    )
+    service = WorkforceService(session)
+    shift_session = await service.close_shift_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        shift_session_id=shift_session_id,
+        actor_user_id=actor.user_id,
+        closing_note=payload.closing_note,
+    )
+    return ShiftSessionResponse(**shift_session)
+
+
+@router.post("/{tenant_id}/branches/{branch_id}/shift-sessions/{shift_session_id}/force-close", response_model=ShiftSessionResponse)
+async def force_close_branch_shift_session(
+    tenant_id: str,
+    branch_id: str,
+    shift_session_id: str,
+    payload: ShiftSessionForceCloseRequest,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> ShiftSessionResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("branch.manage",))
+    service = WorkforceService(session)
+    shift_session = await service.force_close_shift_session(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        shift_session_id=shift_session_id,
+        actor_user_id=actor.user_id,
+        reason=payload.reason,
+    )
+    return ShiftSessionResponse(**shift_session)
 
 
 @router.get("/{tenant_id}/branches/{branch_id}/cashier-sessions", response_model=CashierSessionListResponse)
@@ -299,6 +449,32 @@ async def list_branch_device_claims(
     service = WorkforceService(session)
     records = await service.list_branch_device_claims(tenant_id=tenant_id, branch_id=branch_id)
     return DeviceClaimListResponse(records=[DeviceClaimRecord(**record) for record in records])
+
+
+@router.get("/{tenant_id}/branches/{branch_id}/workforce-audit-events", response_model=AuditListResponse)
+async def list_branch_workforce_audit_events(
+    tenant_id: str,
+    branch_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> AuditListResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("branch.manage",))
+    service = WorkforceService(session)
+    records = await service.list_workforce_audit_events(tenant_id=tenant_id, branch_id=branch_id)
+    return AuditListResponse(records=[AuditRecord(**record) for record in records])
+
+
+@router.get("/{tenant_id}/branches/{branch_id}/workforce-audit-export", response_model=WorkforceAuditExportResponse)
+async def export_branch_workforce_audit_events(
+    tenant_id: str,
+    branch_id: str,
+    actor: ActorContext = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> WorkforceAuditExportResponse:
+    assert_branch_any_capability(actor, tenant_id=tenant_id, branch_id=branch_id, capabilities=("branch.manage",))
+    service = WorkforceService(session)
+    payload = await service.export_workforce_audit_events(tenant_id=tenant_id, branch_id=branch_id)
+    return WorkforceAuditExportResponse(**payload)
 
 
 @router.post("/{tenant_id}/branches/{branch_id}/device-claims/{claim_id}/approve", response_model=DeviceClaimApprovalResponse)

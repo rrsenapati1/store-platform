@@ -27,11 +27,13 @@ import type {
   ControlPlaneLoyaltyProgram,
   ControlPlaneComplianceProviderProfile,
   ControlPlaneAttendanceSession,
+  ControlPlaneBranchRuntimePolicy,
   ControlPlaneCashierSession,
   ControlPlaneDeviceClaimApproval,
   ControlPlaneDeviceClaimRecord,
   ControlPlaneDeviceRecord,
   ControlPlaneDeviceRegistration,
+  ControlPlaneShiftSession,
   ControlPlaneStoreDesktopActivation,
   ControlPlaneGstExportJob,
   ControlPlaneGstExportReport,
@@ -88,6 +90,7 @@ import type {
   ControlPlaneTransfer,
   ControlPlaneVendorDisputeBoard,
   ControlPlaneTransferBoard,
+  ControlPlaneWorkforceAuditExport,
 } from '@store/types';
 
 async function request<T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> {
@@ -1430,6 +1433,72 @@ export const ownerControlPlaneClient = {
     const search = status ? `?status=${encodeURIComponent(status)}` : '';
     return request<{ records: ControlPlaneAttendanceSession[] }>(
       `/v1/tenants/${tenantId}/branches/${branchId}/attendance-sessions${search}`,
+      undefined,
+      accessToken,
+    );
+  },
+  getBranchRuntimePolicy(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneBranchRuntimePolicy>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime-policy`,
+      undefined,
+      accessToken,
+    );
+  },
+  updateBranchRuntimePolicy(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      require_shift_for_attendance: boolean;
+      require_attendance_for_cashier: boolean;
+      require_assigned_staff_for_device: boolean;
+      allow_offline_sales: boolean;
+      max_pending_offline_sales: number;
+    },
+  ) {
+    return request<ControlPlaneBranchRuntimePolicy>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime-policy`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  listBranchShiftSessions(accessToken: string, tenantId: string, branchId: string, status?: string) {
+    const search = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request<{ records: ControlPlaneShiftSession[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/shift-sessions${search}`,
+      undefined,
+      accessToken,
+    );
+  },
+  forceCloseBranchShiftSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    shiftSessionId: string,
+    payload: { reason: string },
+  ) {
+    return request<ControlPlaneShiftSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/shift-sessions/${shiftSessionId}/force-close`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  listBranchWorkforceAuditEvents(accessToken: string, tenantId: string, branchId: string) {
+    return request<{ records: ControlPlaneAuditRecord[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/workforce-audit-events`,
+      undefined,
+      accessToken,
+    );
+  },
+  exportBranchWorkforceAuditEvents(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneWorkforceAuditExport>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/workforce-audit-export`,
       undefined,
       accessToken,
     );

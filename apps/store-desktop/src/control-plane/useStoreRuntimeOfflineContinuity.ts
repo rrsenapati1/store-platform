@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type {
   ControlPlaneActor,
   ControlPlaneBranchCatalogItem,
+  ControlPlaneBranchRuntimePolicy,
   ControlPlaneBranchRecord,
   ControlPlaneDeviceRecord,
   ControlPlaneInventorySnapshotRecord,
@@ -32,6 +33,7 @@ type UseStoreRuntimeOfflineContinuityArgs = {
   runtimeDevices: ControlPlaneDeviceRecord[];
   selectedRuntimeDeviceId: string;
   hubIdentityRecord: StoreRuntimeHubIdentityRecord | null;
+  branchRuntimePolicy: ControlPlaneBranchRuntimePolicy | null;
   onInventorySnapshotChange(nextInventorySnapshot: ControlPlaneInventorySnapshotRecord[]): void;
   onSalesChange(nextSales: ControlPlaneSaleRecord[]): void;
 };
@@ -167,6 +169,7 @@ export function useStoreRuntimeOfflineContinuity({
   runtimeDevices,
   selectedRuntimeDeviceId,
   hubIdentityRecord,
+  branchRuntimePolicy,
   onInventorySnapshotChange,
   onSalesChange,
 }: UseStoreRuntimeOfflineContinuityArgs) {
@@ -184,7 +187,9 @@ export function useStoreRuntimeOfflineContinuity({
   const selectedRuntimeDevice = runtimeDevices.find((device) => device.id === selectedRuntimeDeviceId) ?? runtimeDevices[0] ?? null;
   const runtimeProfile = resolveRuntimeProfile(selectedRuntimeDevice);
   const staffActorId = actor?.user_id ?? '';
-  const continuityReady = isOfflineSaleContinuityReady({
+  const policyAllowsOfflineSales = branchRuntimePolicy?.allow_offline_sales ?? true;
+  const maxPendingOfflineSales = Math.max(0, branchRuntimePolicy?.max_pending_offline_sales ?? 25);
+  const continuityReady = policyAllowsOfflineSales && isOfflineSaleContinuityReady({
     runtimeProfile,
     branchCode: selectedBranch?.code ?? null,
     branchGstin: selectedBranch?.gstin ?? null,
@@ -299,6 +304,9 @@ export function useStoreRuntimeOfflineContinuity({
   ]);
 
   async function createOfflineSale(args: CreateOfflineSaleArgs) {
+    if (!policyAllowsOfflineSales) {
+      throw new Error('Offline sale continuity is disabled by branch policy.');
+    }
     if (!continuityReady || !selectedBranch) {
       throw new Error('Offline continuity is not ready on this runtime.');
     }
@@ -309,6 +317,12 @@ export function useStoreRuntimeOfflineContinuity({
       hubDeviceId: hubIdentityRecord?.device_id ?? selectedRuntimeDevice?.id ?? '',
       inventorySnapshot,
     });
+    const pendingOfflineSales = baseSnapshot.offline_sales.filter(
+      (sale) => sale.reconciliation_state === 'PENDING_REPLAY' || sale.reconciliation_state === 'REPLAYING',
+    );
+    if (pendingOfflineSales.length >= maxPendingOfflineSales) {
+      throw new Error(`Offline sale continuity reached the branch limit of ${maxPendingOfflineSales} pending sales.`);
+    }
     const nextDraft = prepareOfflineSaleContinuityDraft({
       tenantId,
       branchId,

@@ -8,6 +8,7 @@ import type {
   ControlPlaneBarcodeScanLookup,
   ControlPlaneAttendanceSession,
   ControlPlaneBranchCatalogItem,
+  ControlPlaneBranchRuntimePolicy,
   ControlPlaneExchange,
   ControlPlaneBranchRecord,
   ControlPlaneCustomerProfile,
@@ -37,6 +38,7 @@ import type {
   ControlPlaneStoreDesktopActivationSession,
   ControlPlaneTenant,
   ControlPlaneLoyaltyProgram,
+  ControlPlaneShiftSession,
 } from '@store/types';
 import {
   createResolvedStoreRuntimeCache,
@@ -69,6 +71,11 @@ import {
   runLoadCashierSessions,
   runOpenCashierSession,
 } from './storeCashierSessionActions';
+import {
+  runCloseShiftSession,
+  runLoadShiftSessions,
+  runOpenShiftSession,
+} from './storeShiftActions';
 import { resolveStoreRuntimeSessionRestorePolicy } from './storeRuntimeSessionRestorePolicy';
 import {
   runCancelRestockTask,
@@ -163,6 +170,9 @@ export function useStoreRuntimeWorkspace() {
   const [activeAttendanceSession, setActiveAttendanceSession] = useState<ControlPlaneAttendanceSession | null>(null);
   const [cashierSessions, setCashierSessions] = useState<ControlPlaneCashierSession[]>([]);
   const [activeCashierSession, setActiveCashierSession] = useState<ControlPlaneCashierSession | null>(null);
+  const [branchRuntimePolicy, setBranchRuntimePolicy] = useState<ControlPlaneBranchRuntimePolicy | null>(null);
+  const [shiftSessions, setShiftSessions] = useState<ControlPlaneShiftSession[]>([]);
+  const [activeShiftSession, setActiveShiftSession] = useState<ControlPlaneShiftSession | null>(null);
   const [runtimeHeartbeat, setRuntimeHeartbeat] = useState<ControlPlaneRuntimeHeartbeat | null>(null);
   const [printJobs, setPrintJobs] = useState<ControlPlanePrintJob[]>([]);
   const [latestPrintJob, setLatestPrintJob] = useState<ControlPlanePrintJob | null>(null);
@@ -232,6 +242,9 @@ export function useStoreRuntimeWorkspace() {
   const [cashierOpeningFloatAmount, setCashierOpeningFloatAmount] = useState('');
   const [cashierOpeningNote, setCashierOpeningNote] = useState('');
   const [cashierClosingNote, setCashierClosingNote] = useState('');
+  const [shiftName, setShiftName] = useState('');
+  const [shiftOpeningNote, setShiftOpeningNote] = useState('');
+  const [shiftClosingNote, setShiftClosingNote] = useState('');
   const [returnQuantity, setReturnQuantity] = useState('1');
   const [refundAmount, setRefundAmount] = useState('');
   const [refundMethod, setRefundMethod] = useState('Cash');
@@ -319,6 +332,7 @@ export function useStoreRuntimeWorkspace() {
     runtimeDevices,
     selectedRuntimeDeviceId,
     hubIdentityRecord,
+    branchRuntimePolicy,
     onInventorySnapshotChange(nextInventorySnapshot) {
       applyStateTransition(() => {
         setInventorySnapshot(nextInventorySnapshot);
@@ -435,6 +449,27 @@ export function useStoreRuntimeWorkspace() {
   ]);
 
   useEffect(() => {
+    if (!accessToken || !tenantId || !branchId) {
+      applyStateTransition(() => {
+        setBranchRuntimePolicy(null);
+      });
+      return;
+    }
+    void loadBranchRuntimePolicy();
+  }, [accessToken, branchId, tenantId]);
+
+  useEffect(() => {
+    if (!accessToken || !tenantId || !branchId) {
+      applyStateTransition(() => {
+        setShiftSessions([]);
+        setActiveShiftSession(null);
+      });
+      return;
+    }
+    void loadShiftSessions();
+  }, [accessToken, branchId, tenantId]);
+
+  useEffect(() => {
     if (!accessToken || !tenantId || !branchId || !actor?.user_id || !selectedRuntimeDeviceId) {
       applyStateTransition(() => {
         setAttendanceSessions([]);
@@ -509,6 +544,9 @@ export function useStoreRuntimeWorkspace() {
       setActiveAttendanceSession(null);
       setCashierSessions([]);
       setActiveCashierSession(null);
+      setBranchRuntimePolicy(null);
+      setShiftSessions([]);
+      setActiveShiftSession(null);
       setRuntimeHeartbeat(null);
       setPrintJobs([]);
       setLatestPrintJob(null);
@@ -553,6 +591,9 @@ export function useStoreRuntimeWorkspace() {
       setCashierOpeningFloatAmount('');
       setCashierOpeningNote('');
       setCashierClosingNote('');
+      setShiftName('');
+      setShiftOpeningNote('');
+      setShiftClosingNote('');
       setRestockRequestedQuantity('');
       setRestockPickedQuantity('');
       setRestockSourcePosture('BACKROOM_AVAILABLE');
@@ -721,6 +762,39 @@ export function useStoreRuntimeWorkspace() {
     });
   }
 
+  async function loadBranchRuntimePolicy() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    try {
+      const policy = await storeControlPlaneClient.getBranchRuntimePolicy(accessToken, tenantId, branchId);
+      applyStateTransition(() => {
+        setBranchRuntimePolicy(policy);
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load branch runtime policy');
+    }
+  }
+
+  async function loadShiftSessions() {
+    if (!accessToken || !tenantId || !branchId) {
+      applyStateTransition(() => {
+        setShiftSessions([]);
+        setActiveShiftSession(null);
+      });
+      return;
+    }
+    await runLoadShiftSessions({
+      accessToken,
+      tenantId,
+      branchId,
+      setIsBusy: () => {},
+      setErrorMessage,
+      setShiftSessions,
+      setActiveShiftSession,
+    });
+  }
+
   async function loadAttendanceSessions() {
     if (!accessToken || !tenantId || !branchId || !actor?.user_id || !selectedRuntimeDeviceId) {
       return;
@@ -757,6 +831,10 @@ export function useStoreRuntimeWorkspace() {
       setErrorMessage('The selected runtime device must be assigned to a staff profile before clocking in.');
       return;
     }
+    if ((branchRuntimePolicy?.require_shift_for_attendance ?? false) && !activeShiftSession) {
+      setErrorMessage('Open a branch shift before clocking in.');
+      return;
+    }
     await runOpenAttendanceSession({
       accessToken,
       tenantId,
@@ -771,6 +849,7 @@ export function useStoreRuntimeWorkspace() {
       setActiveAttendanceSession,
       setAttendanceClockInNote,
     });
+    await loadShiftSessions();
   }
 
   async function closeAttendanceSession() {
@@ -795,6 +874,56 @@ export function useStoreRuntimeWorkspace() {
       setActiveAttendanceSession,
       setAttendanceClockOutNote,
     });
+    await loadShiftSessions();
+  }
+
+  async function openShiftSession() {
+    if (!accessToken || !tenantId || !branchId) {
+      return;
+    }
+    if (activeShiftSession) {
+      setErrorMessage('Close the active branch shift before opening another one.');
+      return;
+    }
+    if (!shiftName.trim()) {
+      setErrorMessage('Enter a shift name before opening a branch shift.');
+      return;
+    }
+    await runOpenShiftSession({
+      accessToken,
+      tenantId,
+      branchId,
+      shiftName: shiftName.trim(),
+      openingNote: shiftOpeningNote,
+      setIsBusy,
+      setErrorMessage,
+      setShiftSessions,
+      setActiveShiftSession,
+      setShiftName,
+      setShiftOpeningNote,
+    });
+  }
+
+  async function closeShiftSession() {
+    if (!accessToken || !tenantId || !branchId || !activeShiftSession) {
+      return;
+    }
+    if (activeShiftSession.linked_attendance_sessions_count > 0 || activeShiftSession.linked_cashier_sessions_count > 0) {
+      setErrorMessage('Close linked attendance and cashier sessions before closing this branch shift.');
+      return;
+    }
+    await runCloseShiftSession({
+      accessToken,
+      tenantId,
+      branchId,
+      shiftSessionId: activeShiftSession.id,
+      closingNote: shiftClosingNote,
+      setIsBusy,
+      setErrorMessage,
+      setShiftSessions,
+      setActiveShiftSession,
+      setShiftClosingNote,
+    });
   }
 
   async function openCashierSession() {
@@ -809,7 +938,7 @@ export function useStoreRuntimeWorkspace() {
       setErrorMessage('The selected runtime device must be assigned to a staff profile before opening a cashier session.');
       return;
     }
-    if (!activeAttendanceSession) {
+    if ((branchRuntimePolicy?.require_attendance_for_cashier ?? true) && !activeAttendanceSession) {
       setErrorMessage('Open an attendance session before opening a cashier session.');
       return;
     }
@@ -834,6 +963,7 @@ export function useStoreRuntimeWorkspace() {
       setCashierOpeningFloatAmount,
       setCashierOpeningNote,
     });
+    await loadShiftSessions();
   }
 
   async function closeCashierSession() {
@@ -854,6 +984,7 @@ export function useStoreRuntimeWorkspace() {
       setActiveCashierSession,
       setCashierClosingNote,
     });
+    await loadShiftSessions();
   }
 
   function resetRestockForm() {
@@ -2509,6 +2640,7 @@ export function useStoreRuntimeWorkspace() {
     activeAttendanceSession,
     activeBatchExpirySession,
     activeCashierSession,
+    activeShiftSession,
     activeStockCountSession,
     attendanceClockInNote,
     attendanceClockOutNote,
@@ -2520,6 +2652,7 @@ export function useStoreRuntimeWorkspace() {
     batchExpiryBoard,
     branchCatalogItems,
     branchId,
+    branchRuntimePolicy,
     branches,
     cashierSessions,
     cashierOpeningFloatAmount,
@@ -2540,6 +2673,7 @@ export function useStoreRuntimeWorkspace() {
     createBatchExpiryWriteOff,
     closeAttendanceSession,
     closeCashierSession,
+    closeShiftSession,
     createStockCountSession,
     createSaleReturn,
     createSalesInvoice,
@@ -2605,10 +2739,12 @@ export function useStoreRuntimeWorkspace() {
     loadAttendanceSessions,
     loadBatchExpiryBoard,
     loadBatchExpiryReport,
+    loadBranchRuntimePolicy,
     loadCashierSessions,
     loadCustomerProfiles,
     loadReceivingBoard,
     loadRestockBoard,
+    loadShiftSessions,
     loadStockCountBoard,
     queueLatestCreditNotePrint,
     queueLatestInvoicePrint,
@@ -2623,6 +2759,7 @@ export function useStoreRuntimeWorkspace() {
     openRuntimeCashDrawer,
     openAttendanceSession,
     openCashierSession,
+    openShiftSession,
     readRuntimeScaleWeight,
     recordBatchExpirySession,
     recordStockCountSession,
@@ -2723,10 +2860,14 @@ export function useStoreRuntimeWorkspace() {
     returnQuantity,
       saleQuantity,
       sales,
-      sessionExpiresAt,
+    sessionExpiresAt,
       promotionCode,
     selectedRuntimeDeviceId,
     selectedStockCountProductId,
+    shiftClosingNote,
+    shiftName,
+    shiftOpeningNote,
+    shiftSessions,
     blindCountedQuantity,
     setConfirmPin,
     setCustomerProfileSearchQuery,
@@ -2752,6 +2893,9 @@ export function useStoreRuntimeWorkspace() {
     setCashierOpeningFloatAmount,
     setCashierOpeningNote,
     setCashierClosingNote,
+    setShiftClosingNote,
+    setShiftName,
+    setShiftOpeningNote,
     setRestockRequestedQuantity,
     setRestockPickedQuantity,
     setRestockSourcePosture,

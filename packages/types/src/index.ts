@@ -418,6 +418,7 @@ export interface ControlPlaneAttendanceSession {
   id: string;
   tenant_id: string;
   branch_id: string;
+  shift_session_id?: string | null;
   device_registration_id: string;
   device_name?: string | null;
   device_code?: string | null;
@@ -435,6 +436,43 @@ export interface ControlPlaneAttendanceSession {
   closed_at?: string | null;
   last_activity_at?: string | null;
   linked_cashier_sessions_count: number;
+}
+
+export interface ControlPlaneShiftSession {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  opened_by_user_id?: string | null;
+  closed_by_user_id?: string | null;
+  status: string;
+  shift_number: string;
+  shift_name: string;
+  opening_note?: string | null;
+  closing_note?: string | null;
+  force_close_reason?: string | null;
+  opened_at: string;
+  closed_at?: string | null;
+  last_activity_at?: string | null;
+  linked_attendance_sessions_count: number;
+  linked_cashier_sessions_count: number;
+}
+
+export interface ControlPlaneBranchRuntimePolicy {
+  id?: string | null;
+  tenant_id: string;
+  branch_id: string;
+  require_shift_for_attendance: boolean;
+  require_attendance_for_cashier: boolean;
+  require_assigned_staff_for_device: boolean;
+  allow_offline_sales: boolean;
+  max_pending_offline_sales: number;
+  updated_by_user_id?: string | null;
+}
+
+export interface ControlPlaneWorkforceAuditExport {
+  filename: string;
+  content_type: string;
+  content: string;
 }
 
 export interface ControlPlaneRuntimeHubBootstrap {

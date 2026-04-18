@@ -7,10 +7,18 @@ export function StoreAttendanceSection({ workspace }: { workspace: StoreRuntimeW
     ?? null;
   const activeAttendanceSession = workspace.activeAttendanceSession;
   const attendanceHistory = workspace.attendanceSessions.filter((session) => session.status !== 'OPEN');
+  const requiresShift = workspace.branchRuntimePolicy?.require_shift_for_attendance ?? false;
+  const shiftGateSatisfied = !requiresShift || Boolean(workspace.activeShiftSession);
   const canOpenAttendanceSession = Boolean(
     workspace.isSessionLive
       && selectedRuntimeDevice?.assigned_staff_profile_id,
-  );
+  ) && shiftGateSatisfied;
+  const attendanceIntro = selectedRuntimeDevice?.assigned_staff_profile_id
+    ? requiresShift && !workspace.activeShiftSession
+      ? 'Open a branch shift before clocking in on this runtime device.'
+      : 'Clock in on this runtime device before opening a cashier session.'
+    : 'Assign this runtime device to a staff profile before clocking in.';
+  const shiftDescriptor = workspace.activeShiftSession?.shift_number ?? 'No active shift';
 
   return (
     <SectionCard eyebrow="Staff presence" title="Attendance">
@@ -28,6 +36,7 @@ export function StoreAttendanceSection({ workspace }: { workspace: StoreRuntimeW
               { label: 'Staff member', value: activeAttendanceSession.staff_full_name ?? 'Unknown' },
               { label: 'Opened at', value: activeAttendanceSession.opened_at },
               { label: 'Clock-in note', value: activeAttendanceSession.clock_in_note || 'None' },
+              { label: 'Linked shift', value: activeAttendanceSession.shift_session_id ?? shiftDescriptor },
               { label: 'Linked cashier sessions', value: String(activeAttendanceSession.linked_cashier_sessions_count) },
             ]}
           />
@@ -46,15 +55,14 @@ export function StoreAttendanceSection({ workspace }: { workspace: StoreRuntimeW
       ) : (
         <>
           <p style={{ marginTop: 0, color: '#4e5871' }}>
-            {selectedRuntimeDevice?.assigned_staff_profile_id
-              ? 'Clock in on this runtime device before opening a cashier session.'
-              : 'Assign this runtime device to a staff profile before clocking in.'}
+            {attendanceIntro}
           </p>
           <DetailList
             items={[
               { label: 'Selected device', value: selectedRuntimeDevice?.device_name ?? 'None' },
               { label: 'Device code', value: selectedRuntimeDevice?.device_code ?? 'None' },
               { label: 'Assigned staff member', value: selectedRuntimeDevice?.assigned_staff_full_name ?? 'Not assigned' },
+              { label: 'Active shift', value: shiftDescriptor },
             ]}
           />
           <div style={{ marginTop: '16px' }}>

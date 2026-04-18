@@ -146,6 +146,7 @@ class AttendanceSessionResponse(BaseModel):
     id: str
     tenant_id: str
     branch_id: str
+    shift_session_id: str | None = None
     device_registration_id: str
     device_name: str | None = None
     device_code: str | None = None
@@ -167,6 +168,68 @@ class AttendanceSessionResponse(BaseModel):
 
 class AttendanceSessionListResponse(BaseModel):
     records: list[AttendanceSessionResponse]
+
+
+class ShiftSessionCreateRequest(BaseModel):
+    shift_name: str
+    opening_note: str | None = None
+
+
+class ShiftSessionCloseRequest(BaseModel):
+    closing_note: str | None = None
+
+
+class ShiftSessionForceCloseRequest(BaseModel):
+    reason: str
+
+
+class ShiftSessionResponse(BaseModel):
+    id: str
+    tenant_id: str
+    branch_id: str
+    opened_by_user_id: str | None = None
+    closed_by_user_id: str | None = None
+    status: str
+    shift_number: str
+    shift_name: str
+    opening_note: str | None = None
+    closing_note: str | None = None
+    force_close_reason: str | None = None
+    opened_at: datetime
+    closed_at: datetime | None = None
+    last_activity_at: datetime | None = None
+    linked_attendance_sessions_count: int = 0
+    linked_cashier_sessions_count: int = 0
+
+
+class ShiftSessionListResponse(BaseModel):
+    records: list[ShiftSessionResponse]
+
+
+class BranchRuntimePolicyUpsertRequest(BaseModel):
+    require_shift_for_attendance: bool
+    require_attendance_for_cashier: bool
+    require_assigned_staff_for_device: bool
+    allow_offline_sales: bool
+    max_pending_offline_sales: int
+
+
+class BranchRuntimePolicyResponse(BaseModel):
+    id: str | None = None
+    tenant_id: str
+    branch_id: str
+    require_shift_for_attendance: bool
+    require_attendance_for_cashier: bool
+    require_assigned_staff_for_device: bool
+    allow_offline_sales: bool
+    max_pending_offline_sales: int
+    updated_by_user_id: str | None = None
+
+
+class WorkforceAuditExportResponse(BaseModel):
+    filename: str
+    content_type: str
+    content: str
 
 
 class RuntimeDeviceClaimResolveRequest(BaseModel):

@@ -2,6 +2,8 @@ import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@
 import type { OwnerWorkspaceState } from './useOwnerWorkspace';
 
 export function OwnerReplenishmentSection({ workspace }: { workspace: OwnerWorkspaceState }) {
+  const branchCatalogItems = workspace.branchCatalogItems ?? [];
+  const replenishmentRecords = workspace.replenishmentBoard?.records ?? [];
   const latestPolicy =
     workspace.latestBranchCatalogItem?.reorder_point != null && workspace.latestBranchCatalogItem?.target_stock != null
       ? workspace.latestBranchCatalogItem
@@ -31,7 +33,7 @@ export function OwnerReplenishmentSection({ workspace }: { workspace: OwnerWorks
               workspace.isBusy ||
               !workspace.actor ||
               !workspace.branchId ||
-              workspace.branchCatalogItems.length === 0 ||
+              branchCatalogItems.length === 0 ||
               !workspace.replenishmentReorderPoint ||
               !workspace.replenishmentTargetStock
             }
@@ -59,8 +61,8 @@ export function OwnerReplenishmentSection({ workspace }: { workspace: OwnerWorks
 
       <SectionCard eyebrow="Low-stock visibility" title="Replenishment board">
         <ul style={{ marginBottom: 0, marginTop: 0, color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.replenishmentBoard?.records.length ? (
-            workspace.replenishmentBoard.records.map((record) => (
+          {replenishmentRecords.length ? (
+            replenishmentRecords.map((record) => (
               <li key={record.product_id}>
                 {record.product_name} ::{' '}
                 <StatusBadge label={record.replenishment_status} tone={record.replenishment_status === 'LOW_STOCK' ? 'warning' : 'success'} /> :: suggest{' '}

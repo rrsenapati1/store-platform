@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import BranchAttendanceSession, BranchCashierSession, DeviceClaim, DeviceRegistration, Sale, SaleReturn, SpokeRuntimeActivation, StaffProfile, StoreDesktopActivation
+from ..models import BranchAttendanceSession, BranchCashierSession, BranchRuntimePolicy, BranchShiftSession, DeviceClaim, DeviceRegistration, Sale, SaleReturn, SpokeRuntimeActivation, StaffProfile, StoreDesktopActivation
 from ..utils import new_id
 
 
@@ -152,6 +152,54 @@ class WorkforceRepository:
             .order_by(DeviceRegistration.created_at.asc(), DeviceRegistration.id.asc())
         )
         return list((await self._session.scalars(statement)).all())
+
+    async def get_branch_runtime_policy(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+    ) -> BranchRuntimePolicy | None:
+        statement = select(BranchRuntimePolicy).where(
+            BranchRuntimePolicy.tenant_id == tenant_id,
+            BranchRuntimePolicy.branch_id == branch_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def upsert_branch_runtime_policy(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        require_shift_for_attendance: bool,
+        require_attendance_for_cashier: bool,
+        require_assigned_staff_for_device: bool,
+        allow_offline_sales: bool,
+        max_pending_offline_sales: int,
+        updated_by_user_id: str | None,
+    ) -> BranchRuntimePolicy:
+        record = await self.get_branch_runtime_policy(tenant_id=tenant_id, branch_id=branch_id)
+        if record is None:
+            record = BranchRuntimePolicy(
+                id=new_id(),
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                require_shift_for_attendance=require_shift_for_attendance,
+                require_attendance_for_cashier=require_attendance_for_cashier,
+                require_assigned_staff_for_device=require_assigned_staff_for_device,
+                allow_offline_sales=allow_offline_sales,
+                max_pending_offline_sales=max_pending_offline_sales,
+                updated_by_user_id=updated_by_user_id,
+            )
+            self._session.add(record)
+        else:
+            record.require_shift_for_attendance = require_shift_for_attendance
+            record.require_attendance_for_cashier = require_attendance_for_cashier
+            record.require_assigned_staff_for_device = require_assigned_staff_for_device
+            record.allow_offline_sales = allow_offline_sales
+            record.max_pending_offline_sales = max_pending_offline_sales
+            record.updated_by_user_id = updated_by_user_id
+        await self._session.flush()
+        return record
 
     async def get_device_registration(
         self,
@@ -502,6 +550,14 @@ class WorkforceRepository:
         count = await self._session.scalar(statement)
         return int(count or 0) + 1
 
+    async def next_branch_shift_session_sequence(self, *, tenant_id: str, branch_id: str) -> int:
+        statement = select(func.count(BranchShiftSession.id)).where(
+            BranchShiftSession.tenant_id == tenant_id,
+            BranchShiftSession.branch_id == branch_id,
+        )
+        count = await self._session.scalar(statement)
+        return int(count or 0) + 1
+
     async def create_branch_cashier_session(
         self,
         *,
@@ -542,6 +598,7 @@ class WorkforceRepository:
         *,
         tenant_id: str,
         branch_id: str,
+        shift_session_id: str | None,
         device_registration_id: str,
         staff_profile_id: str,
         runtime_user_id: str | None,
@@ -554,6 +611,7 @@ class WorkforceRepository:
             id=new_id(),
             tenant_id=tenant_id,
             branch_id=branch_id,
+            shift_session_id=shift_session_id,
             device_registration_id=device_registration_id,
             staff_profile_id=staff_profile_id,
             runtime_user_id=runtime_user_id,
@@ -561,6 +619,33 @@ class WorkforceRepository:
             status="OPEN",
             attendance_number=attendance_number,
             clock_in_note=clock_in_note,
+            opened_at=opened_at,
+            last_activity_at=opened_at,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        return record
+
+    async def create_branch_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        opened_by_user_id: str | None,
+        shift_number: str,
+        shift_name: str,
+        opening_note: str | None,
+        opened_at,
+    ) -> BranchShiftSession:
+        record = BranchShiftSession(
+            id=new_id(),
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            opened_by_user_id=opened_by_user_id,
+            status="OPEN",
+            shift_number=shift_number,
+            shift_name=shift_name,
+            opening_note=opening_note,
             opened_at=opened_at,
             last_activity_at=opened_at,
         )
@@ -593,6 +678,37 @@ class WorkforceRepository:
             BranchAttendanceSession.tenant_id == tenant_id,
             BranchAttendanceSession.branch_id == branch_id,
             BranchAttendanceSession.id == attendance_session_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def get_branch_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        shift_session_id: str,
+    ) -> BranchShiftSession | None:
+        statement = select(BranchShiftSession).where(
+            BranchShiftSession.tenant_id == tenant_id,
+            BranchShiftSession.branch_id == branch_id,
+            BranchShiftSession.id == shift_session_id,
+        )
+        return await self._session.scalar(statement)
+
+    async def get_open_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+    ) -> BranchShiftSession | None:
+        statement = (
+            select(BranchShiftSession)
+            .where(
+                BranchShiftSession.tenant_id == tenant_id,
+                BranchShiftSession.branch_id == branch_id,
+                BranchShiftSession.status == "OPEN",
+            )
+            .order_by(BranchShiftSession.opened_at.desc(), BranchShiftSession.id.desc())
         )
         return await self._session.scalar(statement)
 
@@ -703,6 +819,22 @@ class WorkforceRepository:
         statement = statement.order_by(BranchAttendanceSession.opened_at.desc(), BranchAttendanceSession.id.desc())
         return list((await self._session.scalars(statement)).all())
 
+    async def list_branch_shift_sessions(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        status: str | None = None,
+    ) -> list[BranchShiftSession]:
+        statement = select(BranchShiftSession).where(
+            BranchShiftSession.tenant_id == tenant_id,
+            BranchShiftSession.branch_id == branch_id,
+        )
+        if status is not None:
+            statement = statement.where(BranchShiftSession.status == status)
+        statement = statement.order_by(BranchShiftSession.opened_at.desc(), BranchShiftSession.id.desc())
+        return list((await self._session.scalars(statement)).all())
+
     async def close_branch_cashier_session(
         self,
         *,
@@ -741,6 +873,25 @@ class WorkforceRepository:
         await self._session.flush()
         return attendance_session
 
+    async def close_branch_shift_session(
+        self,
+        *,
+        shift_session: BranchShiftSession,
+        closed_by_user_id: str | None,
+        status: str,
+        closing_note: str | None,
+        force_close_reason: str | None,
+        closed_at,
+    ) -> BranchShiftSession:
+        shift_session.status = status
+        shift_session.closed_by_user_id = closed_by_user_id
+        shift_session.closing_note = closing_note
+        shift_session.force_close_reason = force_close_reason
+        shift_session.closed_at = closed_at
+        shift_session.last_activity_at = closed_at
+        await self._session.flush()
+        return shift_session
+
     async def touch_branch_cashier_session_activity(
         self,
         *,
@@ -750,6 +901,39 @@ class WorkforceRepository:
         cashier_session.last_activity_at = activity_at
         await self._session.flush()
         return cashier_session
+
+    async def get_open_attendance_sessions_by_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        shift_session_id: str,
+    ) -> list[BranchAttendanceSession]:
+        statement = select(BranchAttendanceSession).where(
+            BranchAttendanceSession.tenant_id == tenant_id,
+            BranchAttendanceSession.branch_id == branch_id,
+            BranchAttendanceSession.shift_session_id == shift_session_id,
+            BranchAttendanceSession.status == "OPEN",
+        )
+        return list((await self._session.scalars(statement)).all())
+
+    async def get_open_cashier_sessions_by_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        shift_session_id: str,
+    ) -> list[BranchCashierSession]:
+        statement = select(BranchCashierSession).join(
+            BranchAttendanceSession,
+            BranchAttendanceSession.id == BranchCashierSession.attendance_session_id,
+        ).where(
+            BranchCashierSession.tenant_id == tenant_id,
+            BranchCashierSession.branch_id == branch_id,
+            BranchCashierSession.status == "OPEN",
+            BranchAttendanceSession.shift_session_id == shift_session_id,
+        )
+        return list((await self._session.scalars(statement)).all())
 
     async def summarize_cashier_sessions(self, *, cashier_session_ids: list[str]) -> dict[str, dict[str, float | int]]:
         if not cashier_session_ids:
@@ -816,4 +1000,44 @@ class WorkforceRepository:
                 "linked_cashier_sessions_count": counts.get(attendance_session_id, 0),
             }
             for attendance_session_id in attendance_session_ids
+        }
+
+    async def summarize_shift_sessions(self, *, shift_session_ids: list[str]) -> dict[str, dict[str, int]]:
+        if not shift_session_ids:
+            return {}
+
+        attendance_statement = (
+            select(BranchAttendanceSession.shift_session_id, func.count(BranchAttendanceSession.id))
+            .where(BranchAttendanceSession.shift_session_id.in_(shift_session_ids))
+            .group_by(BranchAttendanceSession.shift_session_id)
+        )
+        attendance_rows = (await self._session.execute(attendance_statement)).all()
+        attendance_counts = {
+            str(shift_session_id): int(count)
+            for shift_session_id, count in attendance_rows
+            if shift_session_id is not None
+        }
+
+        cashier_statement = (
+            select(BranchAttendanceSession.shift_session_id, func.count(BranchCashierSession.id))
+            .join(
+                BranchCashierSession,
+                BranchCashierSession.attendance_session_id == BranchAttendanceSession.id,
+            )
+            .where(BranchAttendanceSession.shift_session_id.in_(shift_session_ids))
+            .group_by(BranchAttendanceSession.shift_session_id)
+        )
+        cashier_rows = (await self._session.execute(cashier_statement)).all()
+        cashier_counts = {
+            str(shift_session_id): int(count)
+            for shift_session_id, count in cashier_rows
+            if shift_session_id is not None
+        }
+
+        return {
+            shift_session_id: {
+                "linked_attendance_sessions_count": attendance_counts.get(shift_session_id, 0),
+                "linked_cashier_sessions_count": cashier_counts.get(shift_session_id, 0),
+            }
+            for shift_session_id in shift_session_ids
         }

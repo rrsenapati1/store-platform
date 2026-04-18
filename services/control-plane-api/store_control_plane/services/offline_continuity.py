@@ -59,6 +59,15 @@ class OfflineContinuityService:
         payload: dict[str, object],
     ) -> dict[str, object]:
         await self._commercial_access.assert_offline_continuity_allowed(tenant_id=device.tenant_id)
+        branch_runtime_policy = await self._workforce_repo.get_branch_runtime_policy(
+            tenant_id=device.tenant_id,
+            branch_id=device.branch_id,
+        )
+        if branch_runtime_policy is not None and not branch_runtime_policy.allow_offline_sales:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Offline sale continuity is disabled by branch policy.",
+            )
         branch = await self._tenant_repo.get_branch(tenant_id=device.tenant_id, branch_id=device.branch_id)
         if branch is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")

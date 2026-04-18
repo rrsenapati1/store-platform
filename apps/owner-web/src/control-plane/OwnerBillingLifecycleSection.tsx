@@ -26,7 +26,7 @@ function formatPlanLabel(planCode: string): string {
 }
 
 function providerLabel(summary: ControlPlaneTenantLifecycleSummary | null): string {
-  return summary?.subscription.provider_name ?? 'Not configured';
+  return summary?.subscription?.provider_name ?? 'Not configured';
 }
 
 export function OwnerBillingLifecycleSection({ accessToken, tenantId }: OwnerBillingLifecycleSectionProps) {
@@ -90,6 +90,15 @@ export function OwnerBillingLifecycleSection({ accessToken, tenantId }: OwnerBil
 
   const isSuspended = summary?.entitlement?.lifecycle_status === 'SUSPENDED';
   const isGrace = summary?.entitlement?.lifecycle_status === 'GRACE';
+  const activePlanCode = summary?.entitlement?.active_plan_code;
+  const subscriptionStatus = summary?.subscription?.lifecycle_status;
+  const entitlementStatus = summary?.entitlement?.lifecycle_status;
+  const mandateStatus = summary?.subscription?.mandate_status;
+  const trialEndsAt = summary?.subscription?.trial_ends_at;
+  const graceUntil = summary?.entitlement?.grace_until;
+  const branchLimit = summary?.entitlement?.branch_limit;
+  const deviceLimit = summary?.entitlement?.device_limit;
+  const offlineRuntimeHours = summary?.entitlement?.offline_runtime_hours;
 
   return (
     <SectionCard eyebrow="Tenant billing lifecycle" title="Subscription and entitlement">
@@ -129,22 +138,22 @@ export function OwnerBillingLifecycleSection({ accessToken, tenantId }: OwnerBil
         <div style={{ marginTop: '16px' }}>
           <DetailList
             items={[
-              { label: 'Plan', value: formatPlanLabel(summary.entitlement.active_plan_code) },
+              { label: 'Plan', value: activePlanCode ? formatPlanLabel(activePlanCode) : 'Unavailable' },
               {
                 label: 'Subscription status',
-                value: <StatusBadge label={summary.subscription.lifecycle_status} tone={statusTone(summary.subscription.lifecycle_status)} />,
+                value: <StatusBadge label={subscriptionStatus ?? 'UNKNOWN'} tone={statusTone(subscriptionStatus ?? 'UNKNOWN')} />,
               },
               {
                 label: 'Entitlement status',
-                value: <StatusBadge label={summary.entitlement.lifecycle_status} tone={statusTone(summary.entitlement.lifecycle_status)} />,
+                value: <StatusBadge label={entitlementStatus ?? 'UNKNOWN'} tone={statusTone(entitlementStatus ?? 'UNKNOWN')} />,
               },
               { label: 'Provider', value: providerLabel(summary) },
-              { label: 'Mandate status', value: summary.subscription.mandate_status ?? 'Pending setup' },
-              { label: 'Trial ends', value: summary.subscription.trial_ends_at ?? 'Unavailable' },
-              { label: 'Grace until', value: summary.entitlement.grace_until ?? 'Unavailable' },
-              { label: 'Branch limit', value: String(summary.entitlement.branch_limit) },
-              { label: 'Device limit', value: String(summary.entitlement.device_limit) },
-              { label: 'Offline hours', value: String(summary.entitlement.offline_runtime_hours) },
+              { label: 'Mandate status', value: mandateStatus ?? 'Pending setup' },
+              { label: 'Trial ends', value: trialEndsAt ?? 'Unavailable' },
+              { label: 'Grace until', value: graceUntil ?? 'Unavailable' },
+              { label: 'Branch limit', value: branchLimit == null ? 'Unavailable' : String(branchLimit) },
+              { label: 'Device limit', value: deviceLimit == null ? 'Unavailable' : String(deviceLimit) },
+              { label: 'Offline hours', value: offlineRuntimeHours == null ? 'Unavailable' : String(offlineRuntimeHours) },
             ]}
           />
         </div>

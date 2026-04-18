@@ -45,6 +45,10 @@ function canSubmitReviewedReceipt(workspace: OwnerWorkspaceState) {
 }
 
 export function OwnerReceivingSection({ workspace }: { workspace: OwnerWorkspaceState }) {
+  const goodsReceipts = workspace.goodsReceipts ?? [];
+  const inventorySnapshot = workspace.inventorySnapshot ?? [];
+  const inventoryLedger = workspace.inventoryLedger ?? [];
+  const receivingBoardRecords = workspace.receivingBoard?.records ?? [];
   const reviewedReceiptSummary = receiptSummary(workspace);
   const boardRecord = latestReceivingRecord(workspace);
 
@@ -169,7 +173,7 @@ export function OwnerReceivingSection({ workspace }: { workspace: OwnerWorkspace
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.goodsReceipts.map((goodsReceipt) => (
+          {goodsReceipts.map((goodsReceipt) => (
             <li key={goodsReceipt.goods_receipt_id}>
               {goodsReceipt.goods_receipt_number} :: {goodsReceipt.received_quantity}
             </li>
@@ -179,7 +183,7 @@ export function OwnerReceivingSection({ workspace }: { workspace: OwnerWorkspace
 
       <SectionCard eyebrow="Receiving status" title="Receiving board">
         <ul style={{ marginBottom: 0, marginTop: 0, color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.receivingBoard?.records.map((record) => (
+          {receivingBoardRecords.map((record) => (
             <li key={record.purchase_order_id}>
               {record.purchase_order_number} ::{' '}
               <StatusBadge
@@ -188,16 +192,17 @@ export function OwnerReceivingSection({ workspace }: { workspace: OwnerWorkspace
               />
               {record.has_discrepancy ? ` :: variance ${record.variance_quantity}` : ''}
             </li>
-          )) ?? <li>No approved purchase orders are waiting for receipt.</li>}
+          ))}
+          {!receivingBoardRecords.length ? <li>No approved purchase orders are waiting for receipt.</li> : null}
         </ul>
       </SectionCard>
 
       <SectionCard eyebrow="Inventory foundation" title="Inventory snapshot">
         <ul style={{ marginBottom: 0, marginTop: 0, color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.inventorySnapshot.length === 0 ? (
+          {inventorySnapshot.length === 0 ? (
             <li>No branch stock has been received yet.</li>
           ) : (
-            workspace.inventorySnapshot.map((record) => (
+            inventorySnapshot.map((record) => (
               <li key={record.product_id}>
                 {record.product_name} {'->'} {record.stock_on_hand}
               </li>
@@ -208,10 +213,10 @@ export function OwnerReceivingSection({ workspace }: { workspace: OwnerWorkspace
 
       <SectionCard eyebrow="Append-only ledger" title="Inventory ledger">
         <ul style={{ marginBottom: 0, marginTop: 0, color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.inventoryLedger.length === 0 ? (
+          {inventoryLedger.length === 0 ? (
             <li>No inventory movements recorded yet.</li>
           ) : (
-            workspace.inventoryLedger.map((record) => (
+            inventoryLedger.map((record) => (
               <li key={record.inventory_ledger_entry_id}>
                 {record.product_name} :: {record.entry_type} :: {record.quantity}
               </li>

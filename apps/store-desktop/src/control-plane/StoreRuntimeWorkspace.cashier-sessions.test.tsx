@@ -18,9 +18,10 @@ function jsonResponse(body: unknown, status = 200): MockResponse {
   };
 }
 
-function installCashierSessionFetchMock() {
+function installCashierSessionFetchMock(options?: { requireShiftForAttendance?: boolean }) {
   let activeAttendanceSession: Record<string, unknown> | null = null;
   let activeCashierSession: Record<string, unknown> | null = null;
+  let activeShiftSession: Record<string, unknown> | null = null;
   let latestSaleId: string | null = null;
 
   globalThis.fetch = vi.fn(async (input, init) => {
@@ -134,6 +135,41 @@ function installCashierSessionFetchMock() {
     if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/sync-spokes') && method === 'GET') {
       return jsonResponse({ records: [] }) as never;
     }
+    if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime-policy') && method === 'GET') {
+      return jsonResponse({
+        id: 'runtime-policy-1',
+        tenant_id: 'tenant-acme',
+        branch_id: 'branch-1',
+        require_shift_for_attendance: options?.requireShiftForAttendance ?? false,
+        require_attendance_for_cashier: true,
+        require_assigned_staff_for_device: true,
+        allow_offline_sales: true,
+        max_pending_offline_sales: 25,
+        updated_by_user_id: 'user-owner',
+      }) as never;
+    }
+    if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/shift-sessions') && method === 'GET') {
+      return jsonResponse({ records: activeShiftSession ? [activeShiftSession] : [] }) as never;
+    }
+    if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/shift-sessions') && method === 'POST') {
+      const payload = JSON.parse(String(init?.body ?? '{}'));
+      activeShiftSession = {
+        id: 'shift-session-1',
+        tenant_id: 'tenant-acme',
+        branch_id: 'branch-1',
+        shift_number: 'SHIFT-BLRFLAGSHIP-0001',
+        shift_name: payload.shift_name,
+        status: 'OPEN',
+        opening_note: payload.opening_note ?? null,
+        closing_note: null,
+        force_close_reason: null,
+        opened_at: '2026-04-17T08:45:00Z',
+        closed_at: null,
+        linked_attendance_sessions_count: 0,
+        linked_cashier_sessions_count: 0,
+      };
+      return jsonResponse(activeShiftSession) as never;
+    }
     if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/attendance-sessions') && method === 'GET') {
       return jsonResponse({ records: activeAttendanceSession ? [activeAttendanceSession] : [] }) as never;
     }
@@ -156,11 +192,18 @@ function installCashierSessionFetchMock() {
         clock_in_note: payload.clock_in_note ?? null,
         clock_out_note: null,
         force_close_reason: null,
+        shift_session_id: activeShiftSession?.id ?? null,
         opened_at: '2026-04-17T08:55:00Z',
         closed_at: null,
         last_activity_at: '2026-04-17T08:55:00Z',
         linked_cashier_sessions_count: 0,
       };
+      if (activeShiftSession) {
+        activeShiftSession = {
+          ...activeShiftSession,
+          linked_attendance_sessions_count: 1,
+        };
+      }
       return jsonResponse(activeAttendanceSession) as never;
     }
     if (url.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && method === 'GET') {
@@ -193,6 +236,12 @@ function installCashierSessionFetchMock() {
         linked_returns_count: 0,
         gross_billed_amount: 0,
       };
+      if (activeShiftSession) {
+        activeShiftSession = {
+          ...activeShiftSession,
+          linked_cashier_sessions_count: 1,
+        };
+      }
       return jsonResponse(activeCashierSession) as never;
     }
     if (url.endsWith('/v1/tenants/tenant-acme/branches/branch-1/sales') && method === 'POST') {
@@ -380,6 +429,45 @@ describe('store runtime cashier session governance', () => {
       expect(createReturnCall).toBeDefined();
       expect(JSON.parse(String(createReturnCall?.[1]?.body ?? '{}'))).toMatchObject({
         cashier_session_id: 'cashier-session-1',
+      });
+    });
+  });
+
+  test('requires an open shift before attendance when the branch runtime policy enables shift governance', async () => {
+    installCashierSessionFetchMock({ requireShiftForAttendance: true });
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('Korsenex token'), {
+      target: { value: 'stub:sub=cashier-1;email=cashier@acme.local;name=Counter Cashier' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
+
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/Open a branch shift before clocking in/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clock in' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Shift name'), { target: { value: 'Morning counter shift' } });
+    fireEvent.change(screen.getByLabelText('Shift opening note'), { target: { value: 'Float counted before attendance' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Open shift session' }));
+
+    expect(await screen.findByText('Active shift session')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clock in' })).not.toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
+
+    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
+
+    await waitFor(() => {
+      const createShiftCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) =>
+          String(url).includes('/v1/tenants/tenant-acme/branches/branch-1/shift-sessions')
+          && init?.method === 'POST',
+      );
+      expect(createShiftCall).toBeDefined();
+      expect(JSON.parse(String(createShiftCall?.[1]?.body ?? '{}'))).toMatchObject({
+        shift_name: 'Morning counter shift',
       });
     });
   });

@@ -2,6 +2,10 @@ import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@
 import type { OwnerWorkspaceState } from './useOwnerWorkspace';
 
 export function OwnerProcurementSection({ workspace }: { workspace: OwnerWorkspaceState }) {
+  const suppliers = workspace.suppliers ?? [];
+  const catalogProducts = workspace.catalogProducts ?? [];
+  const purchaseOrders = workspace.purchaseOrders ?? [];
+
   return (
     <>
       <SectionCard eyebrow="Supplier foundation" title="Supplier master bootstrap">
@@ -34,7 +38,7 @@ export function OwnerProcurementSection({ workspace }: { workspace: OwnerWorkspa
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.suppliers.map((supplier) => (
+          {suppliers.map((supplier) => (
             <li key={supplier.supplier_id}>{supplier.name}</li>
           ))}
         </ul>
@@ -49,8 +53,8 @@ export function OwnerProcurementSection({ workspace }: { workspace: OwnerWorkspa
             workspace.isBusy ||
             !workspace.actor ||
             !workspace.branchId ||
-            workspace.suppliers.length === 0 ||
-            workspace.catalogProducts.length === 0 ||
+            suppliers.length === 0 ||
+            catalogProducts.length === 0 ||
             !workspace.purchaseQuantity ||
             !workspace.purchaseUnitCost
           }
@@ -105,7 +109,7 @@ export function OwnerProcurementSection({ workspace }: { workspace: OwnerWorkspa
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.purchaseOrders.map((purchaseOrder) => (
+          {purchaseOrders.map((purchaseOrder) => (
             <li key={purchaseOrder.purchase_order_id}>
               {purchaseOrder.supplier_name} :: {purchaseOrder.approval_status}
             </li>

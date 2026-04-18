@@ -38,6 +38,8 @@ export function StoreOfflineContinuitySection({ workspace }: { workspace: StoreR
   const secondaryMessage = workspace.offlineContinuityMessage && workspace.offlineContinuityMessage !== bannerMessage
     ? workspace.offlineContinuityMessage
     : null;
+  const branchRuntimePolicy = workspace.branchRuntimePolicy;
+  const isOfflineBlockedByPolicy = branchRuntimePolicy?.allow_offline_sales === false;
 
   if (!workspace.hasLoadedOfflineContinuity) {
     return (
@@ -51,7 +53,9 @@ export function StoreOfflineContinuitySection({ workspace }: { workspace: StoreR
     return (
       <SectionCard eyebrow="Offline continuity" title="Branch continuity">
         <p style={{ margin: 0, color: '#4e5871' }}>
-          Offline sales are only available on approved branch hubs after a branch stock snapshot has been seeded locally.
+          {isOfflineBlockedByPolicy
+            ? 'Offline sales are disabled by branch policy. Replay remains available for any already-recorded pending offline sales.'
+            : 'Offline sales are only available on approved branch hubs after a branch stock snapshot has been seeded locally.'}
         </p>
       </SectionCard>
     );
@@ -72,6 +76,16 @@ export function StoreOfflineContinuitySection({ workspace }: { workspace: StoreR
           { label: 'Backend', value: workspace.offlineContinuityBackendLabel },
           { label: 'Snapshot', value: workspace.offlineContinuityCachedAt ?? 'Not seeded yet' },
           { label: 'Conflicts', value: String(workspace.offlineConflictCount) },
+          { label: 'Pending limit', value: String(branchRuntimePolicy?.max_pending_offline_sales ?? 25) },
+          {
+            label: 'Policy',
+            value: (
+              <StatusBadge
+                label={isOfflineBlockedByPolicy ? 'BLOCKED' : 'ALLOWED'}
+                tone={isOfflineBlockedByPolicy ? 'warning' : 'success'}
+              />
+            ),
+          },
         ]}
       />
       <ActionButton

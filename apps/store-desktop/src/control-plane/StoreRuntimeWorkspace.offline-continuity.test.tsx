@@ -247,6 +247,13 @@ function buildCreatedSaleResponse() {
 function installRuntimeFetchMock(options: {
   activeCashierSessions?: unknown[];
   failSaleCreate?: boolean;
+  runtimePolicy?: {
+    require_shift_for_attendance?: boolean;
+    require_attendance_for_cashier?: boolean;
+    require_assigned_staff_for_device?: boolean;
+    allow_offline_sales?: boolean;
+    max_pending_offline_sales?: number;
+  };
   onReplayRequest?: (body: Record<string, unknown>) => void;
 }) {
   let latestSaleId: string | null = null;
@@ -375,6 +382,22 @@ function installRuntimeFetchMock(options: {
       return jsonResponse({ records: [] }) as never;
     }
     if (path.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime/sync-spokes') && method === 'GET') {
+      return jsonResponse({ records: [] }) as never;
+    }
+    if (path.endsWith('/v1/tenants/tenant-acme/branches/branch-1/runtime-policy') && method === 'GET') {
+      return jsonResponse({
+        id: 'runtime-policy-1',
+        tenant_id: 'tenant-acme',
+        branch_id: 'branch-1',
+        require_shift_for_attendance: options.runtimePolicy?.require_shift_for_attendance ?? false,
+        require_attendance_for_cashier: options.runtimePolicy?.require_attendance_for_cashier ?? true,
+        require_assigned_staff_for_device: options.runtimePolicy?.require_assigned_staff_for_device ?? true,
+        allow_offline_sales: options.runtimePolicy?.allow_offline_sales ?? true,
+        max_pending_offline_sales: options.runtimePolicy?.max_pending_offline_sales ?? 25,
+        updated_by_user_id: 'user-owner',
+      }) as never;
+    }
+    if (path.includes('/v1/tenants/tenant-acme/branches/branch-1/shift-sessions') && method === 'GET') {
       return jsonResponse({ records: [] }) as never;
     }
     if (path.includes('/v1/tenants/tenant-acme/branches/branch-1/cashier-sessions') && method === 'GET') {
@@ -647,5 +670,26 @@ describe('store runtime offline continuity flow', () => {
       }),
     }));
     expect((replayBody as { cashier_session_id?: string | null } | null)?.cashier_session_id).toBe('cashier-session-1');
+  });
+
+  test('shows branch policy blocking when offline sales are disabled', async () => {
+    installRuntimeFetchMock({
+      activeCashierSessions: [buildActiveCashierSession()],
+      runtimePolicy: {
+        allow_offline_sales: false,
+        max_pending_offline_sales: 0,
+      },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('Unlock with PIN')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('PIN'), {
+      target: { value: '2580' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock runtime' }));
+
+    expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Offline sales are disabled by branch policy. Replay remains available for any already-recorded pending offline sales.')).toBeInTheDocument();
   });
 });

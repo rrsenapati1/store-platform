@@ -2,8 +2,11 @@ import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@
 import type { OwnerWorkspaceState } from './useOwnerWorkspace';
 
 export function OwnerPriceTierSection({ workspace }: { workspace: OwnerWorkspaceState }) {
-  const firstProduct = workspace.catalogProducts[0];
-  const firstPriceTier = workspace.priceTiers[0];
+  const catalogProducts = workspace.catalogProducts ?? [];
+  const priceTiers = workspace.priceTiers ?? [];
+  const branchPriceTierPrices = workspace.branchPriceTierPrices ?? [];
+  const firstProduct = catalogProducts[0];
+  const firstPriceTier = priceTiers[0];
 
   return (
     <>
@@ -49,8 +52,8 @@ export function OwnerPriceTierSection({ workspace }: { workspace: OwnerWorkspace
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.priceTiers.length ? (
-            workspace.priceTiers.map((tier) => (
+          {priceTiers.length ? (
+            priceTiers.map((tier) => (
               <li key={tier.id}>
                 {tier.code} :: {tier.display_name} :: {tier.status}
               </li>
@@ -98,8 +101,8 @@ export function OwnerPriceTierSection({ workspace }: { workspace: OwnerWorkspace
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.branchPriceTierPrices.length ? (
-            workspace.branchPriceTierPrices.map((record) => (
+          {branchPriceTierPrices.length ? (
+            branchPriceTierPrices.map((record) => (
               <li key={record.id}>
                 {record.product_name} :: {record.price_tier_code} :: {record.selling_price}
               </li>

@@ -9,6 +9,8 @@ import { OwnerComplianceSection } from './OwnerComplianceSection';
 import { OwnerCustomerInsightsSection } from './OwnerCustomerInsightsSection';
 import { OwnerDeviceClaimSection } from './OwnerDeviceClaimSection';
 import { OwnerGiftCardSection } from './OwnerGiftCardSection';
+import { OwnerRuntimePolicySection } from './OwnerRuntimePolicySection';
+import { OwnerShiftSessionSection } from './OwnerShiftSessionSection';
 import { OwnerSupplierReportingSection } from './OwnerSupplierReportingSection';
 import { OwnerSyncRuntimeSection } from './OwnerSyncRuntimeSection';
 import type { WorkspaceMetric } from '@store/types';
@@ -21,6 +23,7 @@ import { OwnerReplenishmentSection } from './OwnerReplenishmentSection';
 import { OwnerRestockSection } from './OwnerRestockSection';
 import { OwnerReturnApprovalsSection } from './OwnerReturnApprovalsSection';
 import { OwnerReceivingSection } from './OwnerReceivingSection';
+import { OwnerWorkforceAuditSection } from './OwnerWorkforceAuditSection';
 import { useOwnerWorkspace } from './useOwnerWorkspace';
 
 function buildMetrics(branchCount: number, onboardingStatus: string | undefined, hasActor: boolean): WorkspaceMetric[] {
@@ -33,7 +36,13 @@ function buildMetrics(branchCount: number, onboardingStatus: string | undefined,
 
 export function OwnerWorkspace() {
   const workspace = useOwnerWorkspace();
-  const metrics = buildMetrics(workspace.branches.length, workspace.tenant?.onboarding_status, Boolean(workspace.actor));
+  const branches = workspace.branches ?? [];
+  const staffProfiles = workspace.staffProfiles ?? [];
+  const catalogProducts = workspace.catalogProducts ?? [];
+  const branchCatalogItems = workspace.branchCatalogItems ?? [];
+  const devices = workspace.devices ?? [];
+  const auditEvents = workspace.auditEvents ?? [];
+  const metrics = buildMetrics(branches.length, workspace.tenant?.onboarding_status, Boolean(workspace.actor));
 
   return (
     <AppShell
@@ -97,7 +106,7 @@ export function OwnerWorkspace() {
           Create first branch
         </ActionButton>
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.branches.map((branch) => (
+          {branches.map((branch) => (
             <li key={branch.branch_id}>{branch.name}</li>
           ))}
         </ul>
@@ -191,7 +200,7 @@ export function OwnerWorkspace() {
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.staffProfiles.map((profile) => (
+          {staffProfiles.map((profile) => (
             <li key={profile.id}>
               {profile.full_name}
               {profile.role_names.length > 0 ? ` (${profile.role_names.join(', ')})` : ''}
@@ -241,7 +250,7 @@ export function OwnerWorkspace() {
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.catalogProducts.map((product) => (
+          {catalogProducts.map((product) => (
             <li key={product.product_id}>
               {product.name} ({product.sku_code}) :: MRP {product.mrp} :: {product.category_code ?? 'NO_CATEGORY'}
             </li>
@@ -259,7 +268,7 @@ export function OwnerWorkspace() {
         />
         <ActionButton
           onClick={() => void workspace.assignFirstProductToBranch()}
-          disabled={workspace.isBusy || !workspace.actor || !workspace.branchId || workspace.catalogProducts.length === 0}
+          disabled={workspace.isBusy || !workspace.actor || !workspace.branchId || catalogProducts.length === 0}
         >
           Assign first product to branch
         </ActionButton>
@@ -280,7 +289,7 @@ export function OwnerWorkspace() {
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.branchCatalogItems.map((item) => (
+          {branchCatalogItems.map((item) => (
             <li key={item.id}>
               {item.product_name} {'->'} {item.effective_selling_price} :: MRP {item.mrp}
             </li>
@@ -294,8 +303,8 @@ export function OwnerWorkspace() {
         accessToken={workspace.accessToken}
         tenantId={workspace.tenantId}
         branchId={workspace.branchId}
-        productId={workspace.catalogProducts[0]?.product_id ?? ''}
-        devices={workspace.devices}
+        productId={catalogProducts[0]?.product_id ?? ''}
+        devices={devices}
       />
 
       <OwnerProcurementSection workspace={workspace} />
@@ -310,8 +319,11 @@ export function OwnerWorkspace() {
       <OwnerCustomerInsightsSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerSupplierReportingSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerSyncRuntimeSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
+      <OwnerRuntimePolicySection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
+      <OwnerShiftSessionSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerAttendanceSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerCashierSessionSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
+      <OwnerWorkforceAuditSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
       <OwnerDeviceClaimSection accessToken={workspace.accessToken} tenantId={workspace.tenantId} branchId={workspace.branchId} />
 
       <SectionCard eyebrow="Branch device foundation" title="Branch device registration">
@@ -338,7 +350,7 @@ export function OwnerWorkspace() {
         ) : null}
 
         <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.devices.map((device) => (
+          {devices.map((device) => (
             <li key={device.id}>
               {device.device_name}
               {device.assigned_staff_full_name ? ` -> ${device.assigned_staff_full_name}` : ''}
@@ -349,7 +361,7 @@ export function OwnerWorkspace() {
 
       <SectionCard eyebrow="Audit foundation" title="Onboarding audit feed">
         <ul style={{ marginBottom: 0, color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.auditEvents.map((event) => (
+          {auditEvents.map((event) => (
             <li key={event.id}>{event.action}</li>
           ))}
         </ul>

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import csv
 from datetime import timedelta
 import hashlib
+import io
 import secrets
 
 from fastapi import HTTPException, status
@@ -19,6 +21,13 @@ DEFAULT_RUNTIME_PROFILE_BY_SURFACE = {
     "store_mobile": "mobile_store_spoke",
     "inventory_tablet": "inventory_tablet_spoke",
     "customer_display": "customer_display",
+}
+DEFAULT_BRANCH_RUNTIME_POLICY = {
+    "require_shift_for_attendance": False,
+    "require_attendance_for_cashier": True,
+    "require_assigned_staff_for_device": True,
+    "allow_offline_sales": True,
+    "max_pending_offline_sales": 25,
 }
 
 
@@ -104,6 +113,11 @@ def attendance_session_number(*, branch_code: str, sequence_number: int) -> str:
     return f"ATTD-{normalized_branch_code}-{sequence_number:04d}"
 
 
+def shift_session_number(*, branch_code: str, sequence_number: int) -> str:
+    normalized_branch_code = "".join(character for character in branch_code.upper() if character.isalnum())
+    return f"SHFT-{normalized_branch_code}-{sequence_number:04d}"
+
+
 def serialize_cashier_session(record, *, device, staff_profile, summary: dict[str, object] | None = None) -> dict[str, object]:
     resolved_summary = summary or {}
     return {
@@ -140,6 +154,7 @@ def serialize_attendance_session(record, *, device, staff_profile, summary: dict
         "id": record.id,
         "tenant_id": record.tenant_id,
         "branch_id": record.branch_id,
+        "shift_session_id": record.shift_session_id,
         "device_registration_id": record.device_registration_id,
         "device_name": device.device_name if device is not None else None,
         "device_code": device.device_code if device is not None else None,
@@ -156,6 +171,28 @@ def serialize_attendance_session(record, *, device, staff_profile, summary: dict
         "opened_at": record.opened_at,
         "closed_at": record.closed_at,
         "last_activity_at": record.last_activity_at,
+        "linked_cashier_sessions_count": int(resolved_summary.get("linked_cashier_sessions_count", 0)),
+    }
+
+
+def serialize_shift_session(record, *, summary: dict[str, object] | None = None) -> dict[str, object]:
+    resolved_summary = summary or {}
+    return {
+        "id": record.id,
+        "tenant_id": record.tenant_id,
+        "branch_id": record.branch_id,
+        "opened_by_user_id": record.opened_by_user_id,
+        "closed_by_user_id": record.closed_by_user_id,
+        "status": record.status,
+        "shift_number": record.shift_number,
+        "shift_name": record.shift_name,
+        "opening_note": record.opening_note,
+        "closing_note": record.closing_note,
+        "force_close_reason": record.force_close_reason,
+        "opened_at": record.opened_at,
+        "closed_at": record.closed_at,
+        "last_activity_at": record.last_activity_at,
+        "linked_attendance_sessions_count": int(resolved_summary.get("linked_attendance_sessions_count", 0)),
         "linked_cashier_sessions_count": int(resolved_summary.get("linked_cashier_sessions_count", 0)),
     }
 
@@ -202,6 +239,34 @@ class WorkforceService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Activated staff profile is not assigned to this branch",
             )
+
+    async def _get_branch_runtime_policy_record(self, *, tenant_id: str, branch_id: str):
+        return await self._workforce_repo.get_branch_runtime_policy(tenant_id=tenant_id, branch_id=branch_id)
+
+    async def _resolve_branch_runtime_policy(self, *, tenant_id: str, branch_id: str) -> dict[str, object]:
+        record = await self._get_branch_runtime_policy_record(tenant_id=tenant_id, branch_id=branch_id)
+        if record is None:
+            return {
+                "id": None,
+                "tenant_id": tenant_id,
+                "branch_id": branch_id,
+                "updated_by_user_id": None,
+                **DEFAULT_BRANCH_RUNTIME_POLICY,
+            }
+        return self._serialize_branch_runtime_policy(record)
+
+    def _serialize_branch_runtime_policy(self, record) -> dict[str, object]:
+        return {
+            "id": record.id,
+            "tenant_id": record.tenant_id,
+            "branch_id": record.branch_id,
+            "require_shift_for_attendance": bool(record.require_shift_for_attendance),
+            "require_attendance_for_cashier": bool(record.require_attendance_for_cashier),
+            "require_assigned_staff_for_device": bool(record.require_assigned_staff_for_device),
+            "allow_offline_sales": bool(record.allow_offline_sales),
+            "max_pending_offline_sales": int(record.max_pending_offline_sales),
+            "updated_by_user_id": record.updated_by_user_id,
+        }
 
     async def create_staff_profile(
         self,
@@ -402,6 +467,297 @@ class WorkforceService:
             for device in devices
         ]
 
+    async def get_branch_runtime_policy(self, *, tenant_id: str, branch_id: str) -> dict[str, object]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        return await self._resolve_branch_runtime_policy(tenant_id=tenant_id, branch_id=branch_id)
+
+    async def update_branch_runtime_policy(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        actor_user_id: str,
+        require_shift_for_attendance: bool,
+        require_attendance_for_cashier: bool,
+        require_assigned_staff_for_device: bool,
+        allow_offline_sales: bool,
+        max_pending_offline_sales: int,
+    ) -> dict[str, object]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        if max_pending_offline_sales < 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Offline pending-sale limit cannot be negative")
+        record = await self._workforce_repo.upsert_branch_runtime_policy(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            require_shift_for_attendance=require_shift_for_attendance,
+            require_attendance_for_cashier=require_attendance_for_cashier,
+            require_assigned_staff_for_device=require_assigned_staff_for_device,
+            allow_offline_sales=allow_offline_sales,
+            max_pending_offline_sales=max_pending_offline_sales,
+            updated_by_user_id=actor_user_id,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="branch_runtime_policy.updated",
+            entity_type="branch_runtime_policy",
+            entity_id=record.id,
+            payload=self._serialize_branch_runtime_policy(record),
+        )
+        await self._session.commit()
+        return self._serialize_branch_runtime_policy(record)
+
+    async def create_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        actor_user_id: str,
+        shift_name: str,
+        opening_note: str | None,
+    ) -> dict[str, object]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        existing_open_shift = await self._workforce_repo.get_open_shift_session(tenant_id=tenant_id, branch_id=branch_id)
+        if existing_open_shift is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A shift session is already open for this branch")
+        opened_at = utc_now()
+        sequence_number = await self._workforce_repo.next_branch_shift_session_sequence(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+        )
+        record = await self._workforce_repo.create_branch_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            opened_by_user_id=actor_user_id,
+            shift_number=shift_session_number(branch_code=branch.code, sequence_number=sequence_number),
+            shift_name=shift_name.strip(),
+            opening_note=opening_note,
+            opened_at=opened_at,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="shift_session.opened",
+            entity_type="branch_shift_session",
+            entity_id=record.id,
+            payload={"shift_number": record.shift_number, "shift_name": record.shift_name},
+        )
+        await self._session.commit()
+        return serialize_shift_session(record)
+
+    async def list_branch_shift_sessions(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        status: str | None = None,
+    ) -> list[dict[str, object]]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        records = await self._workforce_repo.list_branch_shift_sessions(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            status=status,
+        )
+        summaries = await self._workforce_repo.summarize_shift_sessions(shift_session_ids=[record.id for record in records])
+        return [serialize_shift_session(record, summary=summaries.get(record.id)) for record in records]
+
+    async def get_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        shift_session_id: str,
+    ) -> dict[str, object]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        record = await self._workforce_repo.get_branch_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            shift_session_id=shift_session_id,
+        )
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shift session not found")
+        summary = (await self._workforce_repo.summarize_shift_sessions(shift_session_ids=[record.id])).get(record.id)
+        return serialize_shift_session(record, summary=summary)
+
+    async def close_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        shift_session_id: str,
+        actor_user_id: str,
+        closing_note: str | None,
+    ) -> dict[str, object]:
+        record = await self._workforce_repo.get_branch_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            shift_session_id=shift_session_id,
+        )
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shift session not found")
+        if record.status != "OPEN":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only open shift sessions can be closed")
+        open_attendance_sessions = await self._workforce_repo.get_open_attendance_sessions_by_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            shift_session_id=shift_session_id,
+        )
+        if open_attendance_sessions:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Close linked attendance sessions before closing the shift.")
+        open_cashier_sessions = await self._workforce_repo.get_open_cashier_sessions_by_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            shift_session_id=shift_session_id,
+        )
+        if open_cashier_sessions:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Close linked cashier sessions before closing the shift.")
+        closed_at = utc_now()
+        await self._workforce_repo.close_branch_shift_session(
+            shift_session=record,
+            closed_by_user_id=actor_user_id,
+            status="CLOSED",
+            closing_note=closing_note,
+            force_close_reason=None,
+            closed_at=closed_at,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="shift_session.closed",
+            entity_type="branch_shift_session",
+            entity_id=record.id,
+            payload={"shift_number": record.shift_number},
+        )
+        await self._session.commit()
+        return await self.get_shift_session(tenant_id=tenant_id, branch_id=branch_id, shift_session_id=shift_session_id)
+
+    async def force_close_shift_session(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+        shift_session_id: str,
+        actor_user_id: str,
+        reason: str,
+    ) -> dict[str, object]:
+        record = await self._workforce_repo.get_branch_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            shift_session_id=shift_session_id,
+        )
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shift session not found")
+        if record.status != "OPEN":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only open shift sessions can be force-closed")
+        open_attendance_sessions = await self._workforce_repo.get_open_attendance_sessions_by_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            shift_session_id=shift_session_id,
+        )
+        if open_attendance_sessions:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Force-close linked attendance sessions before force-closing the shift.")
+        open_cashier_sessions = await self._workforce_repo.get_open_cashier_sessions_by_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            shift_session_id=shift_session_id,
+        )
+        if open_cashier_sessions:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Force-close linked cashier sessions before force-closing the shift.")
+        closed_at = utc_now()
+        await self._workforce_repo.close_branch_shift_session(
+            shift_session=record,
+            closed_by_user_id=actor_user_id,
+            status="FORCED_CLOSED",
+            closing_note=record.closing_note,
+            force_close_reason=reason,
+            closed_at=closed_at,
+        )
+        await self._audit_repo.record(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            actor_user_id=actor_user_id,
+            action="shift_session.force_closed",
+            entity_type="branch_shift_session",
+            entity_id=record.id,
+            payload={"shift_number": record.shift_number, "reason": reason},
+        )
+        await self._session.commit()
+        return await self.get_shift_session(tenant_id=tenant_id, branch_id=branch_id, shift_session_id=shift_session_id)
+
+    async def list_workforce_audit_events(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+    ) -> list[dict[str, object]]:
+        branch = await self._tenant_repo.get_branch(tenant_id=tenant_id, branch_id=branch_id)
+        if branch is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+        events = await self._audit_repo.list_for_tenant(
+            tenant_id,
+            branch_id=branch_id,
+            action_prefixes=(
+                "branch_runtime_policy.",
+                "shift_session.",
+                "attendance_session.",
+                "cashier_session.",
+            ),
+        )
+        return [
+            {
+                "id": event.id,
+                "action": event.action,
+                "entity_type": event.entity_type,
+                "entity_id": event.entity_id,
+                "tenant_id": event.tenant_id,
+                "branch_id": event.branch_id,
+                "created_at": event.created_at,
+                "payload": event.payload,
+            }
+            for event in events
+        ]
+
+    async def export_workforce_audit_events(
+        self,
+        *,
+        tenant_id: str,
+        branch_id: str,
+    ) -> dict[str, str]:
+        events = await self.list_workforce_audit_events(tenant_id=tenant_id, branch_id=branch_id)
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, lineterminator="\n")
+        writer.writerow(["created_at", "action", "entity_type", "entity_id", "branch_id", "payload"])
+        for event in events:
+            writer.writerow(
+                [
+                    event["created_at"].isoformat(),
+                    event["action"],
+                    event["entity_type"],
+                    event["entity_id"],
+                    event["branch_id"],
+                    event["payload"],
+                ]
+            )
+        issued_at = utc_now().strftime("%Y%m%d-%H%M%S")
+        return {
+            "filename": f"workforce-audit-{issued_at}.csv",
+            "content_type": "text/csv",
+            "content": buffer.getvalue(),
+        }
+
     async def create_cashier_session(
         self,
         *,
@@ -440,7 +796,8 @@ class WorkforceService:
             )
         elif profile.user_id != actor_user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cashier session must match the active staff profile")
-        if device.assigned_staff_profile_id != staff_profile_id:
+        branch_runtime_policy = await self._resolve_branch_runtime_policy(tenant_id=tenant_id, branch_id=branch_id)
+        if branch_runtime_policy["require_assigned_staff_for_device"] and device.assigned_staff_profile_id != staff_profile_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Device registration is not assigned to this staff profile")
 
         existing_device_session = await self._workforce_repo.get_open_cashier_session_by_device(
@@ -457,12 +814,19 @@ class WorkforceService:
         )
         if existing_staff_session is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A cashier session is already open for this staff profile")
-        attendance_session = await self._workforce_repo.get_open_attendance_session_by_device(
+        open_attendance_session = await self._workforce_repo.get_open_attendance_session_by_device(
             tenant_id=tenant_id,
             branch_id=branch_id,
             device_registration_id=device_registration_id,
         )
-        if attendance_session is None or attendance_session.staff_profile_id != staff_profile_id or attendance_session.runtime_user_id != actor_user_id:
+        attendance_session = None
+        if (
+            open_attendance_session is not None
+            and open_attendance_session.staff_profile_id == staff_profile_id
+            and open_attendance_session.runtime_user_id == actor_user_id
+        ):
+            attendance_session = open_attendance_session
+        if branch_runtime_policy["require_attendance_for_cashier"] and attendance_session is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Open an attendance session before opening a cashier session.",
@@ -539,7 +903,8 @@ class WorkforceService:
             )
         elif profile.user_id != actor_user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Attendance session must match the active staff profile")
-        if device.assigned_staff_profile_id != staff_profile_id:
+        branch_runtime_policy = await self._resolve_branch_runtime_policy(tenant_id=tenant_id, branch_id=branch_id)
+        if branch_runtime_policy["require_assigned_staff_for_device"] and device.assigned_staff_profile_id != staff_profile_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Device registration is not assigned to this staff profile")
 
         existing_device_session = await self._workforce_repo.get_open_attendance_session_by_device(
@@ -556,6 +921,15 @@ class WorkforceService:
         )
         if existing_staff_session is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An attendance session is already open for this staff profile")
+        open_shift_session = await self._workforce_repo.get_open_shift_session(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+        )
+        if branch_runtime_policy["require_shift_for_attendance"] and open_shift_session is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Open a shift session before opening attendance.",
+            )
 
         opened_at = utc_now()
         sequence_number = await self._workforce_repo.next_branch_attendance_session_sequence(
@@ -565,6 +939,7 @@ class WorkforceService:
         record = await self._workforce_repo.create_branch_attendance_session(
             tenant_id=tenant_id,
             branch_id=branch_id,
+            shift_session_id=open_shift_session.id if open_shift_session is not None else None,
             device_registration_id=device_registration_id,
             staff_profile_id=staff_profile_id,
             runtime_user_id=actor_user_id,
@@ -584,6 +959,7 @@ class WorkforceService:
                 "device_registration_id": device_registration_id,
                 "staff_profile_id": staff_profile_id,
                 "attendance_number": record.attendance_number,
+                "shift_session_id": record.shift_session_id,
             },
         )
         await self._session.commit()

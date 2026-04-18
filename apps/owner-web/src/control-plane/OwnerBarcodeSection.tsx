@@ -2,7 +2,8 @@ import { ActionButton, DetailList, FormField, SectionCard } from '@store/ui';
 import type { OwnerWorkspaceState } from './useOwnerWorkspace';
 
 export function OwnerBarcodeSection({ workspace }: { workspace: OwnerWorkspaceState }) {
-  const firstProduct = workspace.catalogProducts[0] ?? null;
+  const catalogProducts = workspace.catalogProducts ?? [];
+  const firstProduct = catalogProducts[0] ?? null;
 
   return (
     <SectionCard eyebrow="Barcode foundation" title="Catalog barcode operations">

@@ -2,7 +2,10 @@ import { ActionButton, DetailList, FormField, SectionCard, StatusBadge } from '@
 import type { OwnerWorkspaceState } from './useOwnerWorkspace';
 
 export function OwnerBatchExpirySection({ workspace }: { workspace: OwnerWorkspaceState }) {
-  const firstBatchRecord = workspace.batchExpiryReport?.records[0] ?? null;
+  const batchExpiryReportRecords = workspace.batchExpiryReport?.records ?? [];
+  const batchExpiryBoardRecords = workspace.batchExpiryBoard?.records ?? [];
+  const catalogProducts = workspace.catalogProducts ?? [];
+  const firstBatchRecord = batchExpiryReportRecords[0] ?? null;
   const activeExpirySession = workspace.latestBatchExpirySession;
   const isOpenExpirySession = activeExpirySession?.status === 'OPEN';
   const isReviewedExpirySession = activeExpirySession?.status === 'REVIEWED';
@@ -52,7 +55,7 @@ export function OwnerBatchExpirySection({ workspace }: { workspace: OwnerWorkspa
             || !workspace.actor
             || !workspace.tenantId
             || !workspace.branchId
-            || !workspace.catalogProducts[0]
+            || !catalogProducts[0]
             || !workspace.lotABatchNumber
             || !workspace.lotAQuantity
             || !workspace.lotAExpiryDate
@@ -99,7 +102,7 @@ export function OwnerBatchExpirySection({ workspace }: { workspace: OwnerWorkspa
               />
             </div>
             <ul style={{ marginBottom: 0, marginTop: '16px', color: '#4e5871', lineHeight: 1.7 }}>
-              {workspace.batchExpiryReport.records.map((record) => (
+              {batchExpiryReportRecords.map((record) => (
                 <li key={record.batch_lot_id}>
                   {record.batch_number} :: {record.product_name} :: {record.remaining_quantity} ::{' '}
                   <StatusBadge label={record.status} tone={record.status === 'FRESH' ? 'success' : 'warning'} />
@@ -192,8 +195,8 @@ export function OwnerBatchExpirySection({ workspace }: { workspace: OwnerWorkspa
         <div style={{ marginTop: '16px' }}>
           <h3 style={{ marginBottom: '10px' }}>Expiry disposition board</h3>
           <ul style={{ marginBottom: 0, marginTop: 0, color: '#4e5871', lineHeight: 1.7 }}>
-            {workspace.batchExpiryBoard?.records.length ? (
-              workspace.batchExpiryBoard.records.map((record) => (
+            {batchExpiryBoardRecords.length ? (
+              batchExpiryBoardRecords.map((record) => (
                 <li key={record.batch_expiry_session_id}>
                   {record.session_number} :: {record.batch_number} :: {record.status}
                   {record.proposed_quantity == null ? '' : ` :: proposed ${record.proposed_quantity}`}

@@ -11,6 +11,7 @@ import type {
   ControlPlaneBranchCustomerReport,
   ControlPlaneAttendanceSession,
   ControlPlaneCashierSession,
+  ControlPlaneBranchRuntimePolicy,
   ControlPlaneCheckoutPaymentSession,
   ControlPlaneCheckoutPricePreview,
   ControlPlaneCheckoutPaymentSessionListResponse,
@@ -55,6 +56,7 @@ import type {
   ControlPlaneStockCountApproval,
   ControlPlaneStockCountBoard,
   ControlPlaneStockCountReviewSession,
+  ControlPlaneShiftSession,
   ControlPlaneSyncConflictRecord,
   ControlPlaneSyncEnvelopeRecord,
   ControlPlaneSyncSpokeRecord,
@@ -711,6 +713,57 @@ export const storeControlPlaneClient = {
     return request<{ records: ControlPlaneAttendanceSession[] }>(
       `/v1/tenants/${tenantId}/branches/${branchId}/attendance-sessions${search}`,
       undefined,
+      accessToken,
+    );
+  },
+  getBranchRuntimePolicy(accessToken: string, tenantId: string, branchId: string) {
+    return request<ControlPlaneBranchRuntimePolicy>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/runtime-policy`,
+      undefined,
+      accessToken,
+    );
+  },
+  listShiftSessions(accessToken: string, tenantId: string, branchId: string, status?: string | null) {
+    const search = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request<{ records: ControlPlaneShiftSession[] }>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/shift-sessions${search}`,
+      undefined,
+      accessToken,
+    );
+  },
+  createShiftSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    payload: {
+      shift_name: string;
+      opening_note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneShiftSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/shift-sessions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      accessToken,
+    );
+  },
+  closeShiftSession(
+    accessToken: string,
+    tenantId: string,
+    branchId: string,
+    shiftSessionId: string,
+    payload: {
+      closing_note?: string | null;
+    },
+  ) {
+    return request<ControlPlaneShiftSession>(
+      `/v1/tenants/${tenantId}/branches/${branchId}/shift-sessions/${shiftSessionId}/close`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
       accessToken,
     );
   },

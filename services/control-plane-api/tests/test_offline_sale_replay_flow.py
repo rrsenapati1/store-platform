@@ -314,3 +314,44 @@ def test_branch_hub_replay_rejects_suspended_commercial_access() -> None:
 
     assert replay.status_code == 402
     assert replay.json()["detail"] == "Commercial access is suspended for this tenant. Ask the owner to update billing."
+
+
+def test_branch_hub_replay_rejects_when_branch_policy_disables_offline_sales() -> None:
+    database_url = sqlite_test_database_url("offline-sale-replay-policy-disabled")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            platform_admin_emails=["admin@store.local"],
+        )
+    )
+
+    context = _bootstrap_replay_context(client)
+    owner_headers = {"authorization": f"Bearer {context['owner_access_token']}"}
+    policy_update = client.put(
+        f"/v1/tenants/{context['tenant_id']}/branches/{context['branch_id']}/runtime-policy",
+        headers=owner_headers,
+        json={
+            "require_shift_for_attendance": False,
+            "require_attendance_for_cashier": True,
+            "require_assigned_staff_for_device": True,
+            "allow_offline_sales": False,
+            "max_pending_offline_sales": 25,
+        },
+    )
+    assert policy_update.status_code == 200
+
+    device_headers = {
+        "x-store-device-id": context["hub_device_id"],
+        "x-store-device-secret": context["hub_device_secret"],
+    }
+
+    replay = client.post(
+        "/v1/sync/offline-sales/replay",
+        headers=device_headers,
+        json=_offline_sale_payload(context, quantity=4),
+    )
+
+    assert replay.status_code == 409
+    assert replay.json()["detail"] == "Offline sale continuity is disabled by branch policy."

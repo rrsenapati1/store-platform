@@ -32,6 +32,21 @@
   - `npm run build --workspace @store/store-desktop`
   - `git -c core.safecrlf=false diff --check`
 
+- Finished `V2-006` end-to-end with shift governance, branch runtime policy controls, and workforce audit/export:
+  - added control-plane-owned branch runtime policy authority and branch shift sessions, linking attendance and cashier governance to explicit branch policy instead of hardcoded runtime assumptions
+  - extended Store Desktop with shift open/close controls, policy-aware attendance and cashier gating, and offline continuity checks that honor branch offline-sales policy and pending-sale limits
+  - extended owner-web with branch runtime policy editing, shift-session inspection and force-close, and workforce audit event export without breaking the older onboarding and branch-operations test surfaces
+  - hardened owner-web and Store Desktop full-suite mocks to absorb the new runtime policy and shift bootstrap reads using route-aware fixtures instead of fragile response-order assumptions
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_staff_device_foundation_flow.py services/control-plane-api/tests/test_offline_sale_replay_flow.py -q`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `git -c core.safecrlf=false diff --check`
+
 ## 2026-04-17
 
 - Completed `V2-005` with gift-card foundation as the final commercial-control slice:

@@ -79,6 +79,11 @@ class BranchAttendanceSession(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
     branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    shift_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("branch_shift_sessions.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
     device_registration_id: Mapped[str] = mapped_column(ForeignKey("device_registrations.id"), index=True)
     staff_profile_id: Mapped[str] = mapped_column(ForeignKey("staff_profiles.id"), index=True)
     runtime_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), default=None, index=True)
@@ -92,6 +97,45 @@ class BranchAttendanceSession(Base, TimestampMixin):
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), index=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None, index=True)
     last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None, index=True)
+
+
+class BranchShiftSession(Base, TimestampMixin):
+    __tablename__ = "branch_shift_sessions"
+    __table_args__ = (
+        UniqueConstraint("branch_id", "shift_number", name="uq_branch_shift_sessions_branch_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    opened_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), default=None, index=True)
+    closed_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), default=None, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="OPEN", index=True)
+    shift_number: Mapped[str] = mapped_column(String(64), index=True)
+    shift_name: Mapped[str] = mapped_column(String(255))
+    opening_note: Mapped[str | None] = mapped_column(String(1024), default=None)
+    closing_note: Mapped[str | None] = mapped_column(String(1024), default=None)
+    force_close_reason: Mapped[str | None] = mapped_column(String(1024), default=None)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), index=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None, index=True)
+    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), default=None, index=True)
+
+
+class BranchRuntimePolicy(Base, TimestampMixin):
+    __tablename__ = "branch_runtime_policies"
+    __table_args__ = (
+        UniqueConstraint("branch_id", name="uq_branch_runtime_policies_branch_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    require_shift_for_attendance: Mapped[bool] = mapped_column(Boolean, default=False)
+    require_attendance_for_cashier: Mapped[bool] = mapped_column(Boolean, default=True)
+    require_assigned_staff_for_device: Mapped[bool] = mapped_column(Boolean, default=True)
+    allow_offline_sales: Mapped[bool] = mapped_column(Boolean, default=True)
+    max_pending_offline_sales: Mapped[int] = mapped_column(Integer, default=25)
+    updated_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), default=None, index=True)
 
 
 class DeviceClaim(Base, TimestampMixin):

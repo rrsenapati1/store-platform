@@ -10,14 +10,17 @@ const RESTOCK_SOURCE_OPTIONS = [
 export function StoreRestockSection({ workspace }: { workspace: StoreRuntimeWorkspaceState }) {
   const scannedLookup = workspace.latestScanLookup;
   const activeProductId = workspace.selectedRestockProductId || scannedLookup?.product_id || '';
-  const replenishmentRecord = workspace.replenishmentBoard?.records.find(
+  const replenishmentRecords = workspace.replenishmentBoard?.records ?? [];
+  const branchCatalogItems = workspace.branchCatalogItems ?? [];
+  const restockRecords = workspace.restockBoard?.records ?? [];
+  const replenishmentRecord = replenishmentRecords.find(
     (record) => record.product_id === activeProductId,
   ) ?? null;
-  const branchCatalogItem = workspace.branchCatalogItems.find(
+  const branchCatalogItem = branchCatalogItems.find(
     (item) => item.product_id === activeProductId,
   );
   const isScannedWorkflow = Boolean(scannedLookup?.product_id && scannedLookup.product_id === activeProductId);
-  const activeTask = workspace.restockBoard?.records.find(
+  const activeTask = restockRecords.find(
     (record) => record.product_id === activeProductId && record.has_active_task,
   ) ?? null;
   const reorderPoint = branchCatalogItem?.reorder_point ?? replenishmentRecord?.reorder_point ?? null;
@@ -52,8 +55,8 @@ export function StoreRestockSection({ workspace }: { workspace: StoreRuntimeWork
           Low-stock items -&gt; {workspace.replenishmentBoard?.low_stock_count ?? 0}
         </p>
         <ul style={{ margin: 0, color: '#4e5871', lineHeight: 1.7, paddingLeft: '20px' }}>
-          {workspace.replenishmentBoard?.records.length ? (
-            workspace.replenishmentBoard.records.map((record) => (
+          {replenishmentRecords.length ? (
+            replenishmentRecords.map((record) => (
               <li key={record.product_id} style={{ marginBottom: '8px' }}>
                 <span>
                   {record.product_name} :: {record.replenishment_status} :: suggested {record.suggested_reorder_quantity}
@@ -196,8 +199,8 @@ export function StoreRestockSection({ workspace }: { workspace: StoreRuntimeWork
           <li>Canceled tasks -&gt; {workspace.restockBoard?.canceled_count ?? 0}</li>
         </ul>
         <ul style={{ margin: 0, color: '#4e5871', lineHeight: 1.7 }}>
-          {workspace.restockBoard?.records.length ? (
-            workspace.restockBoard.records.map((record) => (
+          {restockRecords.length ? (
+            restockRecords.map((record) => (
               <li key={record.restock_task_id}>
                 {record.task_number} :: {record.product_name} :: {record.status} :: requested {record.requested_quantity} :: picked {record.picked_quantity ?? 0}
                 {record.completion_note ? ` :: ${record.completion_note}` : ''}
