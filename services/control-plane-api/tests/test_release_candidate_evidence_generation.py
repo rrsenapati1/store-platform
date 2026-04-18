@@ -1093,3 +1093,94 @@ def test_generate_release_candidate_evidence_can_publish_bundle(tmp_path: Path) 
     )
     assert publication_manifest["environment"] == "prod"
     assert publication_manifest["release_version"] == "2026.04.19"
+
+
+def test_generate_release_candidate_evidence_can_retain_published_bundle_offsite(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence.md"
+    evidence_publication_output_dir = tmp_path / "published-evidence"
+    vulnerability_report_path = tmp_path / "vulnerability-report.json"
+    vulnerability_report_path.write_text(
+        json.dumps({"status": "passed", "surfaces": {}, "failing_surfaces": []}),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.19",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "approved",
+            "environment": "prod",
+            "release_version": "2026.04.19",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    retention_manifest_path = evidence_publication_output_dir / "prod-2026.04.19.offsite-retention.json"
+
+    def fake_retain_release_evidence(*_: object, **__: object):
+        retention_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        retention_manifest_path.write_text(
+            json.dumps(
+                {
+                    "environment": "prod",
+                    "release_version": "2026.04.19",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return type(
+            "Plan",
+            (),
+            {
+                "bucket": "store-platform-prod",
+                "archive_key": "control-plane/prod/release-evidence/prod/2026.04.19/store-release-evidence-prod-2026.04.19.tar.gz",
+                "publication_manifest_key": "control-plane/prod/release-evidence/prod/2026.04.19/prod-2026.04.19.publication.json",
+                "catalog_key": "control-plane/prod/release-evidence/release-evidence-catalog.json",
+                "retention_manifest_key": "control-plane/prod/release-evidence/prod/2026.04.19/prod-2026.04.19.offsite-retention.json",
+                "retention_manifest_path": retention_manifest_path,
+            },
+        )()
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.19",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        vulnerability_scan_report_path=vulnerability_report_path,
+        evidence_publication_output_dir=evidence_publication_output_dir,
+        retain_evidence_offsite=True,
+        retain_release_evidence=fake_retain_release_evidence,
+        settings_factory=lambda: object(),
+        date_text="2026-04-19",
+    )
+
+    assert result["final_status"] == "approved"
+    offsite_retention_result = result["offsite_retention_result"]
+    assert offsite_retention_result is not None
+    assert offsite_retention_result["status"] == "retained"
+    retention_manifest = json.loads(
+        Path(str(offsite_retention_result["retention_manifest_path"])).read_text(encoding="utf-8")
+    )
+    assert retention_manifest["environment"] == "prod"
+    assert retention_manifest["release_version"] == "2026.04.19"

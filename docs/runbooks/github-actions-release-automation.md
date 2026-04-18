@@ -17,6 +17,7 @@ This automation also does **not** publish post-deploy release-evidence packs. Th
 - `generate_release_candidate_evidence.py`
 - `build_release_evidence_bundle.py`
 - `publish_release_evidence_bundle.py`
+- `retain_release_evidence.py`
 
 ## Workflows
 
@@ -186,5 +187,6 @@ This task deliberately stops before:
 - applying migrations from GitHub Actions
 - restarting production services from GitHub Actions
 - publishing post-deploy evidence packs from GitHub Actions
+- mirroring published evidence packs into object storage from GitHub Actions
 
 That boundary remains manual until you explicitly choose to trust GitHub as part of the deployment authority path.

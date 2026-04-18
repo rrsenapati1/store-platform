@@ -1,6 +1,6 @@
 # Control-Plane Backup And Restore
 
-Updated: 2026-04-18
+Updated: 2026-04-19
 
 ## Scope
 
@@ -10,6 +10,7 @@ This runbook covers:
 - manual backup invocation
 - restore drills
 - production restore safety checks
+- off-host retention for release-evidence packs
 
 ## Backup Contract
 
@@ -115,3 +116,20 @@ Initial target posture:
 - `RTO`: 4 hours
 
 If the actual environment cannot meet those targets, treat that as a release blocker for public production use.
+
+## Release Evidence Retention
+
+Backup storage is also the default secondary durable store for published release-evidence packs.
+
+After producing a local published evidence pack, mirror it into object storage:
+
+```powershell
+python scripts/retain_release_evidence.py `
+  --publication-dir docs\launch\evidence\published `
+  --environment prod `
+  --release-version 2026.04.19
+```
+
+This writes and uploads an `offsite-retention` manifest beside the already-published archive and publication records.
+
+Treat the offsite-retention manifest as the proof that the release evidence is no longer only present on the operator machine.

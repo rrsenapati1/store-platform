@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     backup_artifact_prefix: str = "postgres-backups"
     restore_artifact_prefix: str = "restore-drills"
     desktop_release_artifact_prefix: str = "desktop-releases"
+    release_evidence_artifact_prefix: str = "release-evidence"
     backup_retention_days: int = 14
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = 0.0
@@ -140,6 +141,7 @@ class Settings(BaseSettings):
         "backup_artifact_prefix",
         "restore_artifact_prefix",
         "desktop_release_artifact_prefix",
+        "release_evidence_artifact_prefix",
         mode="before",
     )
     @classmethod
@@ -263,6 +265,7 @@ def build_settings(
     object_storage_secret_access_key: str | None = None,
     object_storage_session_token: str | None = None,
     object_storage_force_path_style: bool | None = None,
+    release_evidence_artifact_prefix: str | None = None,
     sentry_dsn: str | None = None,
     sentry_traces_sample_rate: float | None = None,
     log_format: str | None = None,
@@ -331,6 +334,8 @@ def build_settings(
         overrides["object_storage_session_token"] = object_storage_session_token
     if object_storage_force_path_style is not None:
         overrides["object_storage_force_path_style"] = object_storage_force_path_style
+    if release_evidence_artifact_prefix is not None:
+        overrides["release_evidence_artifact_prefix"] = release_evidence_artifact_prefix
     if sentry_dsn is not None:
         overrides["sentry_dsn"] = sentry_dsn
     if sentry_traces_sample_rate is not None:

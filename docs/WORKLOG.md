@@ -1030,6 +1030,15 @@
   - `python -m pytest services/control-plane-api/tests/test_release_evidence_publication.py services/control-plane-api/tests/test_publish_release_evidence_bundle_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py -q`
   - `python services/control-plane-api/scripts/publish_release_evidence_bundle.py --help`
   - `git -c core.safecrlf=false diff --check`
+- Added V2-009 evidence off-host retention foundation:
+  - object-storage-backed retention in `store_control_plane/ops/release_evidence_retention.py`
+  - standalone `retain_release_evidence.py` CLI
+  - optional `generate_release_candidate_evidence.py --retain-evidence-offsite` hook
+  - uploaded retention manifest with bucket, keys, and hash metadata
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_release_evidence_retention_ops.py services/control-plane-api/tests/test_retain_release_evidence_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py -q`
+  - `python services/control-plane-api/scripts/retain_release_evidence.py --help`
+  - `git -c core.safecrlf=false diff --check`
 - 2026-04-18: Completed `V2-009` alert verification foundation.
   - Added `store_control_plane.operational_alerts` to normalize release-blocking alert checks from observability and deployed security posture.
   - Added `scripts/verify_operational_alert_posture.py` to emit machine-readable operational alert evidence with release-safe exit status.

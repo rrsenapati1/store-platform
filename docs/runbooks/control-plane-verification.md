@@ -306,6 +306,36 @@ python services/control-plane-api/scripts/generate_release_candidate_evidence.py
 
 If publication is requested and no explicit bundle directory is supplied, the script now creates an adjacent bundle directory automatically before publishing it.
 
+To mirror the published pack into object storage for off-host retention, run:
+
+```powershell
+python services/control-plane-api/scripts/retain_release_evidence.py `
+  --publication-dir docs\launch\evidence\published `
+  --environment prod `
+  --release-version 2026.04.19
+```
+
+That step uploads:
+
+- the published evidence archive
+- the publication manifest
+- the rolling publication catalog
+- a local `offsite-retention` manifest describing uploaded keys and hashes
+
+`generate_release_candidate_evidence.py` can also trigger this after local publication when you pass:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.19 `
+  --output-path docs\launch\evidence\prod-rc-evidence.md `
+  --evidence-publication-output-dir docs\launch\evidence\published `
+  --retain-evidence-offsite
+```
+
+This path is explicit on purpose. Off-host retention should never happen implicitly during ordinary local verification.
+
 `certify_release_candidate.py` can also consume a saved performance report directly:
 
 ```powershell

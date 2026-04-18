@@ -422,6 +422,33 @@ The catalog is the rolling local index of retained evidence packs. Re-publishing
 
 This remains an operator-controlled step. The current repo still does not push published evidence packs to object storage or GitHub Releases automatically.
 
+## Off-Host Evidence Retention
+
+After local publication, mirror the retained evidence pack into object storage:
+
+```powershell
+python services/control-plane-api/scripts/retain_release_evidence.py `
+  --publication-dir docs/launch/evidence/published `
+  --environment prod `
+  --release-version 2026.04.19
+```
+
+This uploads:
+
+- `store-release-evidence-prod-2026.04.19.tar.gz`
+- `prod-2026.04.19.publication.json`
+- `release-evidence-catalog.json`
+- `prod-2026.04.19.offsite-retention.json`
+
+The offsite-retention manifest is the operator-visible proof of what was uploaded, including:
+
+- bucket and object keys
+- release version and environment
+- certification status at retention time
+- SHA-256 hashes for the archive, publication manifest, and catalog
+
+Use this step when the evidence pack must survive workstation loss or needs to be reviewed from a shared durable store.
+
 ## Failure Posture
 
 - If pre-migration backup fails: stop deployment.

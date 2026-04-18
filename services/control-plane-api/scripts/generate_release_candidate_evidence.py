@@ -17,11 +17,14 @@ if str(SERVICE_ROOT) not in sys.path:
 
 from store_control_plane.release_evidence_bundle import build_release_evidence_bundle
 from store_control_plane.release_evidence_publication import publish_release_evidence_bundle
+from store_control_plane.config import Settings
+from store_control_plane.ops.release_evidence_retention import run_release_evidence_retention
 
 
 VerifyCallable = Callable[..., dict[str, object]]
 LocalVerifyCallable = Callable[[], dict[str, object]]
 PerformanceVerifyCallable = Callable[[], dict[str, object]]
+RetentionCallable = Callable[..., object]
 
 
 def _load_script_module(script_name: str, module_name: str):
@@ -409,6 +412,7 @@ def generate_release_candidate_evidence(
     evidence_publication_output_dir: Path | None = None,
     sbom_artifact_dir: Path | None = None,
     vulnerability_raw_output_dir: Path | None = None,
+    retain_evidence_offsite: bool = False,
     bearer_token: str | None = None,
     run_local_verification: bool = True,
     run_performance_validation: bool = True,
@@ -416,6 +420,8 @@ def generate_release_candidate_evidence(
     performance_validate: PerformanceVerifyCallable | None = None,
     verify_deployed: VerifyCallable | None = None,
     certify_release_candidate: VerifyCallable | None = None,
+    retain_release_evidence: RetentionCallable | None = None,
+    settings_factory: Callable[[], object] | None = None,
     date_text: str | None = None,
 ) -> dict[str, object]:
     local_verifier = local_verify or _default_local_verify
@@ -590,12 +596,35 @@ def generate_release_candidate_evidence(
             environment=resolved_environment,
         )
 
+    offsite_retention_result: dict[str, object] | None = None
+    if retain_evidence_offsite and evidence_publication_output_dir is not None:
+        resolved_environment = expected_environment or str(deployed_result.get("environment") or "")
+        resolved_release_version = expected_release_version or str(deployed_result.get("release_version") or "")
+        retention_runner = retain_release_evidence or run_release_evidence_retention
+        settings = (settings_factory or Settings)()
+        retention_plan = retention_runner(
+            settings,
+            publication_dir=evidence_publication_output_dir,
+            environment=resolved_environment,
+            release_version=resolved_release_version,
+        )
+        offsite_retention_result = {
+            "status": "retained",
+            "bucket": retention_plan.bucket,
+            "archive_key": retention_plan.archive_key,
+            "publication_manifest_key": retention_plan.publication_manifest_key,
+            "catalog_key": retention_plan.catalog_key,
+            "retention_manifest_key": retention_plan.retention_manifest_key,
+            "retention_manifest_path": str(retention_plan.retention_manifest_path),
+        }
+
     return {
         "final_status": certification_result.get("status"),
         "output_path": str(output_path),
         "certification_output_path": None if effective_certification_output_path is None else str(effective_certification_output_path),
         "evidence_bundle_result": evidence_bundle_result,
         "evidence_publication_result": evidence_publication_result,
+        "offsite_retention_result": offsite_retention_result,
         "local_result": local_result,
         "performance_result": performance_result,
         "operational_alert_result": operational_alert_result,
@@ -635,6 +664,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--evidence-publication-output-dir", help="Optional directory where the assembled evidence bundle should be archived and cataloged.")
     parser.add_argument("--sbom-artifact-dir", help="Optional directory containing raw SBOM artifacts to include in the evidence bundle.")
     parser.add_argument("--vulnerability-raw-output-dir", help="Optional directory containing raw vulnerability scan output to include in the evidence bundle.")
+    parser.add_argument("--retain-evidence-offsite", action="store_true", help="Upload the published evidence pack to configured object storage after local publication.")
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
     parser.add_argument("--skip-local-verification", action="store_true", help="Skip the local verify_control_plane.py run.")
     parser.add_argument("--skip-performance-validation", action="store_true", help="Skip the local performance validation run.")
@@ -671,6 +701,7 @@ def main() -> None:
         evidence_publication_output_dir=Path(args.evidence_publication_output_dir) if args.evidence_publication_output_dir else None,
         sbom_artifact_dir=Path(args.sbom_artifact_dir) if args.sbom_artifact_dir else None,
         vulnerability_raw_output_dir=Path(args.vulnerability_raw_output_dir) if args.vulnerability_raw_output_dir else None,
+        retain_evidence_offsite=args.retain_evidence_offsite,
         bearer_token=args.bearer_token,
         run_local_verification=not args.skip_local_verification,
         run_performance_validation=not args.skip_performance_validation,
