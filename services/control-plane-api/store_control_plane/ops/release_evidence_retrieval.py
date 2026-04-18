@@ -50,6 +50,15 @@ def _verify_archive(path: Path, *, expected_sha256: str) -> dict[str, object]:
     try:
         with tarfile.open(path, "r:gz") as archive:
             members = [member.name for member in archive.getmembers() if member.isfile()]
+            manifest_member_name = next(
+                (member for member in members if member.endswith("/bundle-manifest.json")),
+                None,
+            )
+            bundle_manifest = None
+            if manifest_member_name is not None:
+                manifest_handle = archive.extractfile(manifest_member_name)
+                if manifest_handle is not None:
+                    bundle_manifest = json.loads(manifest_handle.read().decode("utf-8"))
     except (OSError, tarfile.TarError) as exc:
         return {
             "status": "failed",
@@ -72,6 +81,18 @@ def _verify_archive(path: Path, *, expected_sha256: str) -> dict[str, object]:
             "expected_sha256": expected_sha256,
             "observed_sha256": observed_sha256,
         }
+
+    reports = dict((bundle_manifest or {}).get("reports") or {})
+    for label in ("launch_readiness_report", "launch_readiness_manifest"):
+        bundle_path = dict(reports.get(label) or {}).get("bundle_path")
+        if bundle_path and not any(member.endswith(f"/{bundle_path}") for member in members):
+            missing_name = Path(str(bundle_path)).name
+            return {
+                "status": "failed",
+                "reason": f"archive is missing {missing_name}",
+                "expected_sha256": expected_sha256,
+                "observed_sha256": observed_sha256,
+            }
 
     return {
         "status": "passed",

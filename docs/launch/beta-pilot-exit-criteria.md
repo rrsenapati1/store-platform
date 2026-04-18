@@ -7,9 +7,21 @@ Use this document to decide whether beta/pilot operation is strong enough to mov
 For `V2-010`, record the pilot and sign-off inputs in [v2-launch-readiness-manifest.template.json](./v2-launch-readiness-manifest.template.json) and validate them with:
 
 ```powershell
-python services/control-plane-api/scripts/build_launch_readiness_report.py `
+python services/control-plane-api/scripts/run_v2_launch_gate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version <version> `
+  --release-owner ops@store.korsenex.com `
+  --output-dir D:/ops/v2-launch-gate/<version> `
   --launch-manifest docs/launch/v2-launch-readiness-manifest.json `
-  --release-gate-report D:/ops/release-gate-report.json
+  --admin-bearer-token <admin-token> `
+  --branch-bearer-token <branch-token> `
+  --tenant-id <tenant-id> `
+  --branch-id <branch-id> `
+  --product-id <product-id> `
+  --dump-key control-plane/prod/postgres-backups/restore.dump `
+  --metadata-key control-plane/prod/postgres-backups/metadata.json `
+  --target-database-url postgresql+asyncpg://store:***@db.internal:5432/store_restore
 ```
 
 ## Beta Exit Conditions
@@ -60,4 +72,4 @@ Do not exit beta if:
   - `hold`
 - Notes:
 
-In the repo-owned `V2-010` flow, these same values should also appear in the launch-readiness manifest so the beta exit decision can be validated together with the strict release-gate report.
+In the repo-owned `V2-010` flow, these same values should also appear in the launch-readiness manifest so the beta exit decision can be validated and bundled together with the strict release-gate evidence.

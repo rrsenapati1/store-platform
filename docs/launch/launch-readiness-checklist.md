@@ -13,12 +13,12 @@ Use this checklist before declaring a release candidate operationally ready for 
 
 ## Verification Gates
 
-- [ ] Strict release gate reports `passed`
+- [ ] One-shot `V2` launch gate reports `ready`
   - evidence:
-    - `python services/control-plane-api/scripts/run_release_gate.py --base-url ... --expected-environment ... --expected-release-version ...`
-- [ ] Launch-readiness report reports `ready`
+    - `python services/control-plane-api/scripts/run_v2_launch_gate.py --base-url ... --expected-environment ... --expected-release-version ... --launch-manifest ...`
+- [ ] Launch-readiness report is published with the final launch evidence pack
   - evidence:
-    - `python services/control-plane-api/scripts/build_launch_readiness_report.py --launch-manifest ... --release-gate-report ...`
+    - `published/<environment>-<version>.publication.json`
 
 ## Authority / Cutover Gates
 
@@ -28,7 +28,7 @@ Use this checklist before declaring a release candidate operationally ready for 
 
 ## Security / Operations Gates
 
-- [ ] strict release gate includes healthy security, vulnerability, load, rollback, restore-drill, SBOM, license, TLS, environment-drift, and evidence-retention posture
+- [ ] strict technical gate inside the V2 launch gate includes healthy security, vulnerability, load, rollback, restore-drill, SBOM, license, TLS, environment-drift, and evidence-retention posture
 - [ ] release artifacts exist and match the target version used in the launch-readiness manifest
 
 ## Product / Runtime Gates

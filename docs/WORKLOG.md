@@ -2,6 +2,21 @@
 
 ## 2026-04-19
 
+- Extended `V2-010` with launch-artifact bundle integration:
+  - extended the release evidence bundle CLI and publication surface so the `V2` launch-readiness report and manifest can travel in the same archived evidence pack as the strict technical gate
+  - surfaced `launch_readiness_status` in the publication manifest and rolling evidence catalog so downstream launch tooling can tell whether a retained pack included a ready launch decision
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_release_evidence_bundle.py services/control-plane-api/tests/test_build_release_evidence_bundle_script.py services/control-plane-api/tests/test_release_evidence_publication.py -q`
+  - `python services/control-plane-api/scripts/build_release_evidence_bundle.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
+- Completed `V2-010` with final V2 launch-gate orchestration and track closure:
+  - added `store_control_plane.launch_gate_orchestration` and `scripts/run_v2_launch_gate.py` so one operator command now runs the strict technical gate, launch-readiness evaluation, final launch bundle assembly, publication, and optional retained-evidence verification
+  - tightened retained-evidence archive verification so bundles that claim launch-readiness artifacts must actually contain the launch-readiness report and manifest
+  - updated launch runbooks to promote the one-shot `V2` launch gate as the primary go-live path and marked `V2-010` complete in `docs/TASK_LEDGER.md`
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_launch_gate_orchestration.py services/control-plane-api/tests/test_run_v2_launch_gate_script.py services/control-plane-api/tests/test_release_evidence_retrieval_ops.py -q`
+
 - Started `V2-010` with beta readiness evidence foundation:
   - added `store_control_plane.launch_readiness` to validate a structured launch manifest against the strict `run_release_gate.py` output instead of relying on disconnected Markdown templates
   - added `build_launch_readiness_report.py` so operators can turn beta-pilot evidence, known issues, and final sign-offs into one machine-readable JSON report plus a Markdown companion

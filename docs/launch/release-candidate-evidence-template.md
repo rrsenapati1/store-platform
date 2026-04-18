@@ -9,6 +9,7 @@ For `V2-010`, this file is the technical evidence layer only. Pair it with:
 - the strict release-gate report from `run_release_gate.py`
 - the launch-readiness manifest at `docs/launch/v2-launch-readiness-manifest.json`
 - the launch-readiness report from `build_launch_readiness_report.py`
+- the final one-shot launch decision from `run_v2_launch_gate.py`
 
 If you want the repo to pre-fill the verification sections, run:
 
@@ -69,4 +70,4 @@ python services/control-plane-api/scripts/generate_release_candidate_evidence.py
 - Sign-off owner:
 - Notes:
 
-The human launch decision should now be reflected in the launch-readiness report, not only in this technical evidence document.
+The human launch decision should now be reflected in the launch-readiness report and the final `V2` launch-gate report, not only in this technical evidence document.
