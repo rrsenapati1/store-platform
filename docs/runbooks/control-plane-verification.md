@@ -82,6 +82,37 @@ The deployed verifier now also:
 
 Those probes are intentionally invalid but well-formed and should not mutate tenant data. They do consume a small number of rate-limit slots from the verifying client IP, so do not run them continuously from a shared operator workstation during incident response.
 
+## Verify Environment Contract Drift
+
+For staging or production before release certification:
+
+```powershell
+python services/control-plane-api/scripts/verify_environment_drift.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --output-path docs\launch\evidence\prod-environment-drift.json
+```
+
+What this validates:
+
+- `GET /v1/system/environment-contract`
+- deployment environment, public base URL, and release version alignment
+- JSON logging posture
+- Sentry configuration and environment labeling
+- object-storage bucket/prefix posture
+- operations-worker batch and lease posture
+- secure-header and rate-limit configuration values exposed by the control plane
+
+The output is a machine-readable JSON report with:
+
+- `status`
+- `environment`
+- `release_version`
+- `checks`
+- `failing_checks`
+- `summary`
+
 ## Run The Launch-Foundation Performance Validation Lane
 
 From `services/control-plane-api/` or repo root with the database URL available:
@@ -170,6 +201,7 @@ If you do not skip it, the evidence markdown records:
 - the result status
 - a compact scenario summary
 - the deployed security verification status and throttle posture
+- environment drift posture when a `--environment-drift-report` is supplied
 - deployed load posture when a `--deployed-load-report` is supplied
 
 `certify_release_candidate.py` can also consume a saved performance report directly:
@@ -192,6 +224,16 @@ python services/control-plane-api/scripts/certify_release_candidate.py `
   --deployed-load-report docs\launch\evidence\staging-deployed-load.json
 ```
 
+It can also consume a saved environment-drift report directly:
+
+```powershell
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --environment-drift-report docs\launch\evidence\prod-environment-drift.json
+```
+
 ## Expected Success Signal
 
 The script exits `0` and prints a JSON summary with:
@@ -210,6 +252,7 @@ The script exits `0` and prints a JSON summary with:
 - If app-flow tests fail, do not mark the current UI/runtime surface healthy.
 - If the smoke fails after tests pass, treat it as an integration regression between control-plane modules.
 - If performance validation fails, treat the release evidence as incomplete until the failing scenarios are understood and the budgets are re-met or intentionally revised.
+- If environment drift verification fails, treat the release candidate as blocked until deployed configuration matches the declared environment contract.
 - If deployed load verification fails, treat the staged release as not scale-ready until the failing HTTP scenarios are understood and reverified.
 - If deployed security verification fails, treat the release candidate as blocked until the secure-header or throttle mismatch is resolved.
 

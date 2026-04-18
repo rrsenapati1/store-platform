@@ -2,6 +2,16 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with environment drift verification foundation:
+  - added a control-plane `GET /v1/system/environment-contract` read model so deployed verification can inspect the effective environment, base URL, release version, logging, Sentry, object storage, operations-worker, and security-control posture without guessing from host config
+  - added an `environment_drift` domain module plus `verify_environment_drift.py` so operators can generate normalized machine-readable drift evidence against the declared production contract
+  - extended release-candidate evidence generation and certification so environment-drift posture is rendered explicitly and now blocks approval when the report is missing or failed
+  - updated deployment and verification runbooks to document the new environment-contract verifier and its role in release readiness
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_system_routes.py services/control-plane-api/tests/test_environment_drift.py services/control-plane-api/tests/test_verify_environment_drift.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `python services/control-plane-api/scripts/verify_environment_drift.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
 - Extended `V2-009` with rollback verification foundation:
   - added control-plane release-bundle manifests so GitHub release artifacts now carry explicit `release_version`, `bundle_name`, `alembic_head`, and build timestamp metadata
   - extended deployed system health and deployed verification to surface the current `alembic_head` alongside environment and release version

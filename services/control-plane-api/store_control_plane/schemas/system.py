@@ -48,3 +48,17 @@ class SystemSecurityControlsResponse(BaseModel):
     secure_headers_hsts_enabled: bool
     secure_headers_csp: str
     rate_limits: SystemSecurityRateLimitsResponse
+
+
+class SystemEnvironmentContractResponse(BaseModel):
+    deployment_environment: str
+    public_base_url: str
+    release_version: str
+    log_format: str
+    sentry_configured: bool
+    sentry_environment: str
+    object_storage_configured: bool
+    object_storage_bucket: str | None
+    object_storage_prefix: str | None
+    operations_worker: OperationsWorkerStatusResponse
+    security_controls: SystemSecurityControlsResponse

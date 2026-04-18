@@ -110,7 +110,7 @@ from .sync_runtime import (
     SyncStatusResponse,
 )
 from .supplier_reporting import VendorDisputeCreateRequest, VendorDisputeResolveRequest
-from .system import AuthorityBoundaryResponse, OperationsWorkerStatusResponse, SystemComponentStatusResponse, SystemHealthResponse, SystemSecurityControlsResponse, SystemSecurityRateLimitsResponse
+from .system import AuthorityBoundaryResponse, OperationsWorkerStatusResponse, SystemComponentStatusResponse, SystemEnvironmentContractResponse, SystemHealthResponse, SystemSecurityControlsResponse, SystemSecurityRateLimitsResponse
 from .tenants import BranchCreateRequest, BranchListResponse, BranchRecord, BranchResponse, TenantSummaryResponse
 from .workforce import AttendanceSessionCloseRequest, AttendanceSessionCreateRequest, AttendanceSessionForceCloseRequest, AttendanceSessionListResponse, AttendanceSessionResponse, BranchRuntimePolicyResponse, BranchRuntimePolicyUpsertRequest, CashierSessionCloseRequest, CashierSessionCreateRequest, CashierSessionForceCloseRequest, CashierSessionListResponse, CashierSessionResponse, DeviceClaimApprovalResponse, DeviceClaimApproveRequest, DeviceClaimListResponse, DeviceClaimRecord, DeviceRegistrationCreateRequest, DeviceRegistrationListResponse, DeviceRegistrationRecord, DeviceRegistrationResponse, RuntimeActivationIssueResponse, RuntimeDeviceClaimResolveRequest, RuntimeDeviceClaimResolveResponse, RuntimeHubBootstrapRequest, RuntimeHubBootstrapResponse, ShiftSessionCloseRequest, ShiftSessionCreateRequest, ShiftSessionForceCloseRequest, ShiftSessionListResponse, ShiftSessionResponse, StaffProfileCreateRequest, StaffProfileListResponse, StaffProfileRecord, StaffProfileResponse, StoreDesktopActivationIssueResponse, StoreDesktopActivationRedeemRequest, StoreDesktopActivationRedeemResponse, StoreDesktopUnlockRequest, StoreDesktopUnlockResponse, WorkforceAuditExportResponse
 
@@ -391,6 +391,7 @@ __all__ = [
     "StoreDesktopActivationRedeemResponse",
     "StoreDesktopUnlockRequest",
     "StoreDesktopUnlockResponse",
+    "SystemEnvironmentContractResponse",
     "SystemSecurityControlsResponse",
     "SystemSecurityRateLimitsResponse",
     "DeviceRegistrationCreateRequest",

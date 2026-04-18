@@ -34,10 +34,12 @@ def certify_release_candidate(
     bearer_token: str | None = None,
     performance_result: dict[str, object] | None = None,
     operational_alert_result: dict[str, object] | None = None,
+    environment_drift_result: dict[str, object] | None = None,
     deployed_load_result: dict[str, object] | None = None,
     rollback_result: dict[str, object] | None = None,
     vulnerability_scan_result: dict[str, object] | None = None,
     require_operational_alerts: bool = True,
+    require_environment_drift: bool = True,
     require_deployed_load: bool = False,
     require_rollback_verification: bool = False,
     require_vulnerability_scan: bool = True,
@@ -69,6 +71,9 @@ def certify_release_candidate(
       "operational_alerts_verified": (not require_operational_alerts) or (
           operational_alert_result is not None and operational_alert_result.get("status") == "passed"
       ),
+      "environment_drift_verified": (not require_environment_drift) or (
+          environment_drift_result is not None and environment_drift_result.get("status") == "passed"
+      ),
       "deployed_load_verified": (
           deployed_load_result.get("status") == "passed"
           if deployed_load_result is not None
@@ -95,6 +100,8 @@ def certify_release_candidate(
       "performance_failing_scenarios": [] if performance_result is None else list(performance_result.get("failing_scenarios") or []),
       "operational_alert_result_status": None if operational_alert_result is None else operational_alert_result.get("status"),
       "operational_alert_failing_checks": [] if operational_alert_result is None else list(operational_alert_result.get("failing_checks") or []),
+      "environment_drift_result_status": None if environment_drift_result is None else environment_drift_result.get("status"),
+      "environment_drift_failing_checks": [] if environment_drift_result is None else list(environment_drift_result.get("failing_checks") or []),
       "deployed_load_result_status": None if deployed_load_result is None else deployed_load_result.get("status"),
       "deployed_load_failing_scenarios": [] if deployed_load_result is None else list(deployed_load_result.get("failing_scenarios") or []),
       "rollback_result_status": None if rollback_result is None else rollback_result.get("status"),
@@ -113,6 +120,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bearer-token", help="Optional bearer token used to verify /v1/auth/me against the deployment.")
     parser.add_argument("--performance-report", help="Optional JSON performance report path produced by validate_performance_foundation.py.")
     parser.add_argument("--operational-alert-report", help="Optional JSON operational alert report path produced by verify_operational_alert_posture.py.")
+    parser.add_argument("--environment-drift-report", help="Optional JSON environment drift report path produced by verify_environment_drift.py.")
     parser.add_argument("--deployed-load-report", help="Optional JSON deployed load report path produced by verify_deployed_load_posture.py.")
     parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path produced by verify_release_rollback.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
@@ -127,6 +135,9 @@ def main() -> None:
     operational_alert_result = None
     if args.operational_alert_report:
         operational_alert_result = json.loads(Path(args.operational_alert_report).read_text(encoding="utf-8"))
+    environment_drift_result = None
+    if args.environment_drift_report:
+        environment_drift_result = json.loads(Path(args.environment_drift_report).read_text(encoding="utf-8"))
     deployed_load_result = None
     if args.deployed_load_report:
         deployed_load_result = json.loads(Path(args.deployed_load_report).read_text(encoding="utf-8"))
@@ -143,6 +154,7 @@ def main() -> None:
         bearer_token=args.bearer_token,
         performance_result=performance_result,
         operational_alert_result=operational_alert_result,
+        environment_drift_result=environment_drift_result,
         deployed_load_result=deployed_load_result,
         rollback_result=rollback_result,
         vulnerability_scan_result=vulnerability_scan_result,

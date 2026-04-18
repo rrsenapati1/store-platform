@@ -61,3 +61,51 @@ def test_system_security_controls_report_effective_header_and_rate_limit_posture
         "activation_requests": 5,
         "webhook_requests": 21,
     }
+
+
+def test_system_environment_contract_reports_effective_shared_environment_posture() -> None:
+    database_url = sqlite_test_database_url("system-environment-contract")
+    client = TestClient(
+        create_app(
+            database_url=database_url,
+            bootstrap_database=True,
+            korsenex_idp_mode="stub",
+            deployment_environment="staging",
+            public_base_url="https://control.staging.store.korsenex.com",
+            release_version="2026.04.18",
+            log_format="json",
+            sentry_dsn="https://examplePublicKey@o0.ingest.sentry.io/1",
+            object_storage_bucket="store-platform-staging",
+            object_storage_prefix="control-plane/staging",
+            secure_headers_enabled=True,
+            secure_headers_hsts_enabled=True,
+            secure_headers_csp="default-src 'self'; frame-ancestors 'none'",
+            rate_limit_window_seconds=90,
+            rate_limit_auth_requests=8,
+            rate_limit_activation_requests=5,
+            rate_limit_webhook_requests=21,
+        )
+    )
+
+    response = client.get("/v1/system/environment-contract")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["deployment_environment"] == "staging"
+    assert payload["public_base_url"] == "https://control.staging.store.korsenex.com"
+    assert payload["release_version"] == "2026.04.18"
+    assert payload["log_format"] == "json"
+    assert payload["sentry_configured"] is True
+    assert payload["sentry_environment"] == "staging"
+    assert payload["object_storage_configured"] is True
+    assert payload["object_storage_bucket"] == "store-platform-staging"
+    assert payload["object_storage_prefix"] == "control-plane/staging"
+    assert payload["operations_worker"]["configured"] is True
+    assert payload["security_controls"]["secure_headers_enabled"] is True
+    assert payload["security_controls"]["secure_headers_hsts_enabled"] is True
+    assert payload["security_controls"]["rate_limits"] == {
+        "window_seconds": 90,
+        "auth_requests": 8,
+        "activation_requests": 5,
+        "webhook_requests": 21,
+    }

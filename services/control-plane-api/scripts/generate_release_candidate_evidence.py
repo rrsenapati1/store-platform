@@ -98,6 +98,7 @@ def _render_markdown(
     local_result: dict[str, object],
     performance_result: dict[str, object],
     operational_alert_result: dict[str, object] | None,
+    environment_drift_result: dict[str, object] | None,
     deployed_load_result: dict[str, object] | None,
     rollback_result: dict[str, object] | None,
     vulnerability_scan_result: dict[str, object] | None,
@@ -144,6 +145,26 @@ def _render_markdown(
                 f"- {_humanize_check_name(str(check_dict.get('name') or 'unknown'))}: {check_dict.get('status') or 'unknown'}"
             )
         operational_alert_lines.append("")
+    environment_drift_lines = [
+        "## Environment Drift Evidence",
+        "",
+        "- Environment drift status: not-run",
+        "",
+    ]
+    if environment_drift_result is not None:
+        environment_drift_checks = list(environment_drift_result.get("checks") or [])
+        environment_drift_lines = [
+            "## Environment Drift Evidence",
+            "",
+            f"- environment drift status: {environment_drift_result.get('status')}",
+            f"- failing checks: {_stringify_domains(list(environment_drift_result.get('failing_checks') or []))}",
+        ]
+        for check in environment_drift_checks:
+            check_dict = dict(check or {})
+            environment_drift_lines.append(
+                f"- {_humanize_check_name(str(check_dict.get('name') or 'unknown'))}: {check_dict.get('status') or 'unknown'}"
+            )
+        environment_drift_lines.append("")
     deployed_load_lines = [
         "## Deployed Load Evidence",
         "",
@@ -252,6 +273,7 @@ def _render_markdown(
             "",
             *security_lines,
             *operational_alert_lines,
+            *environment_drift_lines,
             *deployed_load_lines,
             *rollback_lines,
             *vulnerability_lines,
@@ -278,6 +300,7 @@ def generate_release_candidate_evidence(
     release_owner: str | None = None,
     output_path: Path,
     alert_report_path: Path | None = None,
+    environment_drift_report_path: Path | None = None,
     deployed_load_report_path: Path | None = None,
     rollback_report_path: Path | None = None,
     vulnerability_scan_report_path: Path | None = None,
@@ -318,6 +341,11 @@ def generate_release_candidate_evidence(
         if alert_report_path is not None
         else None
     )
+    environment_drift_result = (
+        json.loads(environment_drift_report_path.read_text(encoding="utf-8"))
+        if environment_drift_report_path is not None
+        else None
+    )
     deployed_load_result = (
         json.loads(deployed_load_report_path.read_text(encoding="utf-8"))
         if deployed_load_report_path is not None
@@ -351,6 +379,7 @@ def generate_release_candidate_evidence(
         bearer_token=bearer_token,
         performance_result=None if performance_result.get("status") == "skipped" else performance_result,
         operational_alert_result=operational_alert_result,
+        environment_drift_result=environment_drift_result,
         deployed_load_result=deployed_load_result,
         rollback_result=rollback_result,
         vulnerability_scan_result=vulnerability_scan_result,
@@ -366,6 +395,7 @@ def generate_release_candidate_evidence(
             local_result=local_result,
             performance_result=performance_result,
             operational_alert_result=operational_alert_result,
+            environment_drift_result=environment_drift_result,
             deployed_load_result=deployed_load_result,
             rollback_result=rollback_result,
             vulnerability_scan_result=vulnerability_scan_result,
@@ -382,6 +412,7 @@ def generate_release_candidate_evidence(
         "local_result": local_result,
         "performance_result": performance_result,
         "operational_alert_result": operational_alert_result,
+        "environment_drift_result": environment_drift_result,
         "deployed_load_result": deployed_load_result,
         "rollback_result": rollback_result,
         "vulnerability_scan_result": vulnerability_scan_result,
@@ -399,6 +430,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--release-owner", help="Release owner recorded in the evidence file.")
     parser.add_argument("--output-path", help="Markdown file path for the generated evidence document.")
     parser.add_argument("--operational-alert-report", help="Optional JSON alert report path produced by verify_operational_alert_posture.py.")
+    parser.add_argument("--environment-drift-report", help="Optional JSON environment drift report path produced by verify_environment_drift.py.")
     parser.add_argument("--deployed-load-report", help="Optional JSON deployed load report path produced by verify_deployed_load_posture.py.")
     parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path produced by verify_release_rollback.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
@@ -425,6 +457,7 @@ def main() -> None:
         release_owner=args.release_owner,
         output_path=output_path,
         alert_report_path=Path(args.operational_alert_report) if args.operational_alert_report else None,
+        environment_drift_report_path=Path(args.environment_drift_report) if args.environment_drift_report else None,
         deployed_load_report_path=Path(args.deployed_load_report) if args.deployed_load_report else None,
         rollback_report_path=Path(args.rollback_report) if args.rollback_report else None,
         vulnerability_scan_report_path=Path(args.vulnerability_scan_report) if args.vulnerability_scan_report else None,

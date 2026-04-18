@@ -130,6 +130,30 @@ Also keep the deployed security verification result from:
 
 That verification now includes secure-header checks and bounded live auth/webhook throttle probes, and release certification should block if those controls fail.
 
+## Environment Drift Evidence
+
+Before certifying a staging or production release candidate, generate environment-contract drift evidence:
+
+```powershell
+python scripts/verify_environment_drift.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --output-path docs/launch/evidence/prod-environment-drift.json
+```
+
+Keep that JSON report with the release notes or evidence bundle.
+
+If release evidence is generated with `generate_release_candidate_evidence.py`, also pass:
+
+- `--environment-drift-report <environment-drift-report.json>`
+
+If release certification is run with `certify_release_candidate.py`, also pass:
+
+- `--environment-drift-report <environment-drift-report.json>`
+
+Release certification should now block if the environment-drift report is missing or failed.
+
 ## Operational Alert Evidence
 
 Before certifying a staging or production release candidate, generate operational alert posture evidence:

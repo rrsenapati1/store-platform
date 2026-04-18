@@ -571,3 +571,76 @@ def test_generate_release_candidate_evidence_renders_rollback_posture(tmp_path: 
     assert "target release version: 2026.04.17" in content
     assert "rollback mode: restore_required" in content
     assert "failure reason: target bundle schema head differs from deployed schema head" in content
+
+
+def test_generate_release_candidate_evidence_renders_environment_drift_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-environment-drift.md"
+    environment_drift_report_path = tmp_path / "environment-drift-report.json"
+    environment_drift_report_path.write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "environment": "staging",
+                "release_version": "2026.04.18-rc9",
+                "failing_checks": ["log_format_json", "sentry_configured"],
+                "checks": [
+                    {"name": "deployment_environment_match", "status": "passed"},
+                    {"name": "log_format_json", "status": "failed"},
+                    {"name": "sentry_configured", "status": "failed"},
+                ],
+                "summary": "2 checks failed: log_format_json, sentry_configured",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc9",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "blocked",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc9",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "operational_alerts_verified": True,
+                "environment_drift_verified": False,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc9",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        environment_drift_report_path=environment_drift_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "blocked"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Environment Drift Evidence" in content
+    assert "environment drift status: failed" in content
+    assert "failing checks: log_format_json, sentry_configured" in content
+    assert "deployment environment match: passed" in content
+    assert "log format json: failed" in content

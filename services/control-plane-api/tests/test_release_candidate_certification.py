@@ -22,6 +22,7 @@ def test_release_candidate_certification_approves_cutover_ready_deployment() -> 
         expected_environment="prod",
         expected_release_version="2026.04.15-rc1",
         operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         verify_deployed=lambda **_: {
             "status": "ok",
@@ -104,6 +105,7 @@ def test_release_candidate_certification_approves_when_performance_budgets_pass(
             "failing_scenarios": [],
         },
         operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         verify_deployed=lambda **_: {
             "status": "ok",
@@ -236,6 +238,53 @@ def test_release_candidate_certification_blocks_missing_operational_alert_report
     assert result["gates"]["operational_alerts_verified"] is False
 
 
+def test_release_candidate_certification_blocks_missing_environment_drift_report_by_default() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.18-rc9",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.18-rc9",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "blocked"
+    assert result["gates"]["environment_drift_verified"] is False
+
+
+def test_release_candidate_certification_approves_when_environment_drift_passes() -> None:
+    module = _load_certification_script_module()
+
+    result = module.certify_release_candidate(
+        base_url="https://control.store.korsenex.com",
+        expected_environment="prod",
+        expected_release_version="2026.04.18-rc9",
+        operational_alert_result={"status": "passed", "failing_checks": []},
+        vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
+        verify_deployed=lambda **_: {
+            "status": "ok",
+            "environment": "prod",
+            "release_version": "2026.04.18-rc9",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "security_result": {"status": "passed"},
+        },
+    )
+
+    assert result["status"] == "approved"
+    assert result["gates"]["environment_drift_verified"] is True
+
+
 def test_release_candidate_certification_blocks_failed_operational_alert_report() -> None:
     module = _load_certification_script_module()
 
@@ -274,6 +323,7 @@ def test_release_candidate_certification_approves_when_operational_alerts_pass()
             "status": "passed",
             "failing_checks": [],
         },
+        environment_drift_result={"status": "passed", "failing_checks": []},
         verify_deployed=lambda **_: {
             "status": "ok",
             "environment": "prod",
@@ -296,6 +346,7 @@ def test_release_candidate_certification_blocks_failed_deployed_load_report() ->
         expected_environment="prod",
         expected_release_version="2026.04.18-rc5",
         operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         deployed_load_result={
             "status": "failed",
@@ -323,6 +374,7 @@ def test_release_candidate_certification_approves_when_deployed_load_passes() ->
         expected_environment="prod",
         expected_release_version="2026.04.18-rc5",
         operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         deployed_load_result={
             "status": "passed",
@@ -350,6 +402,7 @@ def test_release_candidate_certification_blocks_failed_rollback_report() -> None
         expected_environment="prod",
         expected_release_version="2026.04.18",
         operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         rollback_result={
             "status": "failed",
@@ -378,6 +431,7 @@ def test_release_candidate_certification_approves_when_rollback_report_passes() 
         expected_environment="prod",
         expected_release_version="2026.04.18",
         operational_alert_result={"status": "passed", "failing_checks": []},
+        environment_drift_result={"status": "passed", "failing_checks": []},
         vulnerability_scan_result={"status": "passed", "failing_surfaces": []},
         rollback_result={
             "status": "passed",

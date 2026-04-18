@@ -5,9 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..dependencies import get_session, get_settings
-from ..schemas import AuthorityBoundaryResponse, SystemHealthResponse, SystemSecurityControlsResponse
+from ..schemas import (
+    AuthorityBoundaryResponse,
+    SystemEnvironmentContractResponse,
+    SystemHealthResponse,
+    SystemSecurityControlsResponse,
+)
 from ..services.authority import build_authority_boundary
-from ..services.system_status import build_system_health
+from ..services.system_status import build_system_environment_contract, build_system_health
 
 router = APIRouter(prefix="/v1/system", tags=["system"])
 
@@ -42,3 +47,10 @@ async def get_security_controls(
             "webhook_requests": settings.rate_limit_webhook_requests,
         },
     )
+
+
+@router.get("/environment-contract", response_model=SystemEnvironmentContractResponse)
+async def get_environment_contract(
+    settings: Settings = Depends(get_settings),
+) -> SystemEnvironmentContractResponse:
+    return build_system_environment_contract(settings=settings)
