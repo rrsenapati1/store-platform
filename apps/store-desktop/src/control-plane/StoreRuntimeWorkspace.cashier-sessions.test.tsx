@@ -18,6 +18,12 @@ function jsonResponse(body: unknown, status = 200): MockResponse {
   };
 }
 
+async function waitForEnabledButton(name: string) {
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name })).not.toBeDisabled();
+  });
+}
+
 function installCashierSessionFetchMock(options?: { requireShiftForAttendance?: boolean }) {
   let activeAttendanceSession: Record<string, unknown> | null = null;
   let activeCashierSession: Record<string, unknown> | null = null;
@@ -364,6 +370,7 @@ describe('store runtime cashier session governance', () => {
 
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'Cash' } });
+    await waitForEnabledButton('Create sales invoice');
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
 
     expect(await screen.findByText('Open a cashier session before billing.')).toBeInTheDocument();
@@ -377,6 +384,7 @@ describe('store runtime cashier session governance', () => {
 
     expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
 
+    await waitForEnabledButton('Create sales invoice');
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
 
     await waitFor(() => {
@@ -412,6 +420,7 @@ describe('store runtime cashier session governance', () => {
 
     expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
 
+    await waitForEnabledButton('Create sales invoice');
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
     expect(await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).not.toHaveLength(0);
 

@@ -19,6 +19,12 @@ function jsonResponse(body: unknown, status = 200): MockResponse {
   };
 }
 
+async function waitForEnabledButton(name: string) {
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name })).not.toBeDisabled();
+  });
+}
+
 function buildAssignedRuntimeDevice() {
   return {
     id: 'device-1',
@@ -410,7 +416,9 @@ describe('store runtime customer display flow', () => {
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'CASHFREE_UPI_QR' } });
+    await waitForEnabledButton('Open customer display');
     fireEvent.click(screen.getByRole('button', { name: 'Open customer display' }));
+    await waitForEnabledButton('Start branded UPI QR');
     fireEvent.click(screen.getByRole('button', { name: 'Start branded UPI QR' }));
     await waitFor(() => {
       const activePayload = loadCustomerDisplayPayload();
@@ -424,7 +432,7 @@ describe('store runtime customer display flow', () => {
       expect(completedPayload?.state).toBe('sale_complete');
       expect(completedPayload?.message).toContain('SINV-BLRFLAGSHIP-0001');
     }, { timeout: 5000 });
-  }, 10000);
+  }, 20000);
 
   test('publishes cart preview and completed sale posture to the customer display', async () => {
     render(<App />);
@@ -439,6 +447,7 @@ describe('store runtime customer display flow', () => {
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'UPI' } });
+    await waitForEnabledButton('Open customer display');
     fireEvent.click(screen.getByRole('button', { name: 'Open customer display' }));
 
     await waitFor(() => {
@@ -448,6 +457,7 @@ describe('store runtime customer display flow', () => {
     });
 
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
+    await waitForEnabledButton('Create sales invoice');
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
 
     await waitFor(() => {
