@@ -6,6 +6,8 @@ Updated: 2026-04-18
 
 `CP-025` established the baseline scan posture. `V2-009` turns that posture into a repo-owned execution path that writes normalized JSON evidence and can now block release certification when scan evidence is missing or failed.
 
+`V2-009` also adds first-class license-compliance evaluation on top of the generated SBOM bundle so release readiness covers not just known vulnerabilities but also policy-blocking runtime licenses.
+
 ## SBOM Bundle Runner
 
 `V2-009` also adds first-class SBOM generation for the same release surfaces.
@@ -42,6 +44,66 @@ The runner currently covers:
 The first foundation uses `syft` as the primary generator and expects CycloneDX JSON output.
 
 If `syft` is unavailable, the runner still writes a normalized report, but affected surfaces are marked `tool-unavailable` and release certification should block when that report is supplied or required.
+
+## License Compliance Runner
+
+From repo root, run:
+
+```powershell
+python services/control-plane-api/scripts/run_license_compliance.py `
+  --sbom-report docs/launch/evidence/staging-sbom-report.json `
+  --output-path docs/launch/evidence/staging-license-compliance-report.json `
+  --policy-path docs/launch/security/license-policy.json `
+  --exceptions-path docs/launch/security/license-exceptions.json
+```
+
+This runner reuses the SBOM artifact paths from the normalized SBOM report and writes one normalized JSON report with:
+
+- `status`
+- `policy`
+- `surfaces`
+- `failing_surfaces`
+- `summary`
+
+Each surface records:
+
+- `component_count`
+- `license_summary`
+- `findings`
+- `artifact_path`
+- `failure_reason`
+
+## License Policy
+
+The repo-owned default policy lives in:
+
+- `docs/launch/security/license-policy.json`
+
+The first foundation treats:
+
+- permissive licenses such as `MIT`, `Apache-2.0`, and `BSD-*` as allowed
+- reciprocal or ambiguous commercial-risk licenses such as `LGPL-*`, `EPL-*`, and `CDDL-*` as review-required
+- strong copyleft or source-available-only licenses such as `GPL-*`, `AGPL-*`, `SSPL-1.0`, `BUSL-1.1`, and `Commons-Clause` as denied
+
+Unknown licenses are blocking by default.
+
+## License Exceptions
+
+Approved temporary exceptions live in:
+
+- `docs/launch/security/license-exceptions.json`
+
+Each entry must include:
+
+- `surface`
+- `package_or_identifier`
+- `license`
+- `expires_on`
+- `reason`
+- `mitigation`
+- `approved_by`
+
+Expired exceptions fail the runner.
 
 ## Primary Runner
 
@@ -238,3 +300,33 @@ python services/control-plane-api/scripts/certify_release_candidate.py `
 ```
 
 Release certification should now block if the SBOM report is missing or failed.
+
+## Minimum License Evidence For A Release
+
+Keep the latest license-compliance report for the release candidate, for example:
+
+```powershell
+python services/control-plane-api/scripts/run_license_compliance.py `
+  --sbom-report docs/launch/evidence/prod-sbom-report.json `
+  --output-path docs/launch/evidence/prod-license-compliance-report.json `
+  --policy-path docs/launch/security/license-policy.json `
+  --exceptions-path docs/launch/security/license-exceptions.json
+```
+
+Then feed that report into release evidence or certification:
+
+```powershell
+python services/control-plane-api/scripts/generate_release_candidate_evidence.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --license-compliance-report docs/launch/evidence/prod-license-compliance-report.json
+
+python services/control-plane-api/scripts/certify_release_candidate.py `
+  --base-url https://control.store.korsenex.com `
+  --expected-environment prod `
+  --expected-release-version 2026.04.18 `
+  --license-compliance-report docs/launch/evidence/prod-license-compliance-report.json
+```
+
+Release certification should now block if the license-compliance report is missing or failed.

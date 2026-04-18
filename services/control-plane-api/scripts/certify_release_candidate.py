@@ -38,6 +38,7 @@ def certify_release_candidate(
     tls_posture_result: dict[str, object] | None = None,
     sbom_result: dict[str, object] | None = None,
     provenance_result: dict[str, object] | None = None,
+    license_compliance_result: dict[str, object] | None = None,
     deployed_load_result: dict[str, object] | None = None,
     rollback_result: dict[str, object] | None = None,
     vulnerability_scan_result: dict[str, object] | None = None,
@@ -46,6 +47,7 @@ def certify_release_candidate(
     require_tls_posture: bool = True,
     require_sbom: bool = True,
     require_provenance: bool = True,
+    require_license_compliance: bool = True,
     require_deployed_load: bool = False,
     require_rollback_verification: bool = False,
     require_vulnerability_scan: bool = True,
@@ -89,6 +91,9 @@ def certify_release_candidate(
       "provenance_verified": (not require_provenance) or (
           provenance_result is not None and provenance_result.get("status") == "passed"
       ),
+      "license_compliance_verified": (not require_license_compliance) or (
+          license_compliance_result is not None and license_compliance_result.get("status") == "passed"
+      ),
       "deployed_load_verified": (
           deployed_load_result.get("status") == "passed"
           if deployed_load_result is not None
@@ -123,6 +128,8 @@ def certify_release_candidate(
       "sbom_failing_surfaces": [] if sbom_result is None else list(sbom_result.get("failing_surfaces") or []),
       "provenance_result_status": None if provenance_result is None else provenance_result.get("status"),
       "provenance_failure_reason": None if provenance_result is None else provenance_result.get("failure_reason"),
+      "license_compliance_result_status": None if license_compliance_result is None else license_compliance_result.get("status"),
+      "license_compliance_failing_surfaces": [] if license_compliance_result is None else list(license_compliance_result.get("failing_surfaces") or []),
       "deployed_load_result_status": None if deployed_load_result is None else deployed_load_result.get("status"),
       "deployed_load_failing_scenarios": [] if deployed_load_result is None else list(deployed_load_result.get("failing_scenarios") or []),
       "rollback_result_status": None if rollback_result is None else rollback_result.get("status"),
@@ -145,6 +152,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tls-posture-report", help="Optional JSON TLS posture report path produced by verify_tls_posture.py.")
     parser.add_argument("--sbom-report", help="Optional JSON SBOM report path produced by generate_sbom_bundle.py.")
     parser.add_argument("--provenance-report", help="Optional JSON provenance report path produced by package-control-plane-release.mjs.")
+    parser.add_argument("--license-compliance-report", help="Optional JSON license report path produced by run_license_compliance.py.")
     parser.add_argument("--deployed-load-report", help="Optional JSON deployed load report path produced by verify_deployed_load_posture.py.")
     parser.add_argument("--rollback-report", help="Optional JSON rollback verification report path produced by verify_release_rollback.py.")
     parser.add_argument("--vulnerability-scan-report", help="Optional JSON vulnerability report path produced by run_vulnerability_scans.py.")
@@ -171,6 +179,9 @@ def main() -> None:
     provenance_result = None
     if args.provenance_report:
         provenance_result = json.loads(Path(args.provenance_report).read_text(encoding="utf-8"))
+    license_compliance_result = None
+    if args.license_compliance_report:
+        license_compliance_result = json.loads(Path(args.license_compliance_report).read_text(encoding="utf-8"))
     deployed_load_result = None
     if args.deployed_load_report:
         deployed_load_result = json.loads(Path(args.deployed_load_report).read_text(encoding="utf-8"))
@@ -191,6 +202,7 @@ def main() -> None:
         tls_posture_result=tls_posture_result,
         sbom_result=sbom_result,
         provenance_result=provenance_result,
+        license_compliance_result=license_compliance_result,
         deployed_load_result=deployed_load_result,
         rollback_result=rollback_result,
         vulnerability_scan_result=vulnerability_scan_result,

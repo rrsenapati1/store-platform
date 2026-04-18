@@ -418,6 +418,82 @@ def test_generate_release_candidate_evidence_renders_provenance_posture(tmp_path
     assert "source worktree clean: True" in content
 
 
+def test_generate_release_candidate_evidence_renders_license_compliance_posture(tmp_path: Path) -> None:
+    module = _load_script_module()
+    output_path = tmp_path / "rc-evidence-license.md"
+    license_report_path = tmp_path / "license-report.json"
+    license_report_path.write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "surfaces": {
+                    "control_plane_api": {
+                        "status": "failed",
+                        "license_summary": {"allowed": 41, "review_required": 1, "denied": 0, "unknown": 0},
+                        "findings": [
+                            {
+                                "package_or_identifier": "review-lib",
+                                "license": "LGPL-2.1-only",
+                                "status": "review_required",
+                            }
+                        ],
+                    }
+                },
+                "failing_surfaces": ["control_plane_api"],
+                "summary": "1 surfaces failed: control_plane_api",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_verify_deployed(**_: object) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc5",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+        }
+
+    def fake_certify(**_: object) -> dict[str, object]:
+        return {
+            "status": "blocked",
+            "environment": "staging",
+            "release_version": "2026.04.18-rc5",
+            "legacy_write_mode": "cutover",
+            "legacy_remaining_domains": [],
+            "gates": {
+                "health_ok": True,
+                "environment_match": True,
+                "release_version_match": True,
+                "legacy_write_mode_cutover": True,
+                "legacy_remaining_domains_cleared": True,
+                "license_compliance_verified": False,
+                "vulnerability_scans_passed": True,
+            },
+        }
+
+    result = module.generate_release_candidate_evidence(
+        base_url="https://control.staging.store.korsenex.com",
+        expected_environment="staging",
+        expected_release_version="2026.04.18-rc5",
+        release_owner="ops@store.korsenex.com",
+        output_path=output_path,
+        run_local_verification=False,
+        run_performance_validation=False,
+        verify_deployed=fake_verify_deployed,
+        certify_release_candidate=fake_certify,
+        license_compliance_report_path=license_report_path,
+        date_text="2026-04-18",
+    )
+
+    assert result["final_status"] == "blocked"
+    content = output_path.read_text(encoding="utf-8")
+    assert "## License Compliance Evidence" in content
+    assert "license compliance status: failed" in content
+    assert "control_plane_api" in content
+
+
 def test_generate_release_candidate_evidence_renders_operational_alert_posture(tmp_path: Path) -> None:
     module = _load_script_module()
     output_path = tmp_path / "rc-evidence-alerts.md"

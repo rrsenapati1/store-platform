@@ -2,6 +2,16 @@
 
 ## 2026-04-18
 
+- Extended `V2-009` with license-compliance foundation:
+  - added a `license_compliance` domain module that evaluates CycloneDX SBOM artifacts against a repo-owned license policy plus temporary exception file instead of introducing a separate dependency scan path
+  - added `run_license_compliance.py` so operators can turn an SBOM bundle into one machine-readable release-license verdict for backend, web, desktop, mobile, native desktop, and image surfaces
+  - extended release-candidate evidence generation and certification so license posture is rendered explicitly and now blocks approval when the report is missing or failed
+  - added default `license-policy.json` and `license-exceptions.json` under `docs/launch/security/` and documented the runner in the dependency-scanning, verification, and production deployment runbooks
+- Verified:
+  - `python -m pytest services/control-plane-api/tests/test_license_compliance.py services/control-plane-api/tests/test_run_license_compliance_script.py services/control-plane-api/tests/test_release_candidate_evidence_generation.py services/control-plane-api/tests/test_release_candidate_certification.py -q`
+  - `python services/control-plane-api/scripts/run_license_compliance.py --help`
+  - `git -c core.safecrlf=false diff --check`
+
 - Extended `V2-009` with release provenance / artifact attestation foundation:
   - extended `package-control-plane-release.mjs` so each control-plane release bundle now emits a provenance sidecar with archive and manifest SHA-256 hashes plus source commit, tree, ref, remote, and worktree-clean posture captured at packaging time
   - extended release-candidate evidence generation and certification so provenance posture is rendered explicitly and now blocks approval when the provenance report is missing or failed

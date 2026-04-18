@@ -201,6 +201,30 @@ If release certification is run with `certify_release_candidate.py`, also pass:
 
 Release certification should now block if the SBOM report is missing or failed.
 
+## License Compliance Evidence
+
+Before certifying a staging or production release candidate, generate license-compliance evidence from the SBOM bundle:
+
+```powershell
+python scripts/run_license_compliance.py `
+  --sbom-report docs/launch/evidence/prod-sbom-report.json `
+  --output-path docs/launch/evidence/prod-license-compliance-report.json `
+  --policy-path docs/launch/security/license-policy.json `
+  --exceptions-path docs/launch/security/license-exceptions.json
+```
+
+Keep that JSON report with the release notes or evidence bundle.
+
+If release evidence is generated with `generate_release_candidate_evidence.py`, also pass:
+
+- `--license-compliance-report <license-compliance-report.json>`
+
+If release certification is run with `certify_release_candidate.py`, also pass:
+
+- `--license-compliance-report <license-compliance-report.json>`
+
+Release certification should now block if the license-compliance report is missing or failed.
+
 ## Release Provenance Evidence
 
 Before certifying a staging or production release candidate, keep the provenance sidecar produced with the release bundle:
