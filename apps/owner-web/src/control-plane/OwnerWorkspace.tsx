@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { consumeLocalDevBootstrapFromWindow } from '@store/auth';
 import { ActionButton, AppShell, DetailList, FormField, MetricGrid, SectionCard, StatusBadge } from '@store/ui';
 import { OwnerBatchExpirySection } from './OwnerBatchExpirySection';
 import { OwnerAttendanceSection } from './OwnerAttendanceSection';
@@ -37,6 +39,8 @@ function buildMetrics(branchCount: number, onboardingStatus: string | undefined,
 
 export function OwnerWorkspace() {
   const workspace = useOwnerWorkspace();
+  const bootstrapRef = useRef<ReturnType<typeof consumeLocalDevBootstrapFromWindow> | null>(null);
+  const didAutoStartRef = useRef(false);
   const branches = workspace.branches ?? [];
   const staffProfiles = workspace.staffProfiles ?? [];
   const catalogProducts = workspace.catalogProducts ?? [];
@@ -44,6 +48,30 @@ export function OwnerWorkspace() {
   const devices = workspace.devices ?? [];
   const auditEvents = workspace.auditEvents ?? [];
   const metrics = buildMetrics(branches.length, workspace.tenant?.onboarding_status, Boolean(workspace.actor));
+
+  if (bootstrapRef.current == null && typeof window !== 'undefined') {
+    bootstrapRef.current = consumeLocalDevBootstrapFromWindow(window);
+  }
+
+  useEffect(() => {
+    const bootstrap = bootstrapRef.current;
+    if (!bootstrap?.korsenexToken || workspace.korsenexToken === bootstrap.korsenexToken) {
+      return;
+    }
+    workspace.setKorsenexToken(bootstrap.korsenexToken);
+  }, [workspace.korsenexToken, workspace.setKorsenexToken]);
+
+  useEffect(() => {
+    const bootstrap = bootstrapRef.current;
+    if (!bootstrap?.korsenexToken || !bootstrap.autoStart || didAutoStartRef.current) {
+      return;
+    }
+    if (workspace.actor || workspace.isBusy || workspace.korsenexToken !== bootstrap.korsenexToken) {
+      return;
+    }
+    didAutoStartRef.current = true;
+    void workspace.startSession();
+  }, [workspace.actor, workspace.isBusy, workspace.korsenexToken, workspace.startSession]);
 
   return (
     <AppShell

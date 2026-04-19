@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { consumeLocalDevBootstrapFromWindow } from '@store/auth';
 import { AppShell, DetailList, FormField, MetricGrid, SectionCard } from '@store/ui';
 import { StoreBatchExpirySection } from './StoreBatchExpirySection';
 import { StoreBarcodeLookupSection } from './StoreBarcodeLookupSection';
@@ -39,6 +41,8 @@ function buildMetrics(args: { branchCount: number; isSessionLive: boolean; cache
 
 export function StoreRuntimeWorkspace() {
   const workspace = useStoreRuntimeWorkspace();
+  const bootstrapRef = useRef<ReturnType<typeof consumeLocalDevBootstrapFromWindow> | null>(null);
+  const didAutoStartRef = useRef(false);
   const branches = workspace.branches ?? [];
   const inventorySnapshot = workspace.inventorySnapshot ?? [];
   const cacheStatus = workspace.cacheStatus ?? 'EMPTY';
@@ -55,6 +59,39 @@ export function StoreRuntimeWorkspace() {
     cacheStatus: isLocalAuthGateActive ? 'EMPTY' : cacheStatus,
     stockRecords: isLocalAuthGateActive ? 0 : inventorySnapshot.length,
   });
+
+  if (bootstrapRef.current == null && typeof window !== 'undefined') {
+    bootstrapRef.current = consumeLocalDevBootstrapFromWindow(window);
+  }
+
+  useEffect(() => {
+    const bootstrap = bootstrapRef.current;
+    if (!bootstrap?.korsenexToken || workspace.korsenexToken === bootstrap.korsenexToken) {
+      return;
+    }
+    workspace.setKorsenexToken(bootstrap.korsenexToken);
+  }, [workspace.korsenexToken, workspace.setKorsenexToken]);
+
+  useEffect(() => {
+    const bootstrap = bootstrapRef.current;
+    if (!bootstrap?.korsenexToken || !bootstrap.autoStart || didAutoStartRef.current) {
+      return;
+    }
+    if (!workspace.supportsDeveloperSessionBootstrap || workspace.isSessionLive || workspace.isBusy) {
+      return;
+    }
+    if (workspace.korsenexToken !== bootstrap.korsenexToken) {
+      return;
+    }
+    didAutoStartRef.current = true;
+    void workspace.startSession();
+  }, [
+    workspace.isBusy,
+    workspace.isSessionLive,
+    workspace.korsenexToken,
+    workspace.startSession,
+    workspace.supportsDeveloperSessionBootstrap,
+  ]);
 
   return (
     <AppShell

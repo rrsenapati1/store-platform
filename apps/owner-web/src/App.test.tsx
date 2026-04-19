@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from './App';
 
@@ -22,6 +22,7 @@ describe('owner onboarding flow', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    window.history.replaceState(null, '', '/');
     const responses = [
       jsonResponse({ access_token: 'session-owner', token_type: 'Bearer' }),
       jsonResponse({
@@ -223,8 +224,55 @@ describe('owner onboarding flow', () => {
   });
 
   afterEach(() => {
+    cleanup();
+    window.history.replaceState(null, '', '/');
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
+  });
+
+  test('auto-starts an owner session from local bootstrap URL parameters', async () => {
+    const responses = [
+      jsonResponse({ access_token: 'session-owner', token_type: 'Bearer' }),
+      jsonResponse({
+        user_id: 'user-owner',
+        email: 'owner@acme.local',
+        full_name: 'Acme Owner',
+        is_platform_admin: false,
+        tenant_memberships: [{ tenant_id: 'tenant-acme', role_name: 'tenant_owner', status: 'ACTIVE' }],
+        branch_memberships: [],
+      }),
+      jsonResponse({
+        id: 'tenant-acme',
+        name: 'Acme Retail',
+        slug: 'acme-retail',
+        status: 'ACTIVE',
+        onboarding_status: 'BRANCH_READY',
+      }),
+      jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
+    ];
+
+    globalThis.fetch = vi.fn(async () => {
+      const next = responses.shift();
+      if (!next) {
+        throw new Error('Unexpected fetch call');
+      }
+      return next as never;
+    }) as typeof fetch;
+
+    window.history.replaceState(
+      null,
+      '',
+      '/#stub_sub=owner-1&stub_email=owner@acme.local&stub_name=Acme%20Owner',
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Acme Owner')).toBeInTheDocument();
+    expect((await screen.findAllByText('Acme Retail')).length).toBeGreaterThan(0);
   });
 
   test('loads owner onboarding state and bootstraps staff and branch devices', async () => {

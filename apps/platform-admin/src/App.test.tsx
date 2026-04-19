@@ -101,8 +101,37 @@ describe('platform admin onboarding flow', () => {
 
   afterEach(() => {
     cleanup();
+    window.history.replaceState(null, '', '/');
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
+  });
+
+  test('auto-starts a session from local bootstrap URL parameters', async () => {
+    mockResponses([
+      jsonResponse({ access_token: 'session-platform', token_type: 'Bearer' }),
+      jsonResponse({
+        user_id: 'user-platform',
+        email: 'admin@store.local',
+        full_name: 'Platform Admin',
+        is_platform_admin: true,
+        tenant_memberships: [],
+        branch_memberships: [],
+      }),
+      jsonResponse({ records: [] }),
+      jsonResponse({ records: [] }),
+      jsonResponse(observabilitySummaryResponse()),
+    ]);
+
+    window.history.replaceState(
+      null,
+      '',
+      '/#stub_sub=platform-1&stub_email=admin@store.local&stub_name=Platform%20Admin',
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Platform Admin')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('stub:sub=platform-1;email=admin@store.local;name=Platform Admin')).toBeInTheDocument();
   });
 
   test('exchanges session, loads tenants, creates a tenant, and sends an owner invite', async () => {

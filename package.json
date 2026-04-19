@@ -8,6 +8,11 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:platform-admin": "npm run dev --workspace @store/platform-admin",
+    "dev:owner-web": "npm run dev --workspace @store/owner-web",
+    "dev:store-desktop": "npm run dev --workspace @store/store-desktop",
+    "dev:store-desktop:tauri": "npm run tauri:dev --workspace @store/store-desktop",
+    "dev:seed-local-demo": "python services/control-plane-api/scripts/seed_local_demo.py --api-origin http://127.0.0.1:18000",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

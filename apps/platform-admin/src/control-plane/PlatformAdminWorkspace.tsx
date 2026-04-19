@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { consumeLocalDevBootstrapFromWindow } from '@store/auth';
 import { ActionButton, AppShell, DetailList, FormField, MetricGrid, SectionCard, StatusBadge } from '@store/ui';
 import type { WorkspaceMetric } from '@store/types';
 import { usePlatformAdminWorkspace } from './usePlatformAdminWorkspace';
@@ -12,7 +14,33 @@ function buildMetrics(tenantCount: number, activeTenantId: string, isLive: boole
 
 export function PlatformAdminWorkspace() {
   const workspace = usePlatformAdminWorkspace();
+  const bootstrapRef = useRef<ReturnType<typeof consumeLocalDevBootstrapFromWindow> | null>(null);
+  const didAutoStartRef = useRef(false);
   const metrics = buildMetrics(workspace.tenants.length, workspace.activeTenantId, Boolean(workspace.actor));
+
+  if (bootstrapRef.current == null && typeof window !== 'undefined') {
+    bootstrapRef.current = consumeLocalDevBootstrapFromWindow(window);
+  }
+
+  useEffect(() => {
+    const bootstrap = bootstrapRef.current;
+    if (!bootstrap?.korsenexToken || workspace.korsenexToken === bootstrap.korsenexToken) {
+      return;
+    }
+    workspace.setKorsenexToken(bootstrap.korsenexToken);
+  }, [workspace.korsenexToken, workspace.setKorsenexToken]);
+
+  useEffect(() => {
+    const bootstrap = bootstrapRef.current;
+    if (!bootstrap?.korsenexToken || !bootstrap.autoStart || didAutoStartRef.current) {
+      return;
+    }
+    if (workspace.actor || workspace.isBusy || workspace.korsenexToken !== bootstrap.korsenexToken) {
+      return;
+    }
+    didAutoStartRef.current = true;
+    void workspace.startSession();
+  }, [workspace.actor, workspace.isBusy, workspace.korsenexToken, workspace.startSession]);
 
   return (
     <AppShell

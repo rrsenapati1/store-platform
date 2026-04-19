@@ -100,8 +100,98 @@ describe('store runtime workspace', () => {
   });
 
   afterEach(() => {
+    window.history.replaceState(null, '', '/');
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
+  });
+
+  test('auto-starts a runtime session from local bootstrap URL parameters', async () => {
+    const responses = [
+      jsonResponse({ access_token: 'session-cashier', token_type: 'Bearer' }),
+      jsonResponse({
+        user_id: 'user-cashier',
+        email: 'cashier@acme.local',
+        full_name: 'Counter Cashier',
+        is_platform_admin: false,
+        tenant_memberships: [],
+        branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+      }),
+      jsonResponse({
+        id: 'tenant-acme',
+        name: 'Acme Retail',
+        slug: 'acme-retail',
+        status: 'ACTIVE',
+        onboarding_status: 'BRANCH_READY',
+      }),
+      jsonResponse({
+        records: [{ branch_id: 'branch-1', tenant_id: 'tenant-acme', name: 'Bengaluru Flagship', code: 'blr-flagship', status: 'ACTIVE' }],
+      }),
+      jsonResponse({
+        records: [
+          {
+            id: 'catalog-item-1',
+            tenant_id: 'tenant-acme',
+            branch_id: 'branch-1',
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            barcode: '8901234567890',
+            hsn_sac_code: '0902',
+            gst_rate: 5,
+            base_selling_price: 92.5,
+            selling_price_override: null,
+            effective_selling_price: 92.5,
+            availability_status: 'ACTIVE',
+          },
+        ],
+      }),
+      jsonResponse({
+        records: [
+          {
+            product_id: 'product-1',
+            product_name: 'Classic Tea',
+            sku_code: 'tea-classic-250g',
+            stock_on_hand: 24,
+            last_entry_type: 'PURCHASE_RECEIPT',
+          },
+        ],
+      }),
+      jsonResponse({ records: [] }),
+      jsonResponse({
+        records: [
+          {
+            id: 'device-1',
+            tenant_id: 'tenant-acme',
+            branch_id: 'branch-1',
+            device_name: 'Counter Desktop 1',
+            device_code: 'counter-1',
+            session_surface: 'store_desktop',
+            status: 'ACTIVE',
+            assigned_staff_profile_id: null,
+            assigned_staff_full_name: null,
+          },
+        ],
+      }),
+    ];
+
+    globalThis.fetch = vi.fn(async () => {
+      const next = responses.shift();
+      if (!next) {
+        throw new Error('Unexpected fetch call');
+      }
+      return next as never;
+    }) as typeof fetch;
+
+    window.history.replaceState(
+      null,
+      '',
+      '/#stub_sub=cashier-1&stub_email=cashier@acme.local&stub_name=Counter%20Cashier',
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    expect(screen.getByText('Counter checkout')).toBeInTheDocument();
   });
 
   test('starts a runtime session and loads checkout posture', async () => {
