@@ -1403,3 +1403,8 @@
   - moved the tablet runtime onto a modern branch-operations shell with explicit overview, drill-down navigation, and scan/runtime utility sections
   - kept handheld scan-first behavior intact while giving tablet its own product identity
   - reduced the deferred public-release productization backlog to secure-storage hardening, final mobile state polish, and the final cross-app visual parity pass
+- Completed mobile secure-storage hardening review and implementation:
+  - added encrypted Android preference storage as the default persistence backend for paired-device and runtime-session state
+  - bounded plain SharedPreferences to an explicit fallback posture instead of a silent default
+  - surfaced storage-security posture in the runtime diagnostics so insecure fallback is visible immediately during QA and operations
+  - reduced the deferred public-release productization backlog to final mobile state polish and the final cross-app visual parity pass

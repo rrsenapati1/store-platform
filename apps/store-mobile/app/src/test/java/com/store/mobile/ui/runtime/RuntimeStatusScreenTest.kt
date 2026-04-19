@@ -3,6 +3,7 @@ package com.store.mobile.ui.runtime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
+import com.store.mobile.runtime.StoreMobileStorageSecurityPosture
 import com.store.mobile.ui.scan.ScanExternalScannerStatus
 import com.store.mobile.ui.scan.ZebraDataWedgeSetupStatus
 
@@ -49,5 +50,21 @@ class RuntimeStatusScreenTest {
 
         assertEquals("Zebra DataWedge setup failed", state.zebraDataWedgeTitle)
         assertEquals("Zebra setup warning: PLUGIN_BUNDLE_INVALID", state.zebraDataWedgeDetail)
+    }
+
+    @Test
+    fun includesStorageSecurityDiagnostics() {
+        val state = buildRuntimeStatusState(
+            connected = true,
+            pendingSyncCount = 0,
+            storageSecurityPosture = StoreMobileStorageSecurityPosture.FALLBACK_UNENCRYPTED,
+            storageSecurityDetail = "Encrypted storage unavailable: Android keystore unavailable",
+        )
+
+        assertEquals("Storage: Plain-preferences fallback", state.storageSecurityTitle)
+        assertEquals(
+            "Encrypted storage unavailable: Android keystore unavailable",
+            state.storageSecurityDetail,
+        )
     }
 }

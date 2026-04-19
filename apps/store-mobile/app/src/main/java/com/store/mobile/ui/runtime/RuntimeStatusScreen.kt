@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.store.mobile.runtime.StoreMobileStorageSecurityPosture
 import com.store.mobile.ui.scan.ScanExternalScannerStatus
 import com.store.mobile.ui.scan.ZebraDataWedgeSetupStatus
 
@@ -28,6 +29,8 @@ data class RuntimeStatusUiState(
     val externalScannerLastScanLabel: String,
     val zebraDataWedgeTitle: String,
     val zebraDataWedgeDetail: String,
+    val storageSecurityTitle: String,
+    val storageSecurityDetail: String,
     val signOutLabel: String,
     val unpairLabel: String,
 )
@@ -43,6 +46,8 @@ fun buildRuntimeStatusState(
     externalScannerMessage: String? = null,
     zebraDataWedgeStatus: ZebraDataWedgeSetupStatus = ZebraDataWedgeSetupStatus.UNAVAILABLE,
     zebraDataWedgeMessage: String? = null,
+    storageSecurityPosture: StoreMobileStorageSecurityPosture = StoreMobileStorageSecurityPosture.ENCRYPTED,
+    storageSecurityDetail: String? = null,
 ): RuntimeStatusUiState {
     val normalizedPendingSyncCount = pendingSyncCount.coerceAtLeast(0)
     val deviceLabel = deviceId ?: "Awaiting paired device"
@@ -75,6 +80,16 @@ fun buildRuntimeStatusState(
         ZebraDataWedgeSetupStatus.CONFIGURED -> "The Zebra-managed profile is configured for broadcast output and keystroke injection is disabled for this app."
         ZebraDataWedgeSetupStatus.ERROR -> "Zebra setup warning: ${zebraDataWedgeMessage ?: "DataWedge rejected the latest configuration request."}"
     }
+    val storageTitle = when (storageSecurityPosture) {
+        StoreMobileStorageSecurityPosture.ENCRYPTED -> "Storage: Encrypted preferences"
+        StoreMobileStorageSecurityPosture.FALLBACK_UNENCRYPTED -> "Storage: Plain-preferences fallback"
+    }
+    val normalizedStorageDetail = storageSecurityDetail ?: when (storageSecurityPosture) {
+        StoreMobileStorageSecurityPosture.ENCRYPTED ->
+            "Pairing and runtime session data are stored in encrypted app preferences."
+        StoreMobileStorageSecurityPosture.FALLBACK_UNENCRYPTED ->
+            "Encrypted storage could not be initialized, so the runtime fell back to plain app preferences."
+    }
 
     return RuntimeStatusUiState(
         connected = connected,
@@ -97,6 +112,8 @@ fun buildRuntimeStatusState(
         externalScannerLastScanLabel = lastScanLabel,
         zebraDataWedgeTitle = zebraTitle,
         zebraDataWedgeDetail = zebraDetail,
+        storageSecurityTitle = storageTitle,
+        storageSecurityDetail = normalizedStorageDetail,
         signOutLabel = "Sign out",
         unpairLabel = "Unpair device",
     )
@@ -141,6 +158,8 @@ fun RuntimeStatusScreen(
                 Text(text = state.externalScannerLastScanLabel, style = MaterialTheme.typography.bodySmall)
                 Text(text = state.zebraDataWedgeTitle, style = MaterialTheme.typography.titleMedium)
                 Text(text = state.zebraDataWedgeDetail, style = MaterialTheme.typography.bodyMedium)
+                Text(text = state.storageSecurityTitle, style = MaterialTheme.typography.titleMedium)
+                Text(text = state.storageSecurityDetail, style = MaterialTheme.typography.bodyMedium)
             }
         }
         Button(

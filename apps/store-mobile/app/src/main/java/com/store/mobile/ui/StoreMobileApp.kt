@@ -34,13 +34,13 @@ import com.store.mobile.operations.RemoteStockCountRepository
 import com.store.mobile.operations.RestockRepository
 import com.store.mobile.operations.StockCountRepository
 import com.store.mobile.runtime.FakeStoreMobileHubClient
-import com.store.mobile.runtime.SharedPreferencesStoreMobileKeyValueStore
 import com.store.mobile.runtime.StoreMobilePairedDevice
 import com.store.mobile.runtime.StoreMobilePairingRepository
 import com.store.mobile.runtime.StoreMobilePersistentPairingRepository
 import com.store.mobile.runtime.StoreMobilePersistentSessionRepository
 import com.store.mobile.runtime.StoreMobileRuntimeSession
 import com.store.mobile.runtime.StoreMobileSessionRepository
+import com.store.mobile.runtime.createAndroidStoreMobileSecureStorage
 import com.store.mobile.runtime.parseStoreMobileExpiryMillis
 import com.store.mobile.scan.ExternalScannerEvent
 import com.store.mobile.scan.InMemoryScanLookupRepository
@@ -170,15 +170,13 @@ fun StoreMobileApp() {
     val context = LocalContext.current
     val application = remember(context) { context.applicationContext as? StoreMobileApplication }
     val activity = remember(context) { context as? MainActivity }
-    val runtimePreferences = remember(context) {
-        context.applicationContext.getSharedPreferences(
-            STORE_MOBILE_RUNTIME_PREFERENCES,
-            Context.MODE_PRIVATE,
+    val secureStorage = remember(context) {
+        createAndroidStoreMobileSecureStorage(
+            context = context.applicationContext,
+            preferencesName = STORE_MOBILE_RUNTIME_PREFERENCES,
         )
     }
-    val keyValueStore = remember(runtimePreferences) {
-        SharedPreferencesStoreMobileKeyValueStore(runtimePreferences)
-    }
+    val keyValueStore = secureStorage.keyValueStore
     val pairingRepository: StoreMobilePairingRepository = remember(keyValueStore) {
         StoreMobilePersistentPairingRepository(keyValueStore)
     }
@@ -555,6 +553,8 @@ fun StoreMobileApp() {
                         externalScannerMessage = scanLookupState.externalScannerMessage,
                         zebraDataWedgeStatus = scanLookupState.zebraDataWedgeStatus,
                         zebraDataWedgeMessage = scanLookupState.zebraDataWedgeMessage,
+                        storageSecurityPosture = secureStorage.securityPosture,
+                        storageSecurityDetail = secureStorage.detail,
                     )
                     val tabletOverviewModel = buildInventoryTabletOverviewModel(
                         receivingState = receivingState,
