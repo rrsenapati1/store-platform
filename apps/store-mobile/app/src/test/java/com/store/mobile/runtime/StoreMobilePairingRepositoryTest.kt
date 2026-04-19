@@ -53,4 +53,38 @@ class StoreMobilePairingRepositoryTest {
         assertNull(repository.loadPairedDevice())
         assertNull(repository.loadHubManifest())
     }
+
+    @Test
+    fun clearingPairingDoesNotDeleteRuntimeSessionUntilSessionRepositoryClearsIt() {
+        val keyValueStore = InMemoryStoreMobileKeyValueStore()
+        val pairingRepository = StoreMobilePersistentPairingRepository(keyValueStore)
+        val sessionRepository = StoreMobilePersistentSessionRepository(keyValueStore)
+
+        pairingRepository.savePairedDevice(
+            deviceId = "device-1",
+            installationId = "install-1",
+            runtimeProfile = "mobile_store_spoke",
+            sessionSurface = "store_mobile",
+            hubBaseUrl = "http://127.0.0.1:9400",
+            tenantId = "tenant-demo-1",
+            branchId = "branch-demo-1",
+        )
+        sessionRepository.saveSession(
+            StoreMobileRuntimeSession(
+                accessToken = "session:mobile-demo",
+                expiresAt = "2099-01-01T00:00:00Z",
+                deviceId = "device-1",
+                staffProfileId = "staff-demo-1",
+                runtimeProfile = "mobile_store_spoke",
+                sessionSurface = "store_mobile",
+                tenantId = "tenant-demo-1",
+                branchId = "branch-demo-1",
+            ),
+        )
+
+        pairingRepository.clear()
+
+        assertNull(pairingRepository.loadPairedDevice())
+        assertEquals("session:mobile-demo", sessionRepository.loadSession()?.accessToken)
+    }
 }

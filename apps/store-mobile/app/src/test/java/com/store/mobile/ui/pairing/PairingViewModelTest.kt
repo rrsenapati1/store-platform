@@ -122,6 +122,31 @@ class PairingViewModelTest {
     }
 
     @Test
+    fun unpairsDeviceAndClearsPersistedRuntimeSession() {
+        val keyValueStore = InMemoryStoreMobileKeyValueStore()
+        val pairingRepository = StoreMobilePersistentPairingRepository(keyValueStore)
+        val sessionRepository = StoreMobilePersistentSessionRepository(keyValueStore)
+        val viewModel = PairingViewModel(
+            pairingRepository = pairingRepository,
+            sessionRepository = sessionRepository,
+            hubClient = FakeStoreMobileHubClient(),
+        )
+
+        viewModel.updateManualActivation(
+            hubBaseUrl = "http://127.0.0.1:9400",
+            activationCode = "MOBI-1234-EFGH",
+        )
+        viewModel.redeemManualActivation(installationId = "android-handheld-installation")
+
+        viewModel.unpairDevice()
+
+        assertEquals(PairingSessionStatus.UNPAIRED, viewModel.state.sessionStatus)
+        assertNull(viewModel.state.pairedDevice)
+        assertNull(pairingRepository.loadPairedDevice())
+        assertNull(sessionRepository.loadSession())
+    }
+
+    @Test
     fun clearsExpiredPersistedSessionOnRestore() {
         val keyValueStore = InMemoryStoreMobileKeyValueStore()
         val pairingRepository = StoreMobilePersistentPairingRepository(keyValueStore)
@@ -155,6 +180,11 @@ class PairingViewModelTest {
         )
 
         assertEquals(PairingSessionStatus.EXPIRED, viewModel.state.sessionStatus)
+        assertEquals("paired-mobile-1", viewModel.state.pairedDevice?.deviceId)
+        assertEquals(
+            "Runtime session expired. Redeem a fresh activation or unpair this device.",
+            viewModel.state.errorMessage,
+        )
         assertNull(sessionRepository.loadSession())
     }
 }

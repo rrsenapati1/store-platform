@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.store.mobile.StoreMobileAppBootstrap
 import com.store.mobile.StoreMobileApplication
 import com.store.mobile.MainActivity
 import com.store.mobile.controlplane.StoreMobileControlPlaneClient
@@ -51,6 +52,7 @@ import com.store.mobile.scan.InMemoryScanLookupRepository
 import com.store.mobile.scan.RemoteScanLookupRepository
 import com.store.mobile.scan.ScanLookupRepository
 import com.store.mobile.scan.ZebraDataWedgeResult
+import com.store.mobile.ui.entry.StoreMobileEntrySurface
 import com.store.mobile.ui.handheld.HandheldStoreShell
 import com.store.mobile.ui.operations.ExpiryScreenActions
 import com.store.mobile.ui.operations.ExpiryViewModel
@@ -67,6 +69,7 @@ import com.store.mobile.ui.pairing.PairingViewModel
 import com.store.mobile.ui.runtime.buildRuntimeStatusState
 import com.store.mobile.ui.scan.ScanLookupViewModel
 import com.store.mobile.ui.tablet.InventoryTabletShell
+import com.store.mobile.ui.theme.StoreMobileTheme
 
 private const val STORE_MOBILE_RUNTIME_PREFERENCES = "store.mobile.runtime"
 
@@ -502,7 +505,7 @@ fun StoreMobileApp() {
         restockState = restockViewModel.state
     }
 
-    MaterialTheme {
+    StoreMobileTheme(themeMode = StoreMobileAppBootstrap.defaultThemeMode) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -512,7 +515,7 @@ fun StoreMobileApp() {
                 horizontalAlignment = Alignment.Start,
             ) {
                 if (!hasActiveRuntimeSession) {
-                    PairingScreen(
+                    StoreMobileEntrySurface(
                         state = pairingState,
                         onHubBaseUrlChange = { hubBaseUrl ->
                             pairingViewModel.updateManualActivation(

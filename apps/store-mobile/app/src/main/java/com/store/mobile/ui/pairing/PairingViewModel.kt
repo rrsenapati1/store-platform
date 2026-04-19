@@ -131,7 +131,11 @@ class PairingViewModel(
             canRedeemActivation = (pairedDevice?.hubBaseUrl ?: "").isNotBlank() && activationCode.isNotBlank(),
             pairedDevice = pairedDevice,
             sessionStatus = sessionStatus,
-            errorMessage = errorMessage,
+            errorMessage = errorMessage ?: if (sessionStatus == PairingSessionStatus.EXPIRED) {
+                "Runtime session expired. Redeem a fresh activation or unpair this device."
+            } else {
+                null
+            },
         )
     }
 
