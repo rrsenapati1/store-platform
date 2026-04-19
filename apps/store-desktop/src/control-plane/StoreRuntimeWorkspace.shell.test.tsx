@@ -5,12 +5,13 @@ import { describe, expect, test } from 'vitest';
 import { App } from '../App';
 
 describe('store runtime shell identity', () => {
-  test('shows browser shell identity posture before a runtime session starts', async () => {
+  test('shows the entry screen and bootstrap posture before a runtime session starts', async () => {
     render(<App />);
 
-    expect(await screen.findByText('Shell identity')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Store access' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Entry' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('Browser web runtime')).toBeInTheDocument();
     expect(screen.getByText('localhost')).toBeInTheDocument();
-    expect(screen.getByText('Not exposed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start runtime session' })).toBeInTheDocument();
   });
 });

@@ -1,0 +1,204 @@
+/* @vitest-environment jsdom */
+import '@testing-library/jest-dom/vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, test, vi } from 'vitest';
+import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
+import { StoreRuntimeEntrySurface } from './storeRuntimeEntrySurface';
+
+function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): StoreRuntimeWorkspaceState {
+  return {
+    actor: null,
+    accessToken: null,
+    isBusy: false,
+    isSessionLive: false,
+    supportsDeveloperSessionBootstrap: true,
+    korsenexToken: '',
+    setKorsenexToken: vi.fn(),
+    startSession: vi.fn(async () => {}),
+    refreshRuntimeSession: vi.fn(async () => {}),
+    signOut: vi.fn(async () => {}),
+    runtimeShellLabel: 'Browser web runtime',
+    runtimeShellKind: 'browser_web',
+    runtimeHostname: 'localhost',
+    sessionExpiresAt: null,
+    hasLoadedLocalAuth: true,
+    requiresPinEnrollment: false,
+    requiresLocalUnlock: false,
+    activationCode: '',
+    setActivationCode: vi.fn(),
+    activateDesktopAccess: vi.fn(async () => {}),
+    newPin: '',
+    confirmPin: '',
+    setNewPin: vi.fn(),
+    setConfirmPin: vi.fn(),
+    enrollRuntimePin: vi.fn(async () => {}),
+    unlockPin: '',
+    setUnlockPin: vi.fn(),
+    unlockRuntimeWithPin: vi.fn(async () => {}),
+    runtimeDevices: [
+      {
+        id: 'device-1',
+        tenant_id: 'tenant-acme',
+        branch_id: 'branch-1',
+        device_name: 'Counter Desktop 1',
+        device_code: 'counter-1',
+        session_surface: 'store_desktop',
+        status: 'ACTIVE',
+        assigned_staff_profile_id: 'staff-1',
+        assigned_staff_full_name: 'Counter Cashier',
+      },
+    ],
+    selectedRuntimeDeviceId: 'device-1',
+    activeAttendanceSession: null,
+    attendanceSessions: [],
+    attendanceClockInNote: '',
+    attendanceClockOutNote: '',
+    setAttendanceClockInNote: vi.fn(),
+    setAttendanceClockOutNote: vi.fn(),
+    openAttendanceSession: vi.fn(async () => {}),
+    closeAttendanceSession: vi.fn(async () => {}),
+    loadAttendanceSessions: vi.fn(async () => {}),
+    activeCashierSession: null,
+    cashierOpeningFloatAmount: '',
+    cashierOpeningNote: '',
+    cashierClosingNote: '',
+    setCashierOpeningFloatAmount: vi.fn(),
+    setCashierOpeningNote: vi.fn(),
+    setCashierClosingNote: vi.fn(),
+    openCashierSession: vi.fn(async () => {}),
+    closeCashierSession: vi.fn(async () => {}),
+    loadCashierSessions: vi.fn(async () => {}),
+    branchRuntimePolicy: {
+      require_attendance_for_cashier: true,
+      require_shift_for_attendance: false,
+    },
+    activeShiftSession: null,
+    errorMessage: null,
+    ...overrides,
+  } as unknown as StoreRuntimeWorkspaceState;
+}
+
+describe('StoreRuntimeEntrySurface', () => {
+  test('shows store access posture before the runtime session starts', () => {
+    render(<StoreRuntimeEntrySurface workspace={buildWorkspace()} onResumeSelling={vi.fn()} />);
+
+    expect(screen.getByRole('heading', { name: 'Store access' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start runtime session' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resume selling' })).toBeDisabled();
+  });
+
+  test('requires attendance before register open when the branch runtime policy enforces it', () => {
+    render(
+      <StoreRuntimeEntrySurface
+        workspace={buildWorkspace({
+          actor: {
+            user_id: 'user-cashier',
+            email: 'cashier@acme.local',
+            full_name: 'Counter Cashier',
+            is_platform_admin: false,
+            tenant_memberships: [],
+            branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          },
+          isSessionLive: true,
+          korsenexToken: 'stub:token',
+        })}
+        onResumeSelling={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Clock in' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Open register' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Resume selling' })).toBeDisabled();
+  });
+
+  test('keeps register open disabled until the opening float gate is satisfied', () => {
+    const { rerender } = render(
+      <StoreRuntimeEntrySurface
+        workspace={buildWorkspace({
+          actor: {
+            user_id: 'user-cashier',
+            email: 'cashier@acme.local',
+            full_name: 'Counter Cashier',
+            is_platform_admin: false,
+            tenant_memberships: [],
+            branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          },
+          isSessionLive: true,
+          korsenexToken: 'stub:token',
+          activeAttendanceSession: {
+            id: 'attendance-session-1',
+            status: 'OPEN',
+            attendance_number: 'ATTD-BLRFLAGSHIP-0001',
+            staff_full_name: 'Counter Cashier',
+          },
+        })}
+        onResumeSelling={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Open register' })).toBeDisabled();
+
+    rerender(
+      <StoreRuntimeEntrySurface
+        workspace={buildWorkspace({
+          actor: {
+            user_id: 'user-cashier',
+            email: 'cashier@acme.local',
+            full_name: 'Counter Cashier',
+            is_platform_admin: false,
+            tenant_memberships: [],
+            branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          },
+          isSessionLive: true,
+          korsenexToken: 'stub:token',
+          cashierOpeningFloatAmount: '500',
+          activeAttendanceSession: {
+            id: 'attendance-session-1',
+            status: 'OPEN',
+            attendance_number: 'ATTD-BLRFLAGSHIP-0001',
+            staff_full_name: 'Counter Cashier',
+          },
+        })}
+        onResumeSelling={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+  });
+
+  test('switches to resume selling posture when a cashier session is already active', () => {
+    render(
+      <StoreRuntimeEntrySurface
+        workspace={buildWorkspace({
+          actor: {
+            user_id: 'user-cashier',
+            email: 'cashier@acme.local',
+            full_name: 'Counter Cashier',
+            is_platform_admin: false,
+            tenant_memberships: [],
+            branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          },
+          isSessionLive: true,
+          korsenexToken: 'stub:token',
+          activeAttendanceSession: {
+            id: 'attendance-session-1',
+            status: 'OPEN',
+            attendance_number: 'ATTD-BLRFLAGSHIP-0001',
+            staff_full_name: 'Counter Cashier',
+          },
+          activeCashierSession: {
+            id: 'cashier-session-1',
+            status: 'OPEN',
+            session_number: 'CS-BLRFLAGSHIP-0001',
+            staff_full_name: 'Counter Cashier',
+            opening_float_amount: 500,
+          },
+        })}
+        onResumeSelling={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Resume selling' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Open register' })).not.toBeInTheDocument();
+  });
+});
