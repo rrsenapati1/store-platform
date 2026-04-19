@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from './App';
+import { renderOwnerWithSession } from './control-plane/testOwnerSessionHarness';
 
 type MockResponse = {
   ok: boolean;
@@ -230,6 +231,13 @@ describe('owner onboarding flow', () => {
     vi.restoreAllMocks();
   });
 
+  test('shows Korsenex sign-in entry instead of a production token gate', () => {
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Owner sign-in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in with Korsenex' })).toBeInTheDocument();
+  });
+
   test('auto-starts an owner session from local bootstrap URL parameters', async () => {
     const responses = [
       jsonResponse({ access_token: 'session-owner', token_type: 'Bearer' }),
@@ -276,14 +284,7 @@ describe('owner onboarding flow', () => {
   });
 
   test('loads owner onboarding state and bootstraps staff and branch devices', async () => {
-    render(<App />);
-
-    fireEvent.change(screen.getByLabelText('Korsenex token'), {
-      target: { value: 'stub:sub=owner-1;email=owner@acme.local;name=Acme Owner' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
-
-    expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
+    await renderOwnerWithSession(<App />);
     expect((await screen.findAllByText('Acme Retail')).length).toBeGreaterThan(0);
     expect(await screen.findByText('owner_invite.accepted')).toBeInTheDocument();
 

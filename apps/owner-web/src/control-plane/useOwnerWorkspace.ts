@@ -1,4 +1,16 @@
-import { startTransition, useEffect, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';
+import {
+  buildKorsenexSignInUrl,
+  clearStoreWebSession,
+  consumeLocalDevBootstrapFromWindow,
+  exchangeStoreWebSession,
+  isStoreWebSessionExpired,
+  loadStoreWebSession,
+  readKorsenexCallback,
+  refreshStoreWebSession,
+  shouldRefreshStoreWebSession,
+  signOutStoreWebSession,
+} from '@store/auth';
 import type {
   ControlPlaneActor,
   ControlPlaneAuditRecord,
@@ -45,6 +57,11 @@ import type {
   ControlPlaneTransferBoard,
 } from '@store/types';
 import { ownerControlPlaneClient } from './client';
+import {
+  loadOwnerWorkspaceBootstrap,
+  OWNER_WEB_SESSION_STORAGE_KEY,
+  type OwnerWorkspaceSessionState,
+} from './ownerWorkspaceSession';
 import { runApproveBatchExpirySession, runCancelBatchExpirySession, runCreateBatchExpirySession, runLoadBatchExpiryReport, runRecordBatchExpirySession, runRecordBatchLotsOnLatestGoodsReceipt } from './batchExpiryActions';
 import { runAllocateCatalogBarcode, runAssignFirstProductToBranch, runCreateCatalogProduct, runPreviewBarcodeLabel } from './catalogBarcodeActions';
 import { runCreatePriceTier, runLoadPriceTiers, runUpsertBranchPriceTierPrice } from './catalogPriceTierActions';
@@ -75,6 +92,8 @@ function buildReceivingLineDrafts(purchaseOrder: ControlPlanePurchaseOrder) {
 export function useOwnerWorkspace() {
   const [korsenexToken, setKorsenexToken] = useState('');
   const [accessToken, setAccessToken] = useState('');
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  const [sessionState, setSessionState] = useState<OwnerWorkspaceSessionState>('restoring');
   const [actor, setActor] = useState<ControlPlaneActor | null>(null);
   const [tenant, setTenant] = useState<ControlPlaneTenant | null>(null);
   const [branches, setBranches] = useState<ControlPlaneBranchRecord[]>([]);
@@ -195,6 +214,7 @@ export function useOwnerWorkspace() {
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+  const hasBootstrappedSessionRef = useRef(false);
 
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? '';
   const branchId = (selectedBranchId || branches[0]?.branch_id) ?? '';
@@ -240,47 +260,270 @@ export function useOwnerWorkspace() {
     );
   }
 
+  function resetWorkspaceSessionState() {
+    startTransition(() => {
+      setAccessToken('');
+      setSessionExpiresAt(null);
+      setSessionState('signed_out');
+      setActor(null);
+      setTenant(null);
+      setBranches([]);
+      setCatalogProducts([]);
+      setBranchCatalogItems([]);
+      setPriceTiers([]);
+      setBranchPriceTierPrices([]);
+      setStaffProfiles([]);
+      setDevices([]);
+      setSuppliers([]);
+      setPurchaseOrders([]);
+      setPurchaseApprovalReport(null);
+      setPurchaseInvoices([]);
+      setSupplierPayablesReport(null);
+      setGoodsReceipts([]);
+      setBatchExpiryReport(null);
+      setBatchExpiryBoard(null);
+      setReceivingBoard(null);
+      setInventoryLedger([]);
+      setInventorySnapshot([]);
+      setStockCountBoard(null);
+      setTransferBoard(null);
+      setReplenishmentBoard(null);
+      setRestockBoard(null);
+      setAuditEvents([]);
+      setSelectedBranchId('');
+      setTransferDestinationBranchId('');
+      setLatestCatalogProduct(null);
+      setLatestBarcodeAllocation(null);
+      setLatestBarcodeLabelPreview(null);
+      setLatestBranchCatalogItem(null);
+      setLatestPriceTier(null);
+      setLatestBranchPriceTierPrice(null);
+      setLatestSupplier(null);
+      setLatestPurchaseOrder(null);
+      setLatestApprovalState(null);
+      setLatestGoodsReceipt(null);
+      setLatestBatchLotIntake(null);
+      setLatestPurchaseInvoice(null);
+      setLatestBatchExpirySession(null);
+      setLatestBatchExpiryWriteOff(null);
+      setLatestSupplierReturn(null);
+      setLatestSupplierPayment(null);
+      setLatestStockAdjustment(null);
+      setLatestStockCount(null);
+      setLatestStockCountSession(null);
+      setLatestTransfer(null);
+      setLatestRestockTask(null);
+      setLatestStaffProfile(null);
+      setLatestTenantMembership(null);
+      setLatestBranchMembership(null);
+      setLatestDevice(null);
+    });
+  }
+
+  function applyWorkspaceBootstrap(input: {
+    accessToken: string;
+    expiresAt: string;
+    nextState?: OwnerWorkspaceSessionState;
+  } & Awaited<ReturnType<typeof loadOwnerWorkspaceBootstrap>>) {
+    startTransition(() => {
+      setAccessToken(input.accessToken);
+      setSessionExpiresAt(input.expiresAt);
+      setSessionState(input.nextState ?? 'ready');
+      setActor(input.actor);
+      setTenant(input.tenant);
+      setBranches(input.branches);
+      setSelectedBranchId(input.selectedBranchId);
+      setTransferDestinationBranchId(input.transferDestinationBranchId);
+      setCatalogProducts(input.catalogProducts);
+      setBranchCatalogItems(input.branchCatalogItems);
+      setStaffProfiles(input.staffProfiles);
+      setDevices(input.devices);
+      setSuppliers(input.suppliers);
+      setAuditEvents(input.auditEvents);
+    });
+  }
+
+  function resolveSessionFailureMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+  }
+
+  function handleSessionFailure(nextState: Exclude<OwnerWorkspaceSessionState, 'ready' | 'restoring'>, fallback: string, error: unknown) {
+    clearStoreWebSession(OWNER_WEB_SESSION_STORAGE_KEY);
+    resetWorkspaceSessionState();
+    setErrorMessage(resolveSessionFailureMessage(error, fallback));
+    setSessionState(nextState);
+  }
+
+  async function hydrateOwnerSession(record: { accessToken: string; expiresAt: string }) {
+    const bootstrap = await loadOwnerWorkspaceBootstrap(record.accessToken);
+    applyWorkspaceBootstrap({
+      accessToken: record.accessToken,
+      actor: bootstrap.actor,
+      auditEvents: bootstrap.auditEvents,
+      branchCatalogItems: bootstrap.branchCatalogItems,
+      branches: bootstrap.branches,
+      catalogProducts: bootstrap.catalogProducts,
+      devices: bootstrap.devices,
+      expiresAt: record.expiresAt,
+      selectedBranchId: bootstrap.selectedBranchId,
+      staffProfiles: bootstrap.staffProfiles,
+      suppliers: bootstrap.suppliers,
+      tenant: bootstrap.tenant,
+      transferDestinationBranchId: bootstrap.transferDestinationBranchId,
+    });
+  }
+
+  async function exchangeOwnerSessionToken(token: string, options?: { manageBusy?: boolean }) {
+    const manageBusy = options?.manageBusy ?? true;
+    if (manageBusy) {
+      setIsBusy(true);
+    }
+    setErrorMessage('');
+    setSessionState('restoring');
+    try {
+      const record = await exchangeStoreWebSession({
+        token,
+        exchange: ownerControlPlaneClient.exchangeSession,
+        storageKey: OWNER_WEB_SESSION_STORAGE_KEY,
+      });
+      await hydrateOwnerSession(record);
+    } catch (error) {
+      handleSessionFailure('revoked', 'Unable to start owner session', error);
+    } finally {
+      if (manageBusy) {
+        setIsBusy(false);
+      }
+    }
+  }
+
+  async function refreshOwnerSession(recordOverride?: { accessToken: string; expiresAt: string }) {
+    const currentRecord = recordOverride ?? (accessToken && sessionExpiresAt ? { accessToken, expiresAt: sessionExpiresAt } : null);
+    if (!currentRecord) {
+      return;
+    }
+    try {
+      const refreshed = await refreshStoreWebSession({
+        record: currentRecord,
+        refresh: ownerControlPlaneClient.refreshSession,
+        storageKey: OWNER_WEB_SESSION_STORAGE_KEY,
+      });
+      await hydrateOwnerSession(refreshed);
+    } catch (error) {
+      handleSessionFailure('expired', 'Unable to refresh owner session', error);
+    }
+  }
+
+  async function restoreSession() {
+    if (typeof window === 'undefined') {
+      setSessionState('signed_out');
+      return;
+    }
+    setErrorMessage('');
+    setSessionState('restoring');
+
+    const callback = readKorsenexCallback(window);
+    if (callback.error) {
+      handleSessionFailure('revoked', 'Unable to complete owner sign-in', new Error(callback.error));
+      return;
+    }
+    if (callback.token) {
+      await exchangeOwnerSessionToken(callback.token, { manageBusy: false });
+      return;
+    }
+
+    if (import.meta.env.DEV) {
+      const bootstrap = consumeLocalDevBootstrapFromWindow(window);
+      if (bootstrap.korsenexToken) {
+        setKorsenexToken(bootstrap.korsenexToken);
+        if (bootstrap.autoStart) {
+          await exchangeOwnerSessionToken(bootstrap.korsenexToken, { manageBusy: false });
+          return;
+        }
+      }
+    }
+
+    const storedSession = loadStoreWebSession(OWNER_WEB_SESSION_STORAGE_KEY);
+    if (!storedSession) {
+      setSessionState('signed_out');
+      return;
+    }
+
+    try {
+      if (isStoreWebSessionExpired(storedSession) || shouldRefreshStoreWebSession(storedSession)) {
+        await refreshOwnerSession(storedSession);
+        return;
+      }
+      await hydrateOwnerSession(storedSession);
+    } catch (error) {
+      handleSessionFailure('expired', 'Unable to restore owner session', error);
+    }
+  }
+
+  useEffect(() => {
+    if (hasBootstrappedSessionRef.current) {
+      return;
+    }
+    hasBootstrappedSessionRef.current = true;
+    void restoreSession();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !accessToken || !sessionExpiresAt || sessionState !== 'ready') {
+      return;
+    }
+    const refreshDelayMs = Math.max(Date.parse(sessionExpiresAt) - Date.now() - 120_000, 1_000);
+    const timer = window.setTimeout(() => {
+      void refreshOwnerSession();
+    }, refreshDelayMs);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [accessToken, sessionExpiresAt, sessionState]);
+
   async function startSession() {
+    if (!korsenexToken) {
+      return;
+    }
+    await exchangeOwnerSessionToken(korsenexToken);
+  }
+
+  function beginSignIn() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const authorizeBaseUrl = import.meta.env.VITE_KORSENEX_AUTHORIZE_URL?.trim();
+    if (!authorizeBaseUrl) {
+      setErrorMessage('VITE_KORSENEX_AUTHORIZE_URL is not configured');
+      return;
+    }
+    const returnTo = `${window.location.origin}${window.location.pathname}`;
+    window.location.assign(
+      buildKorsenexSignInUrl({
+        authorizeBaseUrl,
+        returnTo,
+        state: 'owner-web',
+      }),
+    );
+  }
+
+  async function signOut() {
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const session = await ownerControlPlaneClient.exchangeSession(korsenexToken);
-      const nextActor = await ownerControlPlaneClient.getActor(session.access_token);
-      const nextTenantId = nextActor.tenant_memberships[0]?.tenant_id;
-      if (!nextTenantId) {
-        throw new Error('Owner session is not bound to a tenant');
+      if (accessToken) {
+        await signOutStoreWebSession({
+          storageKey: OWNER_WEB_SESSION_STORAGE_KEY,
+          accessToken,
+          signOut: async (sessionAccessToken) => {
+            await ownerControlPlaneClient.signOut(sessionAccessToken);
+          },
+        });
+      } else {
+        clearStoreWebSession(OWNER_WEB_SESSION_STORAGE_KEY);
       }
-      const [tenantSummary, branchList, tenantAudit] = await Promise.all([
-        ownerControlPlaneClient.getTenantSummary(session.access_token, nextTenantId),
-        ownerControlPlaneClient.listBranches(session.access_token, nextTenantId),
-        ownerControlPlaneClient.listAuditEvents(session.access_token, nextTenantId),
-      ]);
-      const staffDirectory = await ownerControlPlaneClient.listStaffProfiles(session.access_token, nextTenantId);
-      const productCatalog = await ownerControlPlaneClient.listCatalogProducts(session.access_token, nextTenantId);
-      const branchCatalog =
-        branchList.records[0] == null
-          ? { records: [] }
-          : await ownerControlPlaneClient.listBranchCatalogItems(session.access_token, nextTenantId, branchList.records[0].branch_id);
-      const deviceList =
-        branchList.records[0] == null
-          ? { records: [] }
-          : await ownerControlPlaneClient.listBranchDevices(session.access_token, nextTenantId, branchList.records[0].branch_id);
-      const supplierDirectory = await ownerControlPlaneClient.listSuppliers(session.access_token, nextTenantId);
-      startTransition(() => {
-        setAccessToken(session.access_token);
-        setActor(nextActor);
-        setTenant(tenantSummary);
-        setBranches(branchList.records);
-        setTransferDestinationBranchId(branchList.records[1]?.branch_id ?? '');
-        setCatalogProducts(productCatalog.records);
-        setBranchCatalogItems(branchCatalog.records);
-        setStaffProfiles(staffDirectory.records);
-        setDevices(deviceList.records);
-        setSuppliers(supplierDirectory.records);
-        setAuditEvents(tenantAudit.records);
-      });
+      resetWorkspaceSessionState();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to start owner session');
+      setErrorMessage(resolveSessionFailureMessage(error, 'Unable to sign out owner session'));
     } finally {
       setIsBusy(false);
     }
@@ -1143,6 +1386,7 @@ export function useOwnerWorkspace() {
     assignFirstProductToBranch,
     batchExpiryBoard,
     batchExpiryReport,
+    beginSignIn,
     branches,
     barcodeManualValue,
     branchCatalogItems,
@@ -1246,6 +1490,7 @@ export function useOwnerWorkspace() {
     previewFirstProductBarcodeLabel,
     receivingBoard,
     recordBatchExpirySession,
+    sessionState,
     stockCountBoard,
     registerBranchDevice,
     setAdjustmentDelta,
@@ -1365,6 +1610,7 @@ export function useOwnerWorkspace() {
     assignTenantRole,
     cancelBatchExpirySession,
     createFirstBranch,
+    signOut,
     startSession,
   };
 }
