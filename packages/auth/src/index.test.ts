@@ -4,8 +4,10 @@ import {
   canPerform,
   consumeLocalDevBootstrapFromWindow,
   mergeRoleAssignments,
+  readKorsenexCallback,
   readLocalDevBootstrap,
   rolePermissions,
+  buildKorsenexSignInUrl,
 } from './index';
 
 describe('RBAC capability mapping', () => {
@@ -95,5 +97,16 @@ describe('RBAC capability mapping', () => {
     expect(targetWindow.location.pathname).toBe('/owner');
     expect(targetWindow.location.search).toBe('?tab=branches');
     expect(targetWindow.location.hash).toBe('');
+  });
+
+  test('exports the shared web-session browser helpers', () => {
+    expect(typeof readKorsenexCallback).toBe('function');
+    expect(
+      buildKorsenexSignInUrl({
+        authorizeBaseUrl: 'https://identity.korsenex.local/authorize',
+        returnTo: 'https://owner.store.local/callback',
+        state: 'owner-flow',
+      }),
+    ).toContain('owner-flow');
   });
 });

@@ -35,6 +35,24 @@ export const platformAdminClient = {
       body: JSON.stringify({ token }),
     });
   },
+  refreshSession(accessToken: string) {
+    return request<ControlPlaneSession>(
+      '/v1/auth/refresh',
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  signOut(accessToken: string) {
+    return request<{ status: string }>(
+      '/v1/auth/sign-out',
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
   getActor(accessToken: string) {
     return request<ControlPlaneActor>('/v1/auth/me', undefined, accessToken);
   },

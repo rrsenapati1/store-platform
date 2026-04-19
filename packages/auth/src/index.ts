@@ -1,4 +1,5 @@
 import type { ActorRole, Capability } from '@store/types';
+export * from './webSession';
 
 type RolePermissionMap = Record<Exclude<ActorRole, 'platform_super_admin'>, Capability[]>;
 
