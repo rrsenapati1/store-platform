@@ -46,6 +46,8 @@ fun InventoryTabletShell(
     expiryState: ExpiryUiState,
     expiryActions: ExpiryScreenActions,
     runtimeStatusState: RuntimeStatusUiState,
+    onSignOut: () -> Unit,
+    onUnpair: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -99,6 +101,8 @@ fun InventoryTabletShell(
                 expiryState = expiryState,
                 expiryActions = expiryActions,
                 runtimeStatusState = runtimeStatusState,
+                onSignOut = onSignOut,
+                onUnpair = onUnpair,
             )
         }
     }

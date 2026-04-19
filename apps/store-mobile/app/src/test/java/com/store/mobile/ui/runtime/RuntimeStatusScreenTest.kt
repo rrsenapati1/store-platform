@@ -16,6 +16,8 @@ class RuntimeStatusScreenTest {
 
         assertFalse(state.connected)
         assertEquals("Disconnected from branch hub", state.title)
+        assertEquals("Sign out", state.signOutLabel)
+        assertEquals("Unpair device", state.unpairLabel)
     }
 
     @Test

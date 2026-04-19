@@ -38,6 +38,8 @@ fun MobileOperationsContent(
     expiryActions: ExpiryScreenActions,
     runtimeStatusState: RuntimeStatusUiState,
     onSelectTaskSection: (MobileOperationsSection) -> Unit = {},
+    onSignOut: () -> Unit = {},
+    onUnpair: () -> Unit = {},
 ) {
     when (activeSection) {
         MobileOperationsSection.SCAN -> {
@@ -75,6 +77,10 @@ fun MobileOperationsContent(
             state = expiryState,
             actions = expiryActions,
         )
-        MobileOperationsSection.RUNTIME -> RuntimeStatusScreen(state = runtimeStatusState)
+        MobileOperationsSection.RUNTIME -> RuntimeStatusScreen(
+            state = runtimeStatusState,
+            onSignOut = onSignOut,
+            onUnpair = onUnpair,
+        )
     }
 }

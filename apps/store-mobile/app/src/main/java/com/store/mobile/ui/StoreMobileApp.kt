@@ -3,14 +3,10 @@ package com.store.mobile.ui
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -18,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -63,7 +58,6 @@ import com.store.mobile.ui.operations.RestockScreenActions
 import com.store.mobile.ui.operations.RestockViewModel
 import com.store.mobile.ui.operations.StockCountScreenActions
 import com.store.mobile.ui.operations.StockCountViewModel
-import com.store.mobile.ui.pairing.PairingScreen
 import com.store.mobile.ui.pairing.PairingSessionStatus
 import com.store.mobile.ui.pairing.PairingViewModel
 import com.store.mobile.ui.runtime.buildRuntimeStatusState
@@ -512,7 +506,6 @@ fun StoreMobileApp() {
                     .fillMaxSize()
                     .padding(24.dp),
                 verticalArrangement = Arrangement.Top,
-                horizontalAlignment = Alignment.Start,
             ) {
                 if (!hasActiveRuntimeSession) {
                     StoreMobileEntrySurface(
@@ -547,35 +540,6 @@ fun StoreMobileApp() {
                         },
                     )
                 } else {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Paired to ${pairingState.pairedDevice?.hubBaseUrl}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Button(
-                            onClick = {
-                                pairingViewModel.signOutSession()
-                                pairingState = pairingViewModel.state
-                            },
-                        ) {
-                            Text("Sign out")
-                        }
-                        Button(
-                            onClick = {
-                                pairingViewModel.unpairDevice()
-                                pairingState = pairingViewModel.state
-                            },
-                        ) {
-                            Text("Unpair")
-                        }
-                    }
                     val shellMode = resolveStoreMobileShellMode(pairingState.pairedDevice?.runtimeProfile)
                     val runtimeStatusState = buildRuntimeStatusState(
                         connected = hasActiveRuntimeSession,
@@ -639,6 +603,14 @@ fun StoreMobileApp() {
                             expiryState = expiryState,
                             expiryActions = expiryActions,
                             runtimeStatusState = runtimeStatusState,
+                            onSignOut = {
+                                pairingViewModel.signOutSession()
+                                pairingState = pairingViewModel.state
+                            },
+                            onUnpair = {
+                                pairingViewModel.unpairDevice()
+                                pairingState = pairingViewModel.state
+                            },
                         )
                     } else {
                         HandheldStoreShell(
@@ -689,6 +661,14 @@ fun StoreMobileApp() {
                             expiryState = expiryState,
                             expiryActions = expiryActions,
                             runtimeStatusState = runtimeStatusState,
+                            onSignOut = {
+                                pairingViewModel.signOutSession()
+                                pairingState = pairingViewModel.state
+                            },
+                            onUnpair = {
+                                pairingViewModel.unpairDevice()
+                                pairingState = pairingViewModel.state
+                            },
                         )
                     }
                 }

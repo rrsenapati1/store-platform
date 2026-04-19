@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,6 +28,8 @@ data class RuntimeStatusUiState(
     val externalScannerLastScanLabel: String,
     val zebraDataWedgeTitle: String,
     val zebraDataWedgeDetail: String,
+    val signOutLabel: String,
+    val unpairLabel: String,
 )
 
 fun buildRuntimeStatusState(
@@ -92,27 +97,63 @@ fun buildRuntimeStatusState(
         externalScannerLastScanLabel = lastScanLabel,
         zebraDataWedgeTitle = zebraTitle,
         zebraDataWedgeDetail = zebraDetail,
+        signOutLabel = "Sign out",
+        unpairLabel = "Unpair device",
     )
 }
 
 @Composable
-fun RuntimeStatusScreen(state: RuntimeStatusUiState) {
+fun RuntimeStatusScreen(
+    state: RuntimeStatusUiState,
+    onSignOut: () -> Unit = {},
+    onUnpair: () -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(text = state.title, style = MaterialTheme.typography.headlineSmall)
-        Text(text = state.detail, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.pendingSyncLabel, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.deviceLabel, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.hubLabel, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.sessionLabel, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.externalScannerTitle, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.externalScannerDetail, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.externalScannerLastScanLabel, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.zebraDataWedgeTitle, style = MaterialTheme.typography.bodyMedium)
-        Text(text = state.zebraDataWedgeDetail, style = MaterialTheme.typography.bodyMedium)
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(text = state.title, style = MaterialTheme.typography.headlineSmall)
+                Text(text = state.detail, style = MaterialTheme.typography.bodyMedium)
+                Text(text = state.pendingSyncLabel, style = MaterialTheme.typography.bodyMedium)
+                Text(text = state.deviceLabel, style = MaterialTheme.typography.bodyMedium)
+                Text(text = state.hubLabel, style = MaterialTheme.typography.bodyMedium)
+                Text(text = state.sessionLabel, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(text = state.externalScannerTitle, style = MaterialTheme.typography.titleMedium)
+                Text(text = state.externalScannerDetail, style = MaterialTheme.typography.bodyMedium)
+                Text(text = state.externalScannerLastScanLabel, style = MaterialTheme.typography.bodySmall)
+                Text(text = state.zebraDataWedgeTitle, style = MaterialTheme.typography.titleMedium)
+                Text(text = state.zebraDataWedgeDetail, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        Button(
+            onClick = onSignOut,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(state.signOutLabel)
+        }
+        OutlinedButton(
+            onClick = onUnpair,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(state.unpairLabel)
+        }
     }
 }

@@ -1,11 +1,9 @@
 package com.store.mobile.ui.handheld
 
 import androidx.compose.runtime.Composable
-import com.store.mobile.ui.operations.MobileOperationsContent
 import com.store.mobile.ui.operations.MobileOperationsSection
 import com.store.mobile.ui.operations.ExpiryScreenActions
 import com.store.mobile.ui.operations.ExpiryUiState
-import com.store.mobile.ui.operations.OperationsHomeScreen
 import com.store.mobile.ui.operations.ReceivingScreenActions
 import com.store.mobile.ui.operations.ReceivingUiState
 import com.store.mobile.ui.operations.RestockScreenActions
@@ -35,15 +33,13 @@ fun HandheldStoreShell(
     expiryState: ExpiryUiState,
     expiryActions: ExpiryScreenActions,
     runtimeStatusState: RuntimeStatusUiState,
+    onSignOut: () -> Unit,
+    onUnpair: () -> Unit,
 ) {
-    OperationsHomeScreen(
+    HandheldRuntimeShell(
         activeSection = activeSection,
         onSelectSection = onSelectSection,
-    )
-    MobileOperationsContent(
-        activeSection = activeSection,
         scanLookupState = scanLookupState,
-        isTabletLayout = false,
         onDraftBarcodeChange = onDraftBarcodeChange,
         onLookupBarcode = onLookupBarcode,
         onConfigureZebraDataWedge = onConfigureZebraDataWedge,
@@ -59,6 +55,7 @@ fun HandheldStoreShell(
         expiryState = expiryState,
         expiryActions = expiryActions,
         runtimeStatusState = runtimeStatusState,
-        onSelectTaskSection = onSelectSection,
+        onSignOut = onSignOut,
+        onUnpair = onUnpair,
     )
 }
