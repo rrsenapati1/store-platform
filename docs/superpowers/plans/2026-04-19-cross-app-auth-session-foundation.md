@@ -17,7 +17,7 @@
 - Modify: `packages/auth/src/index.ts`
   - Reduce this file to public exports and keep local-dev bootstrap helpers available only as explicit non-production utilities.
 - Create: `packages/auth/src/webSession.ts`
-  - Shared browser session contract, persistence, callback parsing, refresh and sign-out helpers for `owner-web` and `platform-admin`.
+  - Shared browser session contract, redirect entry helpers, persistence, callback parsing, refresh scheduling, and sign-out helpers for `owner-web` and `platform-admin`.
 - Create: `packages/auth/src/webSession.test.ts`
   - Focused coverage for browser session persistence, restore, expiry, and callback parsing.
 - Modify: `packages/auth/src/index.test.ts`
@@ -135,9 +135,12 @@ export function saveStoreWebSession(storageKey: string, record: StoreWebSessionR
 export function clearStoreWebSession(storageKey: string): void;
 export function isStoreWebSessionExpired(record: StoreWebSessionRecord, now?: number): boolean;
 export function readKorsenexCallback(windowLike: Pick<Window, 'location' | 'history'>): { token: string | null };
+export function buildKorsenexSignInUrl(args: { authorizeBaseUrl: string; returnTo: string; state?: string }): string;
+export function shouldRefreshStoreWebSession(record: StoreWebSessionRecord, now?: number, leadSeconds?: number): boolean;
+export async function signOutStoreWebSession(args: { storageKey: string; accessToken: string; signOut: (accessToken: string) => Promise<void> }): Promise<void>;
 ```
 
-Keep this foundation generic enough for both web apps.
+Keep this foundation generic enough for both web apps so `owner-web` and `platform-admin` do not re-implement redirect entry, refresh timing, or sign-out behavior separately.
 
 - [ ] **Step 4: Re-export the new helpers without breaking the existing dev bootstrap API**
 
@@ -502,9 +505,7 @@ npm run build --workspace @store/owner-web
 npm run test --workspace @store/platform-admin
 npm run typecheck --workspace @store/platform-admin
 npm run build --workspace @store/platform-admin
-npm run test --workspace @store/store-desktop
-npm run typecheck --workspace @store/store-desktop
-npm run build --workspace @store/store-desktop
+npm run ci:store-desktop
 npm run ci:store-mobile
 git -c core.safecrlf=false diff --check
 ```
@@ -517,4 +518,3 @@ Expected: PASS.
 git add docs/runbooks/dev-workflow.md docs/WORKLOG.md
 git commit -m "docs: record cross-app auth session foundation"
 ```
-
