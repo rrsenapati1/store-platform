@@ -135,8 +135,14 @@ Contains:
 - gift cards
 - price tiers
 - customer insights
-- branch performance
+- branch performance as the canonical comparative-performance destination
 - billing lifecycle posture
+
+Branch-performance ownership should be explicit:
+
+- the `Overview` screen may surface a summarized branch-performance panel
+- the canonical full destination for branch-comparison analysis lives under `Commercial`
+- overview branch rows and comparison widgets should deep-link into that canonical destination rather than inventing a second branch-performance surface
 
 ### 4. Catalog
 
@@ -194,6 +200,33 @@ Recommended shell behavior:
 - branch-sensitive screens should support `all branches` plus branch drill-down without forcing a shell switch
 
 The owner should experience one coherent product shell with contextual drill-down, not a collection of pages with no shared hierarchy.
+
+## Branch Filter Semantics
+
+The branch filter is central to the command-center model and must behave deterministically.
+
+### Source Of Truth
+
+- the active branch filter should live in shell-level state
+- that state should be mirrored into the URL as a query parameter, for example `?branch=all` or `?branch=<branch_id>`
+- deep links and drill-down actions should always encode the branch selection in the URL
+
+### Default Behavior
+
+- default owner landing posture is `all branches`
+- if the user explicitly selects a branch, that selection may also be persisted locally for convenience
+- URL state wins over persisted local preference
+
+### Invalid Or Empty State
+
+- missing branch query parameter resolves to `all branches`
+- invalid or no-longer-accessible branch ids fall back to `all branches`
+- the UI may show a non-blocking notice when a previously selected branch becomes invalid, but the app must remain usable
+
+### Testing Expectation
+
+- navigation tests should assert branch-aware routing through URL state
+- drill-down behavior should be deterministic under back/forward navigation because the active branch is encoded in the route state rather than hidden inside ad hoc component state
 
 ## Overview Screen Composition
 
@@ -347,6 +380,30 @@ The theme system should define semantic tokens for:
 
 The product should not rely on hard-coded color decisions inside individual screens.
 
+### Theme Contract
+
+The minimum shared contract should be:
+
+- `theme mode`: `light`, `dark`, or `system`
+- `resolved theme`: the actual active theme after evaluating `system`
+- a shared theme provider in `packages/ui`
+- semantic CSS variable or token emission at the app-shell level
+- a small app-facing API for:
+  - reading current mode
+  - setting current mode
+  - reading resolved theme
+
+### Theme Persistence And Precedence
+
+- explicit user-selected mode should persist locally per app shell
+- when mode is `system`, the resolved theme should follow the operating-system or browser color-scheme preference
+- precedence should be:
+  1. explicit user-selected mode
+  2. system preference when mode is `system`
+  3. `light` fallback if system preference is unavailable
+
+Theme switching should be immediate and should not require an app reload.
+
 ### Adoption Boundary
 
 This slice should:
@@ -360,6 +417,15 @@ This slice should:
   - `platform-admin`
 
 `store-mobile` does not need a full redesign in this slice, but the theme contract should be explicit enough for later adoption.
+
+### Rollout Order
+
+To keep this bounded, theme rollout should happen in this order:
+
+1. implement the theme provider, semantic tokens, and base shell primitives in `packages/ui`
+2. apply the full theme system to `owner-web` as part of the command-center rewrite
+3. adopt shell-level theme plumbing in `store-desktop` and `platform-admin` without requiring a full surface rewrite in the same slice
+4. document the mobile theme contract for later `store-mobile` adoption
 
 ## Shared Design-System Foundation
 
