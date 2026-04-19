@@ -5,9 +5,15 @@ import type {
   ControlPlaneInvite,
   ControlPlaneObservabilitySummary,
   ControlPlanePlatformTenantRecord,
+  ControlPlaneSystemEnvironmentContract,
+  ControlPlaneSystemSecurityControls,
   ControlPlaneTenantLifecycleSummary,
 } from '@store/types';
 import { platformAdminClient } from './client';
+import {
+  buildPlatformAdminOverviewModel,
+  type PlatformAdminSection,
+} from './platformAdminOverviewModel';
 
 export function usePlatformAdminWorkspace() {
   const [korsenexToken, setKorsenexToken] = useState('');
@@ -17,7 +23,10 @@ export function usePlatformAdminWorkspace() {
   const [billingPlans, setBillingPlans] = useState<ControlPlaneBillingPlan[]>([]);
   const [activeTenantLifecycle, setActiveTenantLifecycle] = useState<ControlPlaneTenantLifecycleSummary | null>(null);
   const [observabilitySummary, setObservabilitySummary] = useState<ControlPlaneObservabilitySummary | null>(null);
+  const [securityControls, setSecurityControls] = useState<ControlPlaneSystemSecurityControls | null>(null);
+  const [environmentContract, setEnvironmentContract] = useState<ControlPlaneSystemEnvironmentContract | null>(null);
   const [activeTenantId, setActiveTenantId] = useState('');
+  const [activeSection, setActiveSection] = useState<PlatformAdminSection>('overview');
   const [tenantName, setTenantName] = useState('');
   const [tenantSlug, setTenantSlug] = useState('');
   const [planCode, setPlanCode] = useState('');
@@ -71,16 +80,37 @@ export function usePlatformAdminWorkspace() {
     });
   }
 
+  async function refreshPlatformPosture(nextAccessToken = accessToken) {
+    if (!nextAccessToken) {
+      setObservabilitySummary(null);
+      setSecurityControls(null);
+      setEnvironmentContract(null);
+      return;
+    }
+    const [summary, nextSecurityControls, nextEnvironmentContract] = await Promise.all([
+      platformAdminClient.getObservabilitySummary(nextAccessToken),
+      platformAdminClient.getSecurityControls(nextAccessToken),
+      platformAdminClient.getEnvironmentContract(nextAccessToken),
+    ]);
+    startTransition(() => {
+      setObservabilitySummary(summary);
+      setSecurityControls(nextSecurityControls);
+      setEnvironmentContract(nextEnvironmentContract);
+    });
+  }
+
   async function startSession() {
     setIsBusy(true);
     setErrorMessage('');
     try {
       const session = await platformAdminClient.exchangeSession(korsenexToken);
-      const [nextActor, tenantList, planList, summary] = await Promise.all([
+      const [nextActor, tenantList, planList, summary, nextSecurityControls, nextEnvironmentContract] = await Promise.all([
         platformAdminClient.getActor(session.access_token),
         platformAdminClient.listTenants(session.access_token),
         platformAdminClient.listBillingPlans(session.access_token),
         platformAdminClient.getObservabilitySummary(session.access_token),
+        platformAdminClient.getSecurityControls(session.access_token),
+        platformAdminClient.getEnvironmentContract(session.access_token),
       ]);
       const selectedTenantId = tenantList.records[0]?.tenant_id ?? '';
       const lifecycle = selectedTenantId
@@ -92,8 +122,11 @@ export function usePlatformAdminWorkspace() {
         setTenants(tenantList.records);
         setBillingPlans(planList.records);
         setObservabilitySummary(summary);
+        setSecurityControls(nextSecurityControls);
+        setEnvironmentContract(nextEnvironmentContract);
         setActiveTenantId(selectedTenantId);
         setActiveTenantLifecycle(lifecycle);
+        setActiveSection('overview');
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to start session');
@@ -231,16 +264,27 @@ export function usePlatformAdminWorkspace() {
     }
   }
 
+  const overviewModel = buildPlatformAdminOverviewModel({
+    observabilitySummary,
+    securityControls,
+    environmentContract,
+    tenants,
+    activeTenantLifecycle,
+  });
+
   return {
     actor,
+    activeSection,
     activeTenantLifecycle,
     activeTenantId,
     billingPlans,
+    environmentContract,
     errorMessage,
     isBusy,
     korsenexToken,
     latestInvite,
     observabilitySummary,
+    overviewModel,
     ownerEmail,
     ownerFullName,
     planAmountMinor,
@@ -248,13 +292,16 @@ export function usePlatformAdminWorkspace() {
     planCode,
     planDeviceLimit,
     planName,
+    securityControls,
     tenantName,
     tenantSlug,
     tenants,
     createBillingPlan,
     reactivateActiveTenantAccess,
     refreshObservabilitySummary,
+    refreshPlatformPosture,
     selectTenant,
+    setActiveSection,
     setKorsenexToken,
     setOwnerEmail,
     setOwnerFullName,

@@ -204,5 +204,6 @@ export function DetailList(props: { items: Array<{ label: string; value: React.R
 
 export * from './theme';
 export * from './ownerShell';
+export * from './platformShell';
 export * from './runtimeShell';
 export * from './commerce';

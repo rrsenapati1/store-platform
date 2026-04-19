@@ -82,7 +82,80 @@ function observabilitySummaryResponse() {
   };
 }
 
-describe('platform admin onboarding flow', () => {
+function securityControlsResponse() {
+  return {
+    secure_headers_enabled: true,
+    secure_headers_hsts_enabled: true,
+    secure_headers_csp: "default-src 'self'",
+    rate_limits: {
+      window_seconds: 60,
+      auth_requests: 8,
+      activation_requests: 6,
+      webhook_requests: 120,
+    },
+  };
+}
+
+function environmentContractResponse() {
+  return {
+    deployment_environment: 'staging',
+    public_base_url: 'https://control.staging.store.korsenex.com',
+    release_version: '2026.04.15-observability',
+    log_format: 'json',
+    sentry_configured: true,
+    sentry_environment: 'staging',
+    object_storage_configured: true,
+    object_storage_bucket: 'store-staging-evidence',
+    object_storage_prefix: 'control-plane/staging',
+    operations_worker: {
+      configured: true,
+      poll_seconds: 5,
+      batch_size: 25,
+      lease_seconds: 60,
+    },
+    security_controls: securityControlsResponse(),
+  };
+}
+
+function tenantLifecycleResponse(tenantId: string, lifecycleStatus = 'TRIALING') {
+  return {
+    tenant_id: tenantId,
+    subscription: {
+      id: `sub-${tenantId}`,
+      tenant_id: tenantId,
+      billing_plan_id: 'plan-launch',
+      provider_name: null,
+      provider_customer_id: null,
+      provider_subscription_id: null,
+      lifecycle_status: 'TRIALING',
+      mandate_status: null,
+      trial_started_at: '2026-04-14T00:00:00',
+      trial_ends_at: '2026-04-28T00:00:00',
+      current_period_started_at: null,
+      current_period_ends_at: null,
+      grace_until: null,
+      canceled_at: null,
+    },
+    entitlement: {
+      id: `ent-${tenantId}`,
+      tenant_id: tenantId,
+      billing_plan_id: 'plan-launch',
+      active_plan_code: 'launch-starter',
+      lifecycle_status: lifecycleStatus,
+      branch_limit: 2,
+      device_limit: 4,
+      offline_runtime_hours: 48,
+      grace_until: null,
+      suspend_at: '2026-05-03T00:00:00',
+      feature_flags: { offline_continuity: true },
+      policy_source: lifecycleStatus === 'SUSPENDED' ? 'tenant_status' : 'subscription',
+      policy_metadata: { reason: lifecycleStatus === 'SUSPENDED' ? 'Billing review hold' : 'trial_issued' },
+    },
+    active_override: null,
+  };
+}
+
+describe('platform admin control tower flow', () => {
   const originalFetch = globalThis.fetch;
 
   function mockResponses(responses: MockResponse[]) {
@@ -106,7 +179,7 @@ describe('platform admin onboarding flow', () => {
     vi.restoreAllMocks();
   });
 
-  test('auto-starts a session from local bootstrap URL parameters', async () => {
+  test('auto-starts a session from local bootstrap URL parameters into the control tower', async () => {
     mockResponses([
       jsonResponse({ access_token: 'session-platform', token_type: 'Bearer' }),
       jsonResponse({
@@ -120,6 +193,8 @@ describe('platform admin onboarding flow', () => {
       jsonResponse({ records: [] }),
       jsonResponse({ records: [] }),
       jsonResponse(observabilitySummaryResponse()),
+      jsonResponse(securityControlsResponse()),
+      jsonResponse(environmentContractResponse()),
     ]);
 
     window.history.replaceState(
@@ -130,11 +205,12 @@ describe('platform admin onboarding flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Platform Admin')).toBeInTheDocument();
-    expect(screen.queryByDisplayValue('stub:sub=platform-1;email=admin@store.local;name=Platform Admin')).toBeInTheDocument();
+    expect(await screen.findByText('Env: staging')).toBeInTheDocument();
+    expect(screen.getByText('Release: 2026.04.15-observability')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Korsenex token')).not.toBeInTheDocument();
   });
 
-  test('exchanges session, loads tenants, creates a tenant, and sends an owner invite', async () => {
+  test('creates a tenant and sends an owner invite through the tenant surface', async () => {
     mockResponses([
       jsonResponse({ access_token: 'session-platform', token_type: 'Bearer' }),
       jsonResponse({
@@ -178,41 +254,9 @@ describe('platform admin onboarding flow', () => {
         ],
       }),
       jsonResponse(observabilitySummaryResponse()),
-      jsonResponse({
-        tenant_id: 'tenant-acme',
-        subscription: {
-          id: 'sub-acme',
-          tenant_id: 'tenant-acme',
-          billing_plan_id: 'plan-launch',
-          provider_name: null,
-          provider_customer_id: null,
-          provider_subscription_id: null,
-          lifecycle_status: 'TRIALING',
-          mandate_status: null,
-          trial_started_at: '2026-04-14T00:00:00',
-          trial_ends_at: '2026-04-28T00:00:00',
-          current_period_started_at: null,
-          current_period_ends_at: null,
-          grace_until: null,
-          canceled_at: null,
-        },
-        entitlement: {
-          id: 'ent-acme',
-          tenant_id: 'tenant-acme',
-          billing_plan_id: 'plan-launch',
-          active_plan_code: 'launch-starter',
-          lifecycle_status: 'TRIALING',
-          branch_limit: 2,
-          device_limit: 4,
-          offline_runtime_hours: 48,
-          grace_until: null,
-          suspend_at: '2026-05-03T00:00:00',
-          feature_flags: { offline_continuity: true },
-          policy_source: 'subscription',
-          policy_metadata: { reason: 'trial_issued' },
-        },
-        active_override: null,
-      }),
+      jsonResponse(securityControlsResponse()),
+      jsonResponse(environmentContractResponse()),
+      jsonResponse(tenantLifecycleResponse('tenant-acme')),
       jsonResponse({
         id: 'tenant-beta',
         name: 'Beta Retail',
@@ -238,41 +282,7 @@ describe('platform admin onboarding flow', () => {
           },
         ],
       }),
-      jsonResponse({
-        tenant_id: 'tenant-beta',
-        subscription: {
-          id: 'sub-beta',
-          tenant_id: 'tenant-beta',
-          billing_plan_id: 'plan-launch',
-          provider_name: null,
-          provider_customer_id: null,
-          provider_subscription_id: null,
-          lifecycle_status: 'TRIALING',
-          mandate_status: null,
-          trial_started_at: '2026-04-14T00:00:00',
-          trial_ends_at: '2026-04-28T00:00:00',
-          current_period_started_at: null,
-          current_period_ends_at: null,
-          grace_until: null,
-          canceled_at: null,
-        },
-        entitlement: {
-          id: 'ent-beta',
-          tenant_id: 'tenant-beta',
-          billing_plan_id: 'plan-launch',
-          active_plan_code: 'launch-starter',
-          lifecycle_status: 'TRIALING',
-          branch_limit: 2,
-          device_limit: 4,
-          offline_runtime_hours: 48,
-          grace_until: null,
-          suspend_at: '2026-05-03T00:00:00',
-          feature_flags: { offline_continuity: true },
-          policy_source: 'subscription',
-          policy_metadata: { reason: 'trial_issued' },
-        },
-        active_override: null,
-      }),
+      jsonResponse(tenantLifecycleResponse('tenant-beta')),
       jsonResponse({
         id: 'invite-1',
         tenant_id: 'tenant-beta',
@@ -289,29 +299,28 @@ describe('platform admin onboarding flow', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start control plane session' }));
 
-    expect(await screen.findByText('Platform Admin')).toBeInTheDocument();
-    expect(await screen.findByText('Acme Retail')).toBeInTheDocument();
-    expect(await screen.findByText('Launch Starter')).toBeInTheDocument();
-    expect((await screen.findAllByText('TRIALING')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Env: staging')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tenants' }));
+    expect(await screen.findByText('Tenant lifecycle')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Tenant name'), { target: { value: 'Beta Retail' } });
     fireEvent.change(screen.getByLabelText('Tenant slug'), { target: { value: 'beta-retail' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create tenant' }));
 
     expect(await screen.findByText('Beta Retail')).toBeInTheDocument();
+    expect(screen.getByText('Target tenant: tenant-beta')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Owner email'), { target: { value: 'owner@beta.local' } });
     fireEvent.change(screen.getByLabelText('Owner full name'), { target: { value: 'Beta Owner' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send owner invite' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Latest owner invite')).toBeInTheDocument();
       expect(screen.getByText('owner@beta.local')).toBeInTheDocument();
       expect(screen.getByText('PENDING')).toBeInTheDocument();
     });
   });
 
-  test('shows billing plans and lets platform admin suspend the selected tenant', async () => {
+  test('creates a billing plan and suspends the selected tenant through the new IA', async () => {
     mockResponses([
       jsonResponse({ access_token: 'session-platform', token_type: 'Bearer' }),
       jsonResponse({
@@ -355,41 +364,9 @@ describe('platform admin onboarding flow', () => {
         ],
       }),
       jsonResponse(observabilitySummaryResponse()),
-      jsonResponse({
-        tenant_id: 'tenant-acme',
-        subscription: {
-          id: 'sub-acme',
-          tenant_id: 'tenant-acme',
-          billing_plan_id: 'plan-launch',
-          provider_name: null,
-          provider_customer_id: null,
-          provider_subscription_id: null,
-          lifecycle_status: 'TRIALING',
-          mandate_status: null,
-          trial_started_at: '2026-04-14T00:00:00',
-          trial_ends_at: '2026-04-28T00:00:00',
-          current_period_started_at: null,
-          current_period_ends_at: null,
-          grace_until: null,
-          canceled_at: null,
-        },
-        entitlement: {
-          id: 'ent-acme',
-          tenant_id: 'tenant-acme',
-          billing_plan_id: 'plan-launch',
-          active_plan_code: 'launch-starter',
-          lifecycle_status: 'TRIALING',
-          branch_limit: 2,
-          device_limit: 4,
-          offline_runtime_hours: 48,
-          grace_until: null,
-          suspend_at: '2026-05-03T00:00:00',
-          feature_flags: { offline_continuity: true },
-          policy_source: 'subscription',
-          policy_metadata: { reason: 'trial_issued' },
-        },
-        active_override: null,
-      }),
+      jsonResponse(securityControlsResponse()),
+      jsonResponse(environmentContractResponse()),
+      jsonResponse(tenantLifecycleResponse('tenant-acme')),
       jsonResponse({
         id: 'plan-scale',
         code: 'scale-growth',
@@ -445,41 +422,7 @@ describe('platform admin onboarding flow', () => {
           },
         ],
       }),
-      jsonResponse({
-        tenant_id: 'tenant-acme',
-        subscription: {
-          id: 'sub-acme',
-          tenant_id: 'tenant-acme',
-          billing_plan_id: 'plan-launch',
-          provider_name: null,
-          provider_customer_id: null,
-          provider_subscription_id: null,
-          lifecycle_status: 'TRIALING',
-          mandate_status: null,
-          trial_started_at: '2026-04-14T00:00:00',
-          trial_ends_at: '2026-04-28T00:00:00',
-          current_period_started_at: null,
-          current_period_ends_at: null,
-          grace_until: null,
-          canceled_at: null,
-        },
-        entitlement: {
-          id: 'ent-acme',
-          tenant_id: 'tenant-acme',
-          billing_plan_id: 'plan-launch',
-          active_plan_code: 'launch-starter',
-          lifecycle_status: 'SUSPENDED',
-          branch_limit: 2,
-          device_limit: 4,
-          offline_runtime_hours: 48,
-          grace_until: null,
-          suspend_at: '2026-05-03T00:00:00',
-          feature_flags: { offline_continuity: true },
-          policy_source: 'tenant_status',
-          policy_metadata: { reason: 'Billing review hold' },
-        },
-        active_override: null,
-      }),
+      jsonResponse(tenantLifecycleResponse('tenant-acme', 'SUSPENDED')),
     ]);
 
     render(<App />);
@@ -489,9 +432,10 @@ describe('platform admin onboarding flow', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start control plane session' }));
 
-    expect(await screen.findByText('Launch Starter')).toBeInTheDocument();
-    expect((await screen.findAllByText('TRIALING')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Env: staging')).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Commercial' }));
+    expect(await screen.findByText('Billing plan catalog')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Plan code'), { target: { value: 'scale-growth' } });
     fireEvent.change(screen.getByLabelText('Plan name'), { target: { value: 'Scale Growth' } });
     fireEvent.change(screen.getByLabelText('Plan monthly amount (minor units)'), { target: { value: '349900' } });
@@ -501,6 +445,8 @@ describe('platform admin onboarding flow', () => {
 
     expect(await screen.findByText('Scale Growth')).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Tenants' }));
+    expect(await screen.findByText('Owner binding and entitlement')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Suspend tenant access' }));
 
     await waitFor(() => {
@@ -508,7 +454,7 @@ describe('platform admin onboarding flow', () => {
     });
   });
 
-  test('shows the observability cockpit summary after session bootstrap', async () => {
+  test('shows the control-tower overview after session bootstrap', async () => {
     mockResponses([
       jsonResponse({ access_token: 'session-platform', token_type: 'Bearer' }),
       jsonResponse({
@@ -552,41 +498,9 @@ describe('platform admin onboarding flow', () => {
         ],
       }),
       jsonResponse(observabilitySummaryResponse()),
-      jsonResponse({
-        tenant_id: 'tenant-acme',
-        subscription: {
-          id: 'sub-acme',
-          tenant_id: 'tenant-acme',
-          billing_plan_id: 'plan-launch',
-          provider_name: null,
-          provider_customer_id: null,
-          provider_subscription_id: null,
-          lifecycle_status: 'TRIALING',
-          mandate_status: null,
-          trial_started_at: '2026-04-14T00:00:00',
-          trial_ends_at: '2026-04-28T00:00:00',
-          current_period_started_at: null,
-          current_period_ends_at: null,
-          grace_until: null,
-          canceled_at: null,
-        },
-        entitlement: {
-          id: 'ent-acme',
-          tenant_id: 'tenant-acme',
-          billing_plan_id: 'plan-launch',
-          active_plan_code: 'launch-starter',
-          lifecycle_status: 'TRIALING',
-          branch_limit: 2,
-          device_limit: 4,
-          offline_runtime_hours: 48,
-          grace_until: null,
-          suspend_at: '2026-05-03T00:00:00',
-          feature_flags: { offline_continuity: true },
-          policy_source: 'subscription',
-          policy_metadata: { reason: 'trial_issued' },
-        },
-        active_override: null,
-      }),
+      jsonResponse(securityControlsResponse()),
+      jsonResponse(environmentContractResponse()),
+      jsonResponse(tenantLifecycleResponse('tenant-acme')),
     ]);
 
     render(<App />);
@@ -596,9 +510,9 @@ describe('platform admin onboarding flow', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start control plane session' }));
 
-    expect(await screen.findByText('Platform Admin')).toBeInTheDocument();
-    expect(screen.getByText('Operations queue')).toBeInTheDocument();
-    expect(screen.getByText('DEGRADED')).toBeInTheDocument();
-    expect(screen.getByText('control-plane/staging/postgres-backups/20260415T020000Z/metadata.json')).toBeInTheDocument();
+    expect(await screen.findByText('Critical exceptions')).toBeInTheDocument();
+    expect(screen.getByText('Dead-letter operations jobs')).toBeInTheDocument();
+    expect(screen.getByText('Release evidence')).toBeInTheDocument();
+    expect(screen.getByText('https://control.staging.store.korsenex.com')).toBeInTheDocument();
   });
 });

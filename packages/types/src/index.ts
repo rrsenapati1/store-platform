@@ -278,6 +278,37 @@ export interface ControlPlaneObservabilitySummary {
   backup: ControlPlaneObservabilityBackup;
 }
 
+export interface ControlPlaneSystemSecurityControls {
+  secure_headers_enabled: boolean;
+  secure_headers_hsts_enabled: boolean;
+  secure_headers_csp?: string | null;
+  rate_limits: {
+    window_seconds: number;
+    auth_requests: number;
+    activation_requests: number;
+    webhook_requests: number;
+  };
+}
+
+export interface ControlPlaneSystemEnvironmentContract {
+  deployment_environment: string;
+  public_base_url: string;
+  release_version: string;
+  log_format: string;
+  sentry_configured: boolean;
+  sentry_environment: string;
+  object_storage_configured: boolean;
+  object_storage_bucket?: string | null;
+  object_storage_prefix?: string | null;
+  operations_worker: {
+    configured: boolean;
+    poll_seconds: number;
+    batch_size: number;
+    lease_seconds: number;
+  };
+  security_controls: ControlPlaneSystemSecurityControls;
+}
+
 export interface ControlPlaneSubscriptionBootstrap {
   provider_name: string;
   provider_customer_id: string;

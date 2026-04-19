@@ -6,6 +6,8 @@ import type {
   ControlPlaneTenantLifecycleSummary,
   ControlPlanePlatformTenantRecord,
   ControlPlaneSession,
+  ControlPlaneSystemEnvironmentContract,
+  ControlPlaneSystemSecurityControls,
   ControlPlaneTenant,
 } from '@store/types';
 
@@ -88,6 +90,12 @@ export const platformAdminClient = {
   },
   getObservabilitySummary(accessToken: string) {
     return request<ControlPlaneObservabilitySummary>('/v1/platform/observability/summary', undefined, accessToken);
+  },
+  getSecurityControls(accessToken: string) {
+    return request<ControlPlaneSystemSecurityControls>('/v1/system/security-controls', undefined, accessToken);
+  },
+  getEnvironmentContract(accessToken: string) {
+    return request<ControlPlaneSystemEnvironmentContract>('/v1/system/environment-contract', undefined, accessToken);
   },
   suspendTenantAccess(accessToken: string, tenantId: string, reason: string) {
     return request<ControlPlaneTenantLifecycleSummary>(

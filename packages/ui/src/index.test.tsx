@@ -11,6 +11,12 @@ import {
   OwnerNavRail,
   OwnerPanel,
   OwnerSignalRow,
+  PlatformCommandHeader,
+  PlatformCommandShell,
+  PlatformExceptionBoard,
+  PlatformNavRail,
+  PlatformPanel,
+  PlatformSignalRow,
   CommerceLineItem,
   CommerceSheet,
   CommerceSummaryRow,
@@ -133,5 +139,42 @@ describe('shared ui primitives', () => {
     expect(screen.getByText('Branches')).toBeInTheDocument();
     expect(screen.getByText('Low stock')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Light theme' })).toBeInTheDocument();
+  });
+
+  test('renders platform shell primitives from the package barrel', () => {
+    render(
+      <PlatformCommandShell
+        navRail={(
+          <PlatformNavRail
+            title="Platform Tower"
+            items={[
+              { id: 'overview', label: 'Overview' },
+              { id: 'release', label: 'Release' },
+            ]}
+            activeItemId="overview"
+            onSelect={() => undefined}
+          />
+        )}
+        commandHeader={(
+          <PlatformCommandHeader
+            title="Overview"
+            environmentLabel="staging"
+            releaseLabel="2026.04.19"
+            statusLabel="Healthy"
+            statusTone="success"
+          />
+        )}
+      >
+        <PlatformSignalRow items={[{ label: 'Release readiness', value: 'Healthy', tone: 'success' }]} />
+        <PlatformPanel title="Exceptions">
+          <PlatformExceptionBoard items={[{ id: '1', title: 'Dead-letter jobs', detail: '1 jobs require review.' }]} />
+        </PlatformPanel>
+      </PlatformCommandShell>,
+    );
+
+    expect(screen.getByText('Platform Tower')).toBeInTheDocument();
+    expect(screen.getByText('Env: staging')).toBeInTheDocument();
+    expect(screen.getByText('Release readiness')).toBeInTheDocument();
+    expect(screen.getByText('Dead-letter jobs')).toBeInTheDocument();
   });
 });
