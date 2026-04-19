@@ -45,6 +45,7 @@ The accepted model is:
 - secondary operations should be reached through contextual routing and a smaller flow model instead of equal-weight tabs
 - mobile should adopt the suite-wide light/dark token system from the start
 - `inventory tablet` is explicitly deferred but should inherit the same visual and component language later
+- `Entry` is a lifecycle surface that appears before the live runtime, not a persistent in-runtime navigation destination
 
 This is a `handheld runtime redesign`, not a polish pass over the existing section switcher.
 
@@ -98,7 +99,7 @@ The redesign should follow these rules:
 
 ## Information Architecture
 
-`store-mobile` should become a handheld runtime with four top-level areas:
+`store-mobile` should become a handheld runtime with one pre-runtime lifecycle surface and three in-runtime areas.
 
 ### 1. Entry
 
@@ -117,6 +118,15 @@ Contains:
 - unpair
 
 This is not just a pairing form. It should feel like a runtime checkpoint for a field device.
+
+Important boundary:
+
+- `Entry` is shown only when a live runtime session is not ready, or when the runtime needs explicit recovery
+- once the runtime is active, the handheld navigation model becomes:
+  - `Scan`
+  - `Tasks`
+  - `Runtime`
+- `Entry` should not remain a permanent peer tab competing with `Scan`
 
 ### 2. Scan
 
@@ -407,6 +417,13 @@ The following tasks are deferred from this slice but must remain tracked before 
 
 These are not optional nice-to-haves. They are deferred public-release tasks.
 
+Tracking rule:
+
+- these items must be copied into the repo release backlog during implementation planning
+- they must remain explicitly open in the public-release readiness path until closed
+- the implementation plan for this slice should include the exact backlog location where these deferred items will be recorded
+- public-release sign-off for the app suite should treat unresolved items from this list as blocking productization debt, not informal notes
+
 ## Risks
 
 ### Risk: Polishing The Existing Switcher Instead Of Redesigning The Flow
@@ -435,3 +452,29 @@ Mitigation:
 
 - build reusable mobile primitives and theme rules now
 - explicitly track tablet productization as the next mobile follow-up
+
+### Risk: Field Reliability Regressions
+
+Handheld use depends on hardware posture and environmental variability that do not affect the web apps in the same way.
+
+Risk areas:
+
+- scanner or camera availability inconsistency
+- intermittent connectivity during pairing or session recovery
+- runtime behavior degrading in low-attention field conditions
+
+Mitigation:
+
+- keep scanner posture visible in the runtime header
+- preserve explicit runtime and recovery states
+- verify scan-first behavior under degraded-but-expected hardware/runtime posture
+
+### Risk: Persisted-State Migration Regressions
+
+The handheld auth/session foundation already persists pairing and runtime state locally. A shell rewrite can accidentally break restore or mis-handle old stored records.
+
+Mitigation:
+
+- keep the persistence contract stable where possible
+- test restore, sign-out, unpair, and expired-session recovery through the new shell
+- treat persisted-state compatibility as a required verification boundary for this slice
