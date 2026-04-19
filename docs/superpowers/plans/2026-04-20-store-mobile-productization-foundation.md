@@ -122,6 +122,8 @@ git commit -m "feat: add store mobile theme and shell foundation"
 - Modify: `apps/store-mobile/app/src/main/java/com/store/mobile/ui/pairing/PairingScreen.kt`
 - Modify: `apps/store-mobile/app/src/main/java/com/store/mobile/ui/pairing/PairingViewModel.kt`
 - Modify: `apps/store-mobile/app/src/test/java/com/store/mobile/ui/pairing/PairingViewModelTest.kt`
+- Modify: `apps/store-mobile/app/src/test/java/com/store/mobile/runtime/StoreMobilePairingRepositoryTest.kt`
+- Modify: `apps/store-mobile/app/src/test/java/com/store/mobile/runtime/StoreMobileSessionRepositoryTest.kt`
 
 - [ ] **Step 1: Write failing tests for entry-state semantics**
 
@@ -130,6 +132,8 @@ Add or expand tests to require:
 - expired runtime sessions stay paired but surface explicit recovery copy
 - signed-out-but-paired posture remains distinct from unpaired posture
 - live runtime state no longer depends on the old root-level inline header buttons alone
+- sign-out preserves the paired device record
+- unpair clears both pairing and runtime session state
 
 - [ ] **Step 2: Run the focused entry tests to verify they fail**
 
@@ -137,7 +141,7 @@ Run:
 
 ```powershell
 cd apps/store-mobile
-.\gradlew.bat testDebugUnitTest --tests com.store.mobile.ui.pairing.PairingViewModelTest
+.\gradlew.bat testDebugUnitTest --tests com.store.mobile.ui.pairing.PairingViewModelTest --tests com.store.mobile.runtime.StoreMobilePairingRepositoryTest --tests com.store.mobile.runtime.StoreMobileSessionRepositoryTest
 ```
 
 Expected: FAIL because the new entry surface and refined state expectations do not exist yet.
@@ -166,7 +170,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```powershell
-git add apps/store-mobile/app/src/main/java/com/store/mobile/ui/StoreMobileApp.kt apps/store-mobile/app/src/main/java/com/store/mobile/ui/entry/StoreMobileEntrySurface.kt apps/store-mobile/app/src/main/java/com/store/mobile/ui/pairing/PairingScreen.kt apps/store-mobile/app/src/main/java/com/store/mobile/ui/pairing/PairingViewModel.kt apps/store-mobile/app/src/test/java/com/store/mobile/ui/pairing/PairingViewModelTest.kt
+git add apps/store-mobile/app/src/main/java/com/store/mobile/ui/StoreMobileApp.kt apps/store-mobile/app/src/main/java/com/store/mobile/ui/entry/StoreMobileEntrySurface.kt apps/store-mobile/app/src/main/java/com/store/mobile/ui/pairing/PairingScreen.kt apps/store-mobile/app/src/main/java/com/store/mobile/ui/pairing/PairingViewModel.kt apps/store-mobile/app/src/test/java/com/store/mobile/ui/pairing/PairingViewModelTest.kt apps/store-mobile/app/src/test/java/com/store/mobile/runtime/StoreMobilePairingRepositoryTest.kt apps/store-mobile/app/src/test/java/com/store/mobile/runtime/StoreMobileSessionRepositoryTest.kt
 git commit -m "feat: productize store mobile entry flow"
 ```
 
@@ -315,7 +319,7 @@ git commit -m "feat: add store mobile handheld runtime shell"
 
 - [ ] **Step 1: Record the deferred public-release follow-ups**
 
-Add explicit deferred items to the tracked backlog location referenced in the spec so the following remain visible:
+Add explicit deferred items to `docs/TASK_LEDGER.md` under a dedicated section named `Public Release Deferred Productization` so the following remain visible:
 
 - inventory tablet productization
 - secure-storage hardening review
@@ -339,10 +343,17 @@ Run:
 ```powershell
 cd D:\codes\projects\store\.worktrees\korsenex-store-mobile-productization
 npm run ci:store-mobile
+cd apps/store-mobile
+.\gradlew.bat testDebugUnitTest --tests com.store.mobile.ui.pairing.PairingViewModelTest --tests com.store.mobile.runtime.StoreMobilePairingRepositoryTest --tests com.store.mobile.runtime.StoreMobileSessionRepositoryTest --tests com.store.mobile.ui.StoreMobileRuntimeContextTest
 git -c core.safecrlf=false diff --check
 ```
 
-If Compose or UI-adjacent unit tests are added outside the default lane, run those explicitly too.
+This explicit second Gradle command is required to prove:
+
+- persisted pairing restore still works
+- sign-out still preserves pairing
+- unpair still clears both pairing and session
+- repository-backed runtime context still survives the shell rewrite
 
 - [ ] **Step 4: Commit**
 
