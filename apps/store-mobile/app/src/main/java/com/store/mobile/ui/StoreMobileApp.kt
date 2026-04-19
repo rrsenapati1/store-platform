@@ -1,11 +1,16 @@
 package com.store.mobile.ui
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -33,12 +38,14 @@ import com.store.mobile.operations.RemoteStockCountRepository
 import com.store.mobile.operations.RestockRepository
 import com.store.mobile.operations.StockCountRepository
 import com.store.mobile.runtime.FakeStoreMobileHubClient
-import com.store.mobile.runtime.InMemoryStoreMobilePairingRepository
-import com.store.mobile.runtime.InMemoryStoreMobileSessionRepository
+import com.store.mobile.runtime.SharedPreferencesStoreMobileKeyValueStore
 import com.store.mobile.runtime.StoreMobilePairedDevice
 import com.store.mobile.runtime.StoreMobilePairingRepository
+import com.store.mobile.runtime.StoreMobilePersistentPairingRepository
+import com.store.mobile.runtime.StoreMobilePersistentSessionRepository
 import com.store.mobile.runtime.StoreMobileRuntimeSession
 import com.store.mobile.runtime.StoreMobileSessionRepository
+import com.store.mobile.runtime.parseStoreMobileExpiryMillis
 import com.store.mobile.scan.ExternalScannerEvent
 import com.store.mobile.scan.InMemoryScanLookupRepository
 import com.store.mobile.scan.RemoteScanLookupRepository
@@ -55,10 +62,13 @@ import com.store.mobile.ui.operations.RestockViewModel
 import com.store.mobile.ui.operations.StockCountScreenActions
 import com.store.mobile.ui.operations.StockCountViewModel
 import com.store.mobile.ui.pairing.PairingScreen
+import com.store.mobile.ui.pairing.PairingSessionStatus
 import com.store.mobile.ui.pairing.PairingViewModel
 import com.store.mobile.ui.runtime.buildRuntimeStatusState
 import com.store.mobile.ui.scan.ScanLookupViewModel
 import com.store.mobile.ui.tablet.InventoryTabletShell
+
+private const val STORE_MOBILE_RUNTIME_PREFERENCES = "store.mobile.runtime"
 
 internal fun resolveStoreMobileOperationsBranchId(
     pairedDevice: StoreMobilePairedDevice?,
@@ -66,6 +76,12 @@ internal fun resolveStoreMobileOperationsBranchId(
 ): String? {
     return session?.branchId?.takeIf { it.isNotBlank() }
         ?: pairedDevice?.branchId?.takeIf { it.isNotBlank() }
+}
+
+internal fun isStoreMobileRuntimeSessionExpired(session: StoreMobileRuntimeSession, nowMillis: Long = System.currentTimeMillis()): Boolean {
+    val expiresAtMillis = parseStoreMobileExpiryMillis(session.expiresAt)
+        ?: return true
+    return expiresAtMillis <= nowMillis
 }
 
 internal fun buildStoreMobileStockCountRepository(
@@ -154,8 +170,21 @@ fun StoreMobileApp() {
     val context = LocalContext.current
     val application = remember(context) { context.applicationContext as? StoreMobileApplication }
     val activity = remember(context) { context as? MainActivity }
-    val pairingRepository: StoreMobilePairingRepository = remember { InMemoryStoreMobilePairingRepository() }
-    val sessionRepository: StoreMobileSessionRepository = remember { InMemoryStoreMobileSessionRepository() }
+    val runtimePreferences = remember(context) {
+        context.applicationContext.getSharedPreferences(
+            STORE_MOBILE_RUNTIME_PREFERENCES,
+            Context.MODE_PRIVATE,
+        )
+    }
+    val keyValueStore = remember(runtimePreferences) {
+        SharedPreferencesStoreMobileKeyValueStore(runtimePreferences)
+    }
+    val pairingRepository: StoreMobilePairingRepository = remember(keyValueStore) {
+        StoreMobilePersistentPairingRepository(keyValueStore)
+    }
+    val sessionRepository: StoreMobileSessionRepository = remember(keyValueStore) {
+        StoreMobilePersistentSessionRepository(keyValueStore)
+    }
     val pairingViewModel = remember {
         PairingViewModel(
             pairingRepository = pairingRepository,
@@ -165,6 +194,8 @@ fun StoreMobileApp() {
     }
     var pairingState by remember { mutableStateOf(pairingViewModel.state) }
     val currentSession = sessionRepository.loadSession()
+        ?.takeIf { it.accessToken.isNotBlank() && !isStoreMobileRuntimeSessionExpired(it) }
+    val hasActiveRuntimeSession = pairingState.sessionStatus == PairingSessionStatus.ACTIVE && currentSession != null
     val operationsBranchId = resolveStoreMobileOperationsBranchId(
         pairedDevice = pairingState.pairedDevice,
         session = currentSession,
@@ -423,6 +454,23 @@ fun StoreMobileApp() {
         }
     }
 
+    LaunchedEffect(currentSession?.expiresAt, pairingState.sessionStatus) {
+        if (currentSession == null || pairingState.sessionStatus != PairingSessionStatus.ACTIVE) {
+            return@LaunchedEffect
+        }
+        val expiresAtMillis = parseStoreMobileExpiryMillis(currentSession.expiresAt)
+            ?: return@LaunchedEffect
+        val delayMillis = expiresAtMillis - System.currentTimeMillis()
+        if (delayMillis <= 0) {
+            pairingViewModel.handleExpiredSession()
+            pairingState = pairingViewModel.state
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(delayMillis + 1_000L)
+        pairingViewModel.handleExpiredSession()
+        pairingState = pairingViewModel.state
+    }
+
     LaunchedEffect(pairingState.pairedDevice?.deviceId, operationsBranchId, stockCountViewModel) {
         if (pairingState.pairedDevice == null || operationsBranchId == null) {
             receivingViewModel.clearBranch()
@@ -463,7 +511,7 @@ fun StoreMobileApp() {
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.Start,
             ) {
-                if (pairingState.pairedDevice == null) {
+                if (!hasActiveRuntimeSession) {
                     PairingScreen(
                         state = pairingState,
                         onHubBaseUrlChange = { hubBaseUrl ->
@@ -490,11 +538,44 @@ fun StoreMobileApp() {
                             )
                             pairingState = pairingViewModel.state
                         },
+                        onUnpairDevice = {
+                            pairingViewModel.unpairDevice()
+                            pairingState = pairingViewModel.state
+                        },
                     )
                 } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Paired to ${pairingState.pairedDevice?.hubBaseUrl}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Button(
+                            onClick = {
+                                pairingViewModel.signOutSession()
+                                pairingState = pairingViewModel.state
+                            },
+                        ) {
+                            Text("Sign out")
+                        }
+                        Button(
+                            onClick = {
+                                pairingViewModel.unpairDevice()
+                                pairingState = pairingViewModel.state
+                            },
+                        ) {
+                            Text("Unpair")
+                        }
+                    }
                     val shellMode = resolveStoreMobileShellMode(pairingState.pairedDevice?.runtimeProfile)
                     val runtimeStatusState = buildRuntimeStatusState(
-                        connected = true,
+                        connected = hasActiveRuntimeSession,
                         pendingSyncCount = 0,
                         deviceId = pairingState.pairedDevice?.deviceId,
                         hubBaseUrl = pairingState.pairedDevice?.hubBaseUrl,

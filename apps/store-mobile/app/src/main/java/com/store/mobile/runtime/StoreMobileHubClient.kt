@@ -33,7 +33,7 @@ class FakeStoreMobileHubClient : StoreMobileHubClient {
         }
         return StoreMobileRuntimeSession(
             accessToken = "session:$activationCode",
-            expiresAt = "2099-01-01T00:00:00",
+            expiresAt = "2099-01-01T00:00:00Z",
             deviceId = if (runtimeProfile == "inventory_tablet_spoke") "paired-tablet-1" else "paired-mobile-1",
             staffProfileId = "staff-demo-1",
             runtimeProfile = runtimeProfile,

@@ -3,7 +3,16 @@ package com.store.mobile.ui.pairing
 import com.store.mobile.runtime.StoreMobileHubClient
 import com.store.mobile.runtime.StoreMobilePairedDevice
 import com.store.mobile.runtime.StoreMobilePairingRepository
+import com.store.mobile.runtime.StoreMobileRuntimeSession
 import com.store.mobile.runtime.StoreMobileSessionRepository
+import com.store.mobile.runtime.parseStoreMobileExpiryMillis
+
+enum class PairingSessionStatus {
+    UNPAIRED,
+    ACTIVE,
+    SIGNED_OUT,
+    EXPIRED,
+}
 
 data class PairingUiState(
     val hubBaseUrl: String = "",
@@ -11,6 +20,7 @@ data class PairingUiState(
     val requestedSessionSurface: String = "store_mobile",
     val canRedeemActivation: Boolean = false,
     val pairedDevice: StoreMobilePairedDevice? = null,
+    val sessionStatus: PairingSessionStatus = PairingSessionStatus.UNPAIRED,
     val errorMessage: String? = null,
 )
 
@@ -19,9 +29,7 @@ class PairingViewModel(
     private val sessionRepository: StoreMobileSessionRepository,
     private val hubClient: StoreMobileHubClient,
 ) {
-    var state: PairingUiState = PairingUiState(
-        pairedDevice = pairingRepository.loadPairedDevice(),
-    )
+    var state: PairingUiState = buildState()
         private set
 
     fun updateManualActivation(hubBaseUrl: String, activationCode: String) {
@@ -64,9 +72,72 @@ class PairingViewModel(
             branchId = session.branchId,
         )
         sessionRepository.saveSession(session)
-        state = state.copy(
-            pairedDevice = pairingRepository.loadPairedDevice(),
+        state = buildState(
+            activationCode = "",
             errorMessage = null,
+            requestedSessionSurface = state.requestedSessionSurface,
         )
+    }
+
+    fun signOutSession() {
+        sessionRepository.clear()
+        state = buildState(
+            activationCode = "",
+            errorMessage = null,
+            requestedSessionSurface = state.requestedSessionSurface,
+        )
+    }
+
+    fun unpairDevice() {
+        sessionRepository.clear()
+        pairingRepository.clear()
+        state = buildState(
+            activationCode = "",
+            errorMessage = null,
+            requestedSessionSurface = "store_mobile",
+        )
+    }
+
+    fun handleExpiredSession() {
+        sessionRepository.clear()
+        state = buildState(
+            activationCode = "",
+            errorMessage = "Runtime session expired. Redeem a fresh activation or unpair this device.",
+            requestedSessionSurface = state.requestedSessionSurface,
+        )
+    }
+
+    private fun buildState(
+        activationCode: String = "",
+        errorMessage: String? = null,
+        requestedSessionSurface: String = "store_mobile",
+    ): PairingUiState {
+        val pairedDevice = pairingRepository.loadPairedDevice()
+        val persistedSession = sessionRepository.loadSession()
+        val expiredSession = persistedSession?.takeIf { isSessionExpired(it) }
+        if (expiredSession != null) {
+            sessionRepository.clear()
+        }
+        val sessionStatus = when {
+            pairedDevice == null -> PairingSessionStatus.UNPAIRED
+            persistedSession == null -> PairingSessionStatus.SIGNED_OUT
+            expiredSession != null -> PairingSessionStatus.EXPIRED
+            else -> PairingSessionStatus.ACTIVE
+        }
+        return PairingUiState(
+            hubBaseUrl = pairedDevice?.hubBaseUrl ?: "",
+            activationCode = activationCode,
+            requestedSessionSurface = pairedDevice?.sessionSurface ?: requestedSessionSurface,
+            canRedeemActivation = (pairedDevice?.hubBaseUrl ?: "").isNotBlank() && activationCode.isNotBlank(),
+            pairedDevice = pairedDevice,
+            sessionStatus = sessionStatus,
+            errorMessage = errorMessage,
+        )
+    }
+
+    private fun isSessionExpired(session: StoreMobileRuntimeSession): Boolean {
+        val expiresAtMillis = parseStoreMobileExpiryMillis(session.expiresAt)
+            ?: return true
+        return expiresAtMillis <= System.currentTimeMillis()
     }
 }
