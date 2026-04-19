@@ -251,6 +251,14 @@ This is primarily a suite integration and runtime-auth slice, not a new backend 
 - sign-out
 - expired-session handling
 
+In this slice, `shared auth/session foundation` means:
+
+- shared web-facing code for `owner-web` and `platform-admin`
+- shared session-lifecycle terminology and state transitions across every surface
+- shared recovery semantics, even where implementation remains platform-specific
+
+It does **not** mean forcing desktop and mobile runtimes to literally reuse the same persistence or unlock implementation as web surfaces.
+
 Local-dev bootstrap support can remain, but only as a developer-only utility behind explicit non-production behavior.
 
 ### Desktop Runtime Auth Foundation
@@ -260,6 +268,85 @@ Desktop should keep its existing device-bound model and refine it, not replace i
 ### Mobile Runtime Auth Foundation
 
 Mobile should gain durable repositories and runtime-safe restore behavior rather than continuing to rely on in-memory session state.
+
+## Minimum Backend Contract Adjustments
+
+The planning baseline should assume frontend-first work unless these backend gaps are confirmed:
+
+- named web exchange contract remains `POST /v1/auth/oidc/exchange`
+- session refresh remains `POST /v1/auth/refresh`
+- sign-out remains `POST /v1/auth/sign-out`
+- desktop activation remains `POST /v1/auth/store-desktop/activate`
+- desktop unlock remains `POST /v1/auth/store-desktop/unlock`
+- mobile runtime activation should use the existing runtime contract at `POST /v1/auth/runtime/activate` unless the current mobile pairing path proves incompatible
+
+If implementation discovers missing recovery detail, the only backend work in scope is:
+
+- clearer revoked/expired/detached failure payloads
+- payload parity between desktop and mobile runtime activation responses
+- any redirect-safe callback exchange helper strictly required for web sign-in completion
+
+The plan should treat any broader backend auth redesign as out of scope.
+
+## Recovery State Matrix
+
+The planner should treat the following states as explicit product states rather than generic failures.
+
+### Web Surfaces
+
+#### Expired session
+
+- attempt refresh
+- if refresh succeeds, remain live
+- if refresh fails, return to signed-out screen with an expiry explanation
+
+#### Revoked session
+
+- clear persisted session
+- return to signed-out screen
+- message should indicate access or session was revoked
+
+### Store Desktop
+
+#### Locked
+
+- approved device remains known
+- local unlock screen is shown
+- successful unlock restores live runtime session or triggers remote refresh if needed
+
+#### Expired session
+
+- if refresh succeeds, restore runtime
+- if refresh fails but device remains approved, fall back to unlock or signed-out runtime state depending on local-auth posture
+
+#### Revoked session
+
+- clear live session
+- preserve device identity only if local policy still allows device recognition
+- route to activation or blocked runtime posture with an explicit revocation explanation
+
+#### Detached or invalid device approval
+
+- clear live session and any activation-specific resume state
+- require reactivation
+
+### Store Mobile
+
+#### Expired runtime session
+
+- attempt runtime refresh or re-redeem through the paired runtime contract
+- if unsuccessful, keep paired-device record but return to runtime-resume or sign-in-required posture
+
+#### Revoked runtime session
+
+- clear live runtime session
+- preserve paired-device record unless the pair itself is revoked
+- require a fresh runtime session
+
+#### Unpaired or detached device
+
+- clear paired-device and runtime-session state
+- return to pairing screen
 
 ## Testing Strategy
 
