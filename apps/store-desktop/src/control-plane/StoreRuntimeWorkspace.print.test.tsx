@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -22,6 +23,7 @@ describe('store runtime print queue flow', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     let activeAttendanceSession: Record<string, unknown> | null = null;
     let activeCashierSession: Record<string, unknown> | null = null;
     let latestSaleId: string | null = null;
@@ -41,7 +43,7 @@ describe('store runtime print queue flow', () => {
           full_name: 'Counter Cashier',
           is_platform_admin: false,
           tenant_memberships: [],
-          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'store_manager', status: 'ACTIVE' }],
         }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme') && method === 'GET') {
@@ -291,6 +293,7 @@ describe('store runtime print queue flow', () => {
 
   afterEach(() => {
     cleanup();
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -305,13 +308,19 @@ describe('store runtime print queue flow', () => {
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
     expect((await screen.findAllByText('Counter Desktop 1')).length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
+    await screen.findByRole('heading', { name: 'Store access' });
     fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '250' } });
     fireEvent.change(screen.getByLabelText('Opening note'), { target: { value: 'Morning float' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open register' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Resume selling' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Resume selling' }));
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -320,6 +329,8 @@ describe('store runtime print queue flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    await screen.findByRole('heading', { name: 'Operations desk' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Queue latest invoice print' }));
 

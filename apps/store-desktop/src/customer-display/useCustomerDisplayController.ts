@@ -37,7 +37,7 @@ export function useCustomerDisplayController(workspace: StoreRuntimeWorkspaceSta
       }
     : null;
   const payload = buildCustomerDisplayPayload({
-    branchName: workspace.branches[0]?.name ?? workspace.branchId ?? null,
+    branchName: workspace.branches?.[0]?.name ?? workspace.branchId ?? null,
     selectedItem,
     saleQuantity: workspace.saleQuantity,
     paymentMethod: workspace.paymentMethod,

@@ -2,8 +2,70 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
+import type { ControlPlaneAttendanceSession, ControlPlaneCashierSession } from '@store/types';
 import type { StoreRuntimeWorkspaceState } from './useStoreRuntimeWorkspace';
 import { StoreRuntimeEntrySurface } from './storeRuntimeEntrySurface';
+
+function createAttendanceSession(
+  overrides: Partial<ControlPlaneAttendanceSession> = {},
+): ControlPlaneAttendanceSession {
+  return {
+    id: 'attendance-session-1',
+    tenant_id: 'tenant-acme',
+    branch_id: 'branch-1',
+    shift_session_id: null,
+    device_registration_id: 'device-1',
+    device_name: 'Counter Desktop 1',
+    device_code: 'counter-1',
+    staff_profile_id: 'staff-1',
+    staff_full_name: 'Counter Cashier',
+    runtime_user_id: 'user-cashier',
+    opened_by_user_id: 'user-cashier',
+    closed_by_user_id: null,
+    status: 'OPEN',
+    attendance_number: 'ATTD-BLRFLAGSHIP-0001',
+    clock_in_note: null,
+    clock_out_note: null,
+    force_close_reason: null,
+    opened_at: '2026-04-19T10:00:00.000Z',
+    closed_at: null,
+    last_activity_at: '2026-04-19T10:00:00.000Z',
+    linked_cashier_sessions_count: 0,
+    ...overrides,
+  };
+}
+
+function createCashierSession(
+  overrides: Partial<ControlPlaneCashierSession> = {},
+): ControlPlaneCashierSession {
+  return {
+    id: 'cashier-session-1',
+    tenant_id: 'tenant-acme',
+    branch_id: 'branch-1',
+    attendance_session_id: 'attendance-session-1',
+    device_registration_id: 'device-1',
+    device_name: 'Counter Desktop 1',
+    device_code: 'counter-1',
+    staff_profile_id: 'staff-1',
+    staff_full_name: 'Counter Cashier',
+    runtime_user_id: 'user-cashier',
+    opened_by_user_id: 'user-cashier',
+    closed_by_user_id: null,
+    status: 'OPEN',
+    session_number: 'CS-BLRFLAGSHIP-0001',
+    opening_float_amount: 500,
+    opening_note: null,
+    closing_note: null,
+    force_close_reason: null,
+    opened_at: '2026-04-19T10:05:00.000Z',
+    closed_at: null,
+    last_activity_at: '2026-04-19T10:05:00.000Z',
+    linked_sales_count: 0,
+    linked_returns_count: 0,
+    gross_billed_amount: 0,
+    ...overrides,
+  };
+}
 
 function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): StoreRuntimeWorkspaceState {
   return {
@@ -71,8 +133,21 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     branchRuntimePolicy: {
       require_attendance_for_cashier: true,
       require_shift_for_attendance: false,
+      require_assigned_staff_for_device: true,
+      allow_offline_sales: true,
+      max_pending_offline_sales: 25,
     },
     activeShiftSession: null,
+    shiftSessions: [],
+    shiftName: '',
+    shiftOpeningNote: '',
+    shiftClosingNote: '',
+    setShiftName: vi.fn(),
+    setShiftOpeningNote: vi.fn(),
+    setShiftClosingNote: vi.fn(),
+    openShiftSession: vi.fn(async () => {}),
+    closeShiftSession: vi.fn(async () => {}),
+    loadShiftSessions: vi.fn(async () => {}),
     errorMessage: null,
     ...overrides,
   } as unknown as StoreRuntimeWorkspaceState;
@@ -125,12 +200,7 @@ describe('StoreRuntimeEntrySurface', () => {
           },
           isSessionLive: true,
           korsenexToken: 'stub:token',
-          activeAttendanceSession: {
-            id: 'attendance-session-1',
-            status: 'OPEN',
-            attendance_number: 'ATTD-BLRFLAGSHIP-0001',
-            staff_full_name: 'Counter Cashier',
-          },
+          activeAttendanceSession: createAttendanceSession(),
         })}
         onResumeSelling={vi.fn()}
       />,
@@ -152,12 +222,7 @@ describe('StoreRuntimeEntrySurface', () => {
           isSessionLive: true,
           korsenexToken: 'stub:token',
           cashierOpeningFloatAmount: '500',
-          activeAttendanceSession: {
-            id: 'attendance-session-1',
-            status: 'OPEN',
-            attendance_number: 'ATTD-BLRFLAGSHIP-0001',
-            staff_full_name: 'Counter Cashier',
-          },
+          activeAttendanceSession: createAttendanceSession(),
         })}
         onResumeSelling={vi.fn()}
       />,
@@ -180,19 +245,8 @@ describe('StoreRuntimeEntrySurface', () => {
           },
           isSessionLive: true,
           korsenexToken: 'stub:token',
-          activeAttendanceSession: {
-            id: 'attendance-session-1',
-            status: 'OPEN',
-            attendance_number: 'ATTD-BLRFLAGSHIP-0001',
-            staff_full_name: 'Counter Cashier',
-          },
-          activeCashierSession: {
-            id: 'cashier-session-1',
-            status: 'OPEN',
-            session_number: 'CS-BLRFLAGSHIP-0001',
-            staff_full_name: 'Counter Cashier',
-            opening_float_amount: 500,
-          },
+          activeAttendanceSession: createAttendanceSession(),
+          activeCashierSession: createCashierSession(),
         })}
         onResumeSelling={vi.fn()}
       />,

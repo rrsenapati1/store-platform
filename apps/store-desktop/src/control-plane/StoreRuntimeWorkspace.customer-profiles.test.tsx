@@ -372,6 +372,8 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -522,6 +524,8 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
@@ -651,6 +655,8 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
@@ -811,6 +817,8 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
@@ -984,6 +992,8 @@ describe('store runtime checkout customer profiles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.change(screen.getByLabelText('Customer profile search'), { target: { value: 'Acme' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));

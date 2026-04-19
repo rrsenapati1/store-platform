@@ -14,10 +14,35 @@ export function jsonResponse(body: unknown, status = 200): MockResponse {
   };
 }
 
+export function clearRuntimeBrowserState() {
+  if (typeof window !== 'undefined') {
+    const keys = [
+      'store.runtime-cache.v1',
+      'store.runtime-session.v1',
+      'store.runtime-local-auth.v1',
+      'store.runtime-hub-identity.v1',
+      'store.runtime-continuity.v1',
+    ];
+    for (const key of keys) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // jsdom storage can fail on blanket mutations; remove only what this runtime owns.
+      }
+      try {
+        window.sessionStorage.removeItem(key);
+      } catch {
+        // keep tests resilient when sessionStorage is unavailable in the host runtime.
+      }
+    }
+  }
+}
+
 export function installRuntimeBootstrapFetchMock(args?: {
   branchRoleNames?: string[];
   tenantRoleNames?: string[];
 }) {
+  clearRuntimeBrowserState();
   const branchRoleNames = args?.branchRoleNames ?? ['cashier'];
   const tenantRoleNames = args?.tenantRoleNames ?? [];
 

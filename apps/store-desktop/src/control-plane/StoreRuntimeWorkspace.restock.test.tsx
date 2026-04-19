@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -22,6 +23,7 @@ describe('store runtime assisted restock flow', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     let restockTask = {
       id: 'restock-task-1',
       tenant_id: 'tenant-acme',
@@ -84,7 +86,7 @@ describe('store runtime assisted restock flow', () => {
           full_name: 'Counter Cashier',
           is_platform_admin: false,
           tenant_memberships: [],
-          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'store_manager', status: 'ACTIVE' }],
         }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme') && method === 'GET') {
@@ -257,6 +259,7 @@ describe('store runtime assisted restock flow', () => {
   });
 
   afterEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -269,7 +272,8 @@ describe('store runtime assisted restock flow', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Operations' }));
+    await screen.findByRole('heading', { name: 'Operations desk' });
 
     fireEvent.change(screen.getByLabelText('Scanned barcode'), {
       target: { value: 'ACMETEACLASSIC' },
@@ -323,6 +327,8 @@ describe('store runtime assisted restock flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    await screen.findByRole('heading', { name: 'Operations desk' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh restock board' }));
 

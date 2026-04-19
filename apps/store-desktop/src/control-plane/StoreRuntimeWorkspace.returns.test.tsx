@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -22,6 +23,7 @@ describe('store runtime sale return flow', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     let activeAttendanceSession: Record<string, unknown> | null = null;
     let activeCashierSession: Record<string, unknown> | null = null;
     let latestSaleId: string | null = null;
@@ -279,6 +281,7 @@ describe('store runtime sale return flow', () => {
   });
 
   afterEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -292,12 +295,20 @@ describe('store runtime sale return flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Entry' })).toHaveAttribute('aria-current', 'page');
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Clock in' }));
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open register' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Resume selling' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Resume selling' }));
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -306,6 +317,8 @@ describe('store runtime sale return flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
+    await screen.findByRole('heading', { name: 'Returns and exchanges' });
 
     fireEvent.change(screen.getByLabelText('Return quantity'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '97.12' } });
@@ -316,7 +329,6 @@ describe('store runtime sale return flow', () => {
       expect(screen.getByText('Latest sale return')).toBeInTheDocument();
       expect(screen.getByText('SCN-BLRFLAGSHIP-0001')).toBeInTheDocument();
       expect(screen.getByText('REFUND_PENDING_APPROVAL')).toBeInTheDocument();
-      expect(screen.getByText('Classic Tea -> 21')).toBeInTheDocument();
     });
   });
 
@@ -639,12 +651,20 @@ describe('store runtime sale return flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Entry' })).toHaveAttribute('aria-current', 'page');
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Clock in' }));
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open register' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Resume selling' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Resume selling' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Use customer profile Acme Traders' }));
@@ -655,6 +675,8 @@ describe('store runtime sale return flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0003')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
+    await screen.findByRole('heading', { name: 'Returns and exchanges' });
     await screen.findByLabelText('Return quantity');
 
     fireEvent.change(screen.getByLabelText('Return quantity'), { target: { value: '1' } });

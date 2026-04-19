@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -22,6 +23,7 @@ describe('store runtime customer insights', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = vi.fn(async (input, init) => {
       const url = String(input);
       const method = init?.method ?? 'GET';
@@ -36,7 +38,7 @@ describe('store runtime customer insights', () => {
           full_name: 'Counter Cashier',
           is_platform_admin: false,
           tenant_memberships: [],
-          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'store_manager', status: 'ACTIVE' }],
         }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme')) {
@@ -119,6 +121,7 @@ describe('store runtime customer insights', () => {
   });
 
   afterEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -132,6 +135,8 @@ describe('store runtime customer insights', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Manager' }));
+    await screen.findByRole('heading', { name: 'Manager cockpit' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Load customer insights' }));
 

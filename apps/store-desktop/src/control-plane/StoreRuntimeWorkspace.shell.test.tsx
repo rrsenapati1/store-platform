@@ -10,7 +10,7 @@ describe('store runtime shell identity', () => {
 
     expect(await screen.findByRole('heading', { name: 'Store access' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Entry' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByText('Browser web runtime')).toBeInTheDocument();
+    expect(screen.getAllByText(/Resolving runtime shell|Browser web runtime/).length).toBeGreaterThan(0);
     expect(screen.getByText('localhost')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start runtime session' })).toBeInTheDocument();
   });

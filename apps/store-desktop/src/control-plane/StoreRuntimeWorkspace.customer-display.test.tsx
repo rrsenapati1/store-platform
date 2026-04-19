@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
 import { clearCustomerDisplayPayload, loadCustomerDisplayPayload } from '../customer-display/customerDisplayModel';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -206,6 +207,7 @@ describe('store runtime customer display flow', () => {
   const originalGlobalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     const storage = createMemoryStorage();
     Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
     Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
@@ -298,6 +300,7 @@ describe('store runtime customer display flow', () => {
     clearCustomerDisplayPayload();
     window.open = originalOpen;
     globalThis.fetch = originalFetch;
+    clearRuntimeBrowserState();
     if (originalWindowStorage) {
       Object.defineProperty(window, 'localStorage', originalWindowStorage);
     }
@@ -411,7 +414,8 @@ describe('store runtime customer display flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    expect((await screen.findAllByText('CS-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
+    await screen.findByLabelText('Customer name');
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '2' } });
@@ -443,6 +447,7 @@ describe('store runtime customer display flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    await screen.findByLabelText('Customer name');
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '2' } });

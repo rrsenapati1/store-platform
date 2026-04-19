@@ -1,8 +1,9 @@
 /* @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -351,7 +352,12 @@ function installCashierSessionFetchMock(options?: { requireShiftForAttendance?: 
 describe('store runtime cashier session governance', () => {
   const originalFetch = globalThis.fetch;
 
+  beforeEach(() => {
+    clearRuntimeBrowserState();
+  });
+
   afterEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -367,6 +373,8 @@ describe('store runtime cashier session governance', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByLabelText('Sale quantity');
 
     fireEvent.change(screen.getByLabelText('Sale quantity'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'Cash' } });
@@ -375,14 +383,18 @@ describe('store runtime cashier session governance', () => {
 
     expect(await screen.findByText('Open a cashier session before billing.')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
+    await screen.findByRole('heading', { name: 'Store access' });
     fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '250' } });
     fireEvent.change(screen.getByLabelText('Opening note'), { target: { value: 'Morning float' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open register' }));
 
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    expect((await screen.findAllByText('CS-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume selling' }));
 
     await waitForEnabledButton('Create sales invoice');
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
@@ -412,17 +424,24 @@ describe('store runtime cashier session governance', () => {
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
 
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
+    await screen.findByRole('heading', { name: 'Store access' });
     fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open register' }));
 
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    expect((await screen.findAllByText('CS-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume selling' }));
 
     await waitForEnabledButton('Create sales invoice');
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
     expect(await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).not.toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
+    await screen.findByRole('heading', { name: 'Returns and exchanges' });
+    await screen.findByLabelText('Return quantity');
 
     fireEvent.change(screen.getByLabelText('Return quantity'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '97.12' } });
@@ -453,6 +472,8 @@ describe('store runtime cashier session governance', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
+    await screen.findByRole('heading', { name: 'Store access' });
     expect(await screen.findByText(/Open a branch shift before clocking in/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clock in' })).toBeDisabled();
 
@@ -463,10 +484,12 @@ describe('store runtime cashier session governance', () => {
     expect(await screen.findByText('Active shift session')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clock in' })).not.toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
     fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
+    fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '200' } });
 
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+    });
 
     await waitFor(() => {
       const createShiftCall = vi.mocked(globalThis.fetch).mock.calls.find(

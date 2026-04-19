@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -22,6 +23,7 @@ describe('store runtime barcode lookup flow', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = vi.fn(async (input, init) => {
       const url = String(input);
       const method = init?.method ?? 'GET';
@@ -36,7 +38,7 @@ describe('store runtime barcode lookup flow', () => {
           full_name: 'Counter Cashier',
           is_platform_admin: false,
           tenant_memberships: [],
-          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'store_manager', status: 'ACTIVE' }],
         }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme') && method === 'GET') {
@@ -133,6 +135,7 @@ describe('store runtime barcode lookup flow', () => {
 
   afterEach(() => {
     cleanup();
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -146,6 +149,8 @@ describe('store runtime barcode lookup flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    await screen.findByRole('heading', { name: 'Operations desk' });
 
     fireEvent.change(screen.getByLabelText('Scanned barcode'), {
       target: { value: '  ACMETEACLASSIC  ' },

@@ -29,15 +29,15 @@ describe('store runtime workspace', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Sell' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Sell' })).toBeInTheDocument();
+    expect(screen.getByText('Counter Cashier')).toBeInTheDocument();
     expect(screen.getByText('Current cart')).toBeInTheDocument();
   });
 
   test('starts a runtime session and loads checkout posture', async () => {
     render(<App />);
 
-    await screen.findByText('Browser local storage');
+    await screen.findByRole('heading', { name: 'Store access' });
 
     fireEvent.change(screen.getByLabelText('Korsenex token'), {
       target: { value: 'stub:sub=cashier-1;email=cashier@acme.local;name=Counter Cashier' },

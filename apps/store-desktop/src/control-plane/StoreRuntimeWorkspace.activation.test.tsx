@@ -449,14 +449,14 @@ describe('store desktop packaged activation flow', () => {
   test('redeems an owner-issued activation for a packaged runtime and persists the desktop session', async () => {
     render(<App />);
 
-    expect(await screen.findByText('Desktop activation')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Activation code')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Activation code'), {
       target: { value: 'ACTV-1234-5678' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Activate desktop access' }));
 
-    expect(await screen.findByText('Set runtime PIN')).toBeInTheDocument();
+    expect(await screen.findByLabelText('New PIN')).toBeInTheDocument();
     expect(screen.queryByText('Counter Cashier')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('New PIN'), {
@@ -516,7 +516,7 @@ describe('store desktop packaged activation flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Unlock with PIN')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Unlock runtime' })).toBeInTheDocument();
     expect(screen.queryByText('Counter Cashier')).not.toBeInTheDocument();
   });
 
@@ -531,7 +531,7 @@ describe('store desktop packaged activation flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Desktop activation')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Activation code')).toBeInTheDocument();
     expect(screen.queryByText('Counter Cashier')).not.toBeInTheDocument();
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith('cmd_clear_store_runtime_session');
@@ -549,7 +549,7 @@ describe('store desktop packaged activation flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Unlock with PIN')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Unlock runtime' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('PIN'), {
       target: { value: '2580' },
@@ -557,7 +557,7 @@ describe('store desktop packaged activation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Unlock runtime' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
-    expect(screen.getByText('Control plane unavailable. Cached runtime unlocked locally.')).toBeInTheDocument();
+    expect(await screen.findByText(/Cached runtime unlocked locally\./i)).toBeInTheDocument();
     expect(globalThis.fetch).toHaveBeenCalledWith(
       'http://127.0.0.1:8000/v1/auth/store-desktop/unlock',
       expect.objectContaining({
@@ -582,7 +582,7 @@ describe('store desktop packaged activation flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Unlock with PIN')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Unlock runtime' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('PIN'), {
       target: { value: '2580' },
@@ -601,7 +601,7 @@ describe('store desktop packaged activation flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Unlock with PIN')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Unlock runtime' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('PIN'), {
       target: { value: '2580' },
@@ -621,14 +621,14 @@ describe('store desktop packaged activation flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Desktop activation')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Activation code')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Activation code'), {
       target: { value: 'ACTV-1234-5678' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Activate desktop access' }));
 
-    expect(await screen.findByText('Set runtime PIN')).toBeInTheDocument();
+    expect(await screen.findByLabelText('New PIN')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('New PIN'), {
       target: { value: '2580' },

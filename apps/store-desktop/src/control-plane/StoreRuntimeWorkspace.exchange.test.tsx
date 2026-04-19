@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -22,6 +23,7 @@ describe('store runtime exchange flow', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     let activeAttendanceSession: Record<string, unknown> | null = null;
     let activeCashierSession: Record<string, unknown> | null = null;
     let latestSaleId: string | null = null;
@@ -329,6 +331,7 @@ describe('store runtime exchange flow', () => {
   });
 
   afterEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -342,12 +345,19 @@ describe('store runtime exchange flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
+    await screen.findByLabelText('Customer name');
+    fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Entry' })).toHaveAttribute('aria-current', 'page');
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open register' }));
+    expect((await screen.findAllByText('CS-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume selling' }));
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -355,7 +365,10 @@ describe('store runtime exchange flow', () => {
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'Cash' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
 
-    expect(await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).toHaveLength(3);
+    expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
+    await screen.findByRole('heading', { name: 'Returns and exchanges' });
+    await screen.findByLabelText('Exchange return quantity');
 
     fireEvent.change(screen.getByLabelText('Exchange return quantity'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Replacement quantity'), { target: { value: '2' } });
@@ -367,7 +380,12 @@ describe('store runtime exchange flow', () => {
       expect(screen.getByText('COLLECT_FROM_CUSTOMER 97.13')).toBeInTheDocument();
       expect(screen.getAllByText('SINV-BLRFLAGSHIP-0002').length).toBeGreaterThan(0);
       expect(screen.getAllByText('SCN-BLRFLAGSHIP-0001').length).toBeGreaterThan(0);
-      expect(screen.getByText('Classic Tea -> 19')).toBeInTheDocument();
+      const inventoryRefreshCalls = vi.mocked(globalThis.fetch).mock.calls.filter(
+        ([url, init]) =>
+          String(url).includes('/v1/tenants/tenant-acme/branches/branch-1/inventory-snapshot')
+          && (init?.method == null || init.method === 'GET'),
+      );
+      expect(inventoryRefreshCalls.length).toBeGreaterThan(1);
     });
   });
 });

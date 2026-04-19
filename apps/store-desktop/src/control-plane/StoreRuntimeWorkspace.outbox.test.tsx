@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
 import { STORE_RUNTIME_CACHE_KEY } from '../runtime-cache/storeRuntimeCache';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -98,7 +99,7 @@ function queueBootstrapResponses(fetchMock: ReturnType<typeof vi.fn>) {
       full_name: 'Counter Cashier',
       is_platform_admin: false,
       tenant_memberships: [],
-      branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+      branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'store_manager', status: 'ACTIVE' }],
     }),
     jsonResponse({
       id: 'tenant-acme',
@@ -230,6 +231,7 @@ describe('store runtime outbox continuity', () => {
   const originalTauriInternals = (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__;
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     delete (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__;
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
@@ -239,6 +241,7 @@ describe('store runtime outbox continuity', () => {
 
   afterEach(() => {
     cleanup();
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
@@ -261,6 +264,8 @@ describe('store runtime outbox continuity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    await screen.findByRole('heading', { name: 'Operations desk' });
     expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
 
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
@@ -320,7 +325,7 @@ describe('store runtime outbox continuity', () => {
           full_name: 'Counter Cashier',
           is_platform_admin: false,
           tenant_memberships: [],
-          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'cashier', status: 'ACTIVE' }],
+          branch_memberships: [{ tenant_id: 'tenant-acme', branch_id: 'branch-1', role_name: 'store_manager', status: 'ACTIVE' }],
         }) as never;
       }
       if (url.endsWith('/v1/tenants/tenant-acme')) {
@@ -491,7 +496,8 @@ describe('store runtime outbox continuity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
-    expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByLabelText('Customer name');
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -500,6 +506,9 @@ describe('store runtime outbox continuity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    await screen.findByRole('heading', { name: 'Operations desk' });
+    expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
 
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     fireEvent.click(screen.getByRole('button', { name: 'Queue latest invoice print' }));

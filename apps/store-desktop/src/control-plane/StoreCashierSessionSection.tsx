@@ -81,7 +81,7 @@ export function StoreCashierSessionSection({ workspace }: { workspace: StoreRunt
             />
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               <ActionButton onClick={() => void workspace.openCashierSession()} disabled={workspace.isBusy || !canOpenCashierSession}>
-                Open cashier session
+                Open register
               </ActionButton>
               <ActionButton
                 onClick={() => void workspace.loadCashierSessions()}

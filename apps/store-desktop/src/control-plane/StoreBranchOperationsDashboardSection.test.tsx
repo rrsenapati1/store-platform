@@ -20,6 +20,7 @@ function jsonResponse(body: unknown, status = 200): MockResponse {
 }
 
 function buildWorkspace(): StoreRuntimeWorkspaceState {
+  const issuedOn = new Date().toISOString().slice(0, 10);
   return {
     accessToken: 'session-cashier',
     tenantId: 'tenant-acme',
@@ -40,7 +41,7 @@ function buildWorkspace(): StoreRuntimeWorkspaceState {
         loyalty_points_redeemed: 0,
         loyalty_discount_amount: 0,
         loyalty_points_earned: 5,
-        issued_on: '2026-04-18',
+        issued_on: issuedOn,
       },
       {
         sale_id: 'sale-2',
@@ -55,7 +56,7 @@ function buildWorkspace(): StoreRuntimeWorkspaceState {
         loyalty_points_redeemed: 0,
         loyalty_discount_amount: 0,
         loyalty_points_earned: 2,
-        issued_on: '2026-04-18',
+        issued_on: issuedOn,
       },
     ],
     activeShiftSession: {

@@ -30,7 +30,7 @@ describe('store runtime product shell', () => {
     expect(screen.getByRole('button', { name: 'Entry' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sell' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Returns' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Operations' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Operations' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Manager' })).not.toBeInTheDocument();
   });
 

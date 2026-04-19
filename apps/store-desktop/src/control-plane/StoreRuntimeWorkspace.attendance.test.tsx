@@ -1,8 +1,9 @@
 /* @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -282,7 +283,12 @@ function installAttendanceFetchMock() {
 describe('store runtime attendance foundation', () => {
   const originalFetch = globalThis.fetch;
 
+  beforeEach(() => {
+    clearRuntimeBrowserState();
+  });
+
   afterEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -298,27 +304,29 @@ describe('store runtime attendance foundation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    await screen.findByLabelText('Customer name');
+    fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Entry' })).toHaveAttribute('aria-current', 'page');
+    });
 
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '250' } });
     fireEvent.change(screen.getByLabelText('Opening note'), { target: { value: 'Morning float' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
+    expect(screen.getByRole('button', { name: 'Open register' })).toBeDisabled();
 
-    expect(await screen.findByText(/Open an attendance session before opening a cashier session/i)).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText('Clock-in note'), { target: { value: 'Morning shift start' } });
     fireEvent.click(screen.getByRole('button', { name: 'Clock in' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open register' })).toBeEnabled();
+    });
 
-    expect(await screen.findByText('Active attendance session')).toBeInTheDocument();
-    expect(screen.getByText('ATTD-BLRFLAGSHIP-0001')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open cashier session' }));
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open register' }));
+    expect((await screen.findAllByText('CS-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Closing note'), { target: { value: 'Till handoff complete' } });
     fireEvent.click(screen.getByRole('button', { name: 'Close cashier session' }));
 
     await waitFor(() => {
-      expect(screen.queryByText('Active cashier session')).not.toBeInTheDocument();
+      expect(screen.queryAllByText('CS-BLRFLAGSHIP-0001')).toHaveLength(0);
     });
 
     fireEvent.change(screen.getByLabelText('Clock-out note'), { target: { value: 'Shift complete' } });

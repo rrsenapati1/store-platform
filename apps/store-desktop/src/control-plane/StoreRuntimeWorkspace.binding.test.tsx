@@ -214,7 +214,8 @@ describe('packaged runtime device binding', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
-    expect(await screen.findByText('STORE-EFGH5678')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Operations' }));
+    expect(await screen.findByText('Shell identity')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Runtime device')).toHaveValue('');

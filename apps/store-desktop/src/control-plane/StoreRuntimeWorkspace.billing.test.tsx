@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from '../App';
+import { clearRuntimeBrowserState } from './storeRuntimeTestHelpers';
 
 type MockResponse = {
   ok: boolean;
@@ -255,6 +256,7 @@ describe('store runtime billing foundation flow', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    clearRuntimeBrowserState();
     let saleCreated = false;
 
     globalThis.fetch = vi.fn(async (input, init) => {
@@ -343,6 +345,7 @@ describe('store runtime billing foundation flow', () => {
   });
 
   afterEach(() => {
+    clearRuntimeBrowserState();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -357,7 +360,9 @@ describe('store runtime billing foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
-    expect(await screen.findByText('Active cashier session')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
+    expect((await screen.findAllByText('CS-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -480,6 +485,8 @@ describe('store runtime billing foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Acme Traders' } });
     fireEvent.change(screen.getByLabelText('Customer GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });
@@ -716,6 +723,8 @@ describe('store runtime billing foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Use customer profile Acme Traders' }));
@@ -957,6 +966,8 @@ describe('store runtime billing foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Find customer profiles' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Use customer profile Acme Traders' }));
@@ -1200,6 +1211,8 @@ describe('store runtime billing foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sell' }));
+    await screen.findByRole('heading', { name: 'Current cart' });
 
     fireEvent.change(screen.getByLabelText('Gift card code'), { target: { value: 'gift-1000' } });
     fireEvent.change(screen.getByLabelText('Apply gift card amount'), { target: { value: '50' } });
