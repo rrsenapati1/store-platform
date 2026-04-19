@@ -21,6 +21,8 @@ class ScanLookupViewModelTest {
                     sellingPrice = 125.0,
                     stockOnHand = 18.0,
                     availabilityStatus = "IN_STOCK",
+                    reorderPoint = 10.0,
+                    targetStock = 24.0,
                 ),
             ),
         )
@@ -33,6 +35,8 @@ class ScanLookupViewModelTest {
         assertEquals("1234567890123", viewModel.state.barcode)
         assertEquals("18", viewModel.state.stockLabel)
         assertEquals("1234567890123", viewModel.state.draftBarcode)
+        assertEquals(10.0, viewModel.state.reorderPoint)
+        assertEquals(24.0, viewModel.state.targetStock)
         assertEquals(ScanLookupSource.MANUAL, viewModel.state.lastScanSource)
     }
 

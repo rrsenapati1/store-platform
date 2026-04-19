@@ -59,5 +59,6 @@ fun HandheldStoreShell(
         expiryState = expiryState,
         expiryActions = expiryActions,
         runtimeStatusState = runtimeStatusState,
+        onSelectTaskSection = onSelectSection,
     )
 }

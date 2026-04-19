@@ -37,6 +37,7 @@ fun MobileOperationsContent(
     expiryState: ExpiryUiState,
     expiryActions: ExpiryScreenActions,
     runtimeStatusState: RuntimeStatusUiState,
+    onSelectTaskSection: (MobileOperationsSection) -> Unit = {},
 ) {
     when (activeSection) {
         MobileOperationsSection.SCAN -> {
@@ -49,6 +50,11 @@ fun MobileOperationsContent(
                 onCameraPermissionResolved = onCameraPermissionResolved,
                 onCameraPreviewFailure = onCameraPreviewFailure,
                 onCameraBarcodeDetected = onCameraBarcodeDetected,
+                receivingState = receivingState,
+                stockCountState = stockCountState,
+                restockState = restockState,
+                expiryState = expiryState,
+                onSelectTaskSection = onSelectTaskSection,
             )
         }
 

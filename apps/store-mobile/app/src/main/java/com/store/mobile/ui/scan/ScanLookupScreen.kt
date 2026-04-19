@@ -38,6 +38,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import com.store.mobile.ui.handheld.HandheldScanHomeScreen
+import com.store.mobile.ui.handheld.buildHandheldScanActionModel
+import com.store.mobile.ui.operations.ExpiryUiState
+import com.store.mobile.ui.operations.MobileOperationsSection
+import com.store.mobile.ui.operations.ReceivingUiState
+import com.store.mobile.ui.operations.RestockUiState
+import com.store.mobile.ui.operations.StockCountUiState
 
 @Composable
 fun ScanLookupScreen(
@@ -49,6 +56,11 @@ fun ScanLookupScreen(
     onCameraPermissionResolved: (Boolean) -> Unit,
     onCameraPreviewFailure: (String) -> Unit,
     onCameraBarcodeDetected: (String) -> Unit,
+    receivingState: ReceivingUiState = ReceivingUiState(),
+    stockCountState: StockCountUiState = StockCountUiState(),
+    restockState: RestockUiState = RestockUiState(),
+    expiryState: ExpiryUiState = ExpiryUiState(),
+    onSelectTaskSection: (MobileOperationsSection) -> Unit = {},
 ) {
     val context = LocalContext.current
     val permissionGranted = ContextCompat.checkSelfPermission(
@@ -94,34 +106,27 @@ fun ScanLookupScreen(
             )
         }
     } else {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            ScanCameraPanel(
-                modifier = Modifier.fillMaxWidth(),
-                state = state,
-                onRequestPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                onRetryCamera = { onCameraPermissionResolved(permissionGranted) },
-                onCameraPreviewFailure = onCameraPreviewFailure,
-                onCameraBarcodeDetected = onCameraBarcodeDetected,
-            )
-            ScanLookupDetailsPanel(
-                modifier = Modifier.fillMaxWidth(),
-                state = state,
-                focusRequester = barcodeFieldFocusRequester,
-                onDraftBarcodeChange = onDraftBarcodeChange,
-                onLookupBarcode = onLookupBarcode,
-                onConfigureZebraDataWedge = onConfigureZebraDataWedge,
-            )
-        }
+        val actionModel = buildHandheldScanActionModel(
+            scanState = state,
+            receivingState = receivingState,
+            stockCountState = stockCountState,
+            restockState = restockState,
+            expiryState = expiryState,
+        )
+        HandheldScanHomeScreen(
+            state = state,
+            focusRequester = barcodeFieldFocusRequester,
+            actionModel = actionModel,
+            onDraftBarcodeChange = onDraftBarcodeChange,
+            onLookupBarcode = onLookupBarcode,
+            onConfigureZebraDataWedge = onConfigureZebraDataWedge,
+            onSelectTaskSection = onSelectTaskSection,
+        )
     }
 }
 
 @Composable
-private fun ScanCameraPanel(
+internal fun ScanCameraPanel(
     modifier: Modifier,
     state: ScanLookupUiState,
     onRequestPermission: () -> Unit,
@@ -189,7 +194,7 @@ private fun ScanCameraPanel(
 }
 
 @Composable
-private fun ScanLookupDetailsPanel(
+internal fun ScanLookupDetailsPanel(
     modifier: Modifier,
     state: ScanLookupUiState,
     focusRequester: FocusRequester,
