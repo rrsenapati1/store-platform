@@ -1,4 +1,16 @@
-import { startTransition, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';
+import {
+  buildKorsenexSignInUrl,
+  clearStoreWebSession,
+  consumeLocalDevBootstrapFromWindow,
+  exchangeStoreWebSession,
+  isStoreWebSessionExpired,
+  loadStoreWebSession,
+  readKorsenexCallback,
+  refreshStoreWebSession,
+  shouldRefreshStoreWebSession,
+  signOutStoreWebSession,
+} from '@store/auth';
 import type {
   ControlPlaneActor,
   ControlPlaneBillingPlan,
@@ -14,10 +26,15 @@ import {
   buildPlatformAdminOverviewModel,
   type PlatformAdminSection,
 } from './platformAdminOverviewModel';
+import type { PlatformAdminSessionState } from './PlatformAdminAuthEntrySurface';
+
+const PLATFORM_ADMIN_SESSION_STORAGE_KEY = 'platform-admin.session';
 
 export function usePlatformAdminWorkspace() {
   const [korsenexToken, setKorsenexToken] = useState('');
   const [accessToken, setAccessToken] = useState('');
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  const [sessionState, setSessionState] = useState<PlatformAdminSessionState>('restoring');
   const [actor, setActor] = useState<ControlPlaneActor | null>(null);
   const [tenants, setTenants] = useState<ControlPlanePlatformTenantRecord[]>([]);
   const [billingPlans, setBillingPlans] = useState<ControlPlaneBillingPlan[]>([]);
@@ -39,6 +56,204 @@ export function usePlatformAdminWorkspace() {
   const [latestInvite, setLatestInvite] = useState<ControlPlaneInvite | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+  const hasBootstrappedSessionRef = useRef(false);
+
+  async function loadPlatformSessionData(nextAccessToken: string) {
+    const [nextActor, tenantList, planList, summary, nextSecurityControls, nextEnvironmentContract] = await Promise.all([
+      platformAdminClient.getActor(nextAccessToken),
+      platformAdminClient.listTenants(nextAccessToken),
+      platformAdminClient.listBillingPlans(nextAccessToken),
+      platformAdminClient.getObservabilitySummary(nextAccessToken),
+      platformAdminClient.getSecurityControls(nextAccessToken),
+      platformAdminClient.getEnvironmentContract(nextAccessToken),
+    ]);
+    const selectedTenantId = tenantList.records[0]?.tenant_id ?? '';
+    const lifecycle = selectedTenantId
+      ? await platformAdminClient.getTenantBillingLifecycle(nextAccessToken, selectedTenantId)
+      : null;
+    return {
+      actor: nextActor,
+      billingPlans: planList.records,
+      environmentContract: nextEnvironmentContract,
+      lifecycle,
+      observabilitySummary: summary,
+      securityControls: nextSecurityControls,
+      selectedTenantId,
+      tenants: tenantList.records,
+    };
+  }
+
+  function resetSessionState() {
+    startTransition(() => {
+      setAccessToken('');
+      setSessionExpiresAt(null);
+      setSessionState('signed_out');
+      setActor(null);
+      setTenants([]);
+      setBillingPlans([]);
+      setActiveTenantLifecycle(null);
+      setObservabilitySummary(null);
+      setSecurityControls(null);
+      setEnvironmentContract(null);
+      setActiveTenantId('');
+      setActiveSection('overview');
+      setLatestInvite(null);
+    });
+  }
+
+  function applySessionData(input: {
+    accessToken: string;
+    expiresAt: string;
+  } & Awaited<ReturnType<typeof loadPlatformSessionData>>) {
+    startTransition(() => {
+      setAccessToken(input.accessToken);
+      setSessionExpiresAt(input.expiresAt);
+      setSessionState('ready');
+      setActor(input.actor);
+      setTenants(input.tenants);
+      setBillingPlans(input.billingPlans);
+      setObservabilitySummary(input.observabilitySummary);
+      setSecurityControls(input.securityControls);
+      setEnvironmentContract(input.environmentContract);
+      setActiveTenantId(input.selectedTenantId);
+      setActiveTenantLifecycle(input.lifecycle);
+      setActiveSection('overview');
+    });
+  }
+
+  function resolveSessionFailureMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+  }
+
+  function handleSessionFailure(nextState: Exclude<PlatformAdminSessionState, 'ready' | 'restoring'>, fallback: string, error: unknown) {
+    clearStoreWebSession(PLATFORM_ADMIN_SESSION_STORAGE_KEY);
+    resetSessionState();
+    setErrorMessage(resolveSessionFailureMessage(error, fallback));
+    setSessionState(nextState);
+  }
+
+  async function hydratePlatformSession(record: { accessToken: string; expiresAt: string }) {
+    const sessionData = await loadPlatformSessionData(record.accessToken);
+    applySessionData({
+      accessToken: record.accessToken,
+      actor: sessionData.actor,
+      billingPlans: sessionData.billingPlans,
+      environmentContract: sessionData.environmentContract,
+      expiresAt: record.expiresAt,
+      lifecycle: sessionData.lifecycle,
+      observabilitySummary: sessionData.observabilitySummary,
+      securityControls: sessionData.securityControls,
+      selectedTenantId: sessionData.selectedTenantId,
+      tenants: sessionData.tenants,
+    });
+  }
+
+  async function exchangePlatformSessionToken(token: string, options?: { manageBusy?: boolean }) {
+    const manageBusy = options?.manageBusy ?? true;
+    if (manageBusy) {
+      setIsBusy(true);
+    }
+    setErrorMessage('');
+    setSessionState('restoring');
+    try {
+      const record = await exchangeStoreWebSession({
+        token,
+        exchange: platformAdminClient.exchangeSession,
+        storageKey: PLATFORM_ADMIN_SESSION_STORAGE_KEY,
+      });
+      await hydratePlatformSession(record);
+    } catch (error) {
+      handleSessionFailure('revoked', 'Unable to start session', error);
+    } finally {
+      if (manageBusy) {
+        setIsBusy(false);
+      }
+    }
+  }
+
+  async function refreshPlatformSession(recordOverride?: { accessToken: string; expiresAt: string }) {
+    const currentRecord = recordOverride ?? (accessToken && sessionExpiresAt ? { accessToken, expiresAt: sessionExpiresAt } : null);
+    if (!currentRecord) {
+      return;
+    }
+    try {
+      const refreshed = await refreshStoreWebSession({
+        record: currentRecord,
+        refresh: platformAdminClient.refreshSession,
+        storageKey: PLATFORM_ADMIN_SESSION_STORAGE_KEY,
+      });
+      await hydratePlatformSession(refreshed);
+    } catch (error) {
+      handleSessionFailure('expired', 'Unable to refresh platform session', error);
+    }
+  }
+
+  async function restoreSession() {
+    if (typeof window === 'undefined') {
+      setSessionState('signed_out');
+      return;
+    }
+    setErrorMessage('');
+    setSessionState('restoring');
+
+    const callback = readKorsenexCallback(window);
+    if (callback.error) {
+      handleSessionFailure('revoked', 'Unable to complete platform sign-in', new Error(callback.error));
+      return;
+    }
+    if (callback.token) {
+      await exchangePlatformSessionToken(callback.token, { manageBusy: false });
+      return;
+    }
+
+    if (import.meta.env.DEV) {
+      const bootstrap = consumeLocalDevBootstrapFromWindow(window);
+      if (bootstrap.korsenexToken) {
+        setKorsenexToken(bootstrap.korsenexToken);
+        if (bootstrap.autoStart) {
+          await exchangePlatformSessionToken(bootstrap.korsenexToken, { manageBusy: false });
+          return;
+        }
+      }
+    }
+
+    const storedSession = loadStoreWebSession(PLATFORM_ADMIN_SESSION_STORAGE_KEY);
+    if (!storedSession) {
+      setSessionState('signed_out');
+      return;
+    }
+
+    try {
+      if (isStoreWebSessionExpired(storedSession) || shouldRefreshStoreWebSession(storedSession)) {
+        await refreshPlatformSession(storedSession);
+        return;
+      }
+      await hydratePlatformSession(storedSession);
+    } catch (error) {
+      handleSessionFailure('expired', 'Unable to restore platform session', error);
+    }
+  }
+
+  useEffect(() => {
+    if (hasBootstrappedSessionRef.current) {
+      return;
+    }
+    hasBootstrappedSessionRef.current = true;
+    void restoreSession();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !accessToken || !sessionExpiresAt || sessionState !== 'ready') {
+      return;
+    }
+    const refreshDelayMs = Math.max(Date.parse(sessionExpiresAt) - Date.now() - 120_000, 1_000);
+    const timer = window.setTimeout(() => {
+      void refreshPlatformSession();
+    }, refreshDelayMs);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [accessToken, sessionExpiresAt, sessionState]);
 
   async function loadTenantLifecycle(nextAccessToken: string, tenantId: string) {
     if (!tenantId) {
@@ -100,36 +315,49 @@ export function usePlatformAdminWorkspace() {
   }
 
   async function startSession() {
+    if (!korsenexToken) {
+      return;
+    }
+    await exchangePlatformSessionToken(korsenexToken);
+  }
+
+  function beginSignIn() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const authorizeBaseUrl = import.meta.env.VITE_KORSENEX_AUTHORIZE_URL;
+    if (!authorizeBaseUrl) {
+      setErrorMessage('VITE_KORSENEX_AUTHORIZE_URL is not configured');
+      setSessionState('signed_out');
+      return;
+    }
+    const nextUrl = buildKorsenexSignInUrl({
+      authorizeBaseUrl,
+      returnTo: window.location.href,
+      state: 'platform-admin',
+    });
+    window.location.assign(nextUrl);
+  }
+
+  async function signOut() {
+    const currentRecord = accessToken && sessionExpiresAt ? { accessToken, expiresAt: sessionExpiresAt } : null;
     setIsBusy(true);
     setErrorMessage('');
     try {
-      const session = await platformAdminClient.exchangeSession(korsenexToken);
-      const [nextActor, tenantList, planList, summary, nextSecurityControls, nextEnvironmentContract] = await Promise.all([
-        platformAdminClient.getActor(session.access_token),
-        platformAdminClient.listTenants(session.access_token),
-        platformAdminClient.listBillingPlans(session.access_token),
-        platformAdminClient.getObservabilitySummary(session.access_token),
-        platformAdminClient.getSecurityControls(session.access_token),
-        platformAdminClient.getEnvironmentContract(session.access_token),
-      ]);
-      const selectedTenantId = tenantList.records[0]?.tenant_id ?? '';
-      const lifecycle = selectedTenantId
-        ? await platformAdminClient.getTenantBillingLifecycle(session.access_token, selectedTenantId)
-        : null;
-      startTransition(() => {
-        setAccessToken(session.access_token);
-        setActor(nextActor);
-        setTenants(tenantList.records);
-        setBillingPlans(planList.records);
-        setObservabilitySummary(summary);
-        setSecurityControls(nextSecurityControls);
-        setEnvironmentContract(nextEnvironmentContract);
-        setActiveTenantId(selectedTenantId);
-        setActiveTenantLifecycle(lifecycle);
-        setActiveSection('overview');
-      });
+      if (currentRecord) {
+        await signOutStoreWebSession({
+          accessToken: currentRecord.accessToken,
+          signOut: async (sessionAccessToken) => {
+            await platformAdminClient.signOut(sessionAccessToken);
+          },
+          storageKey: PLATFORM_ADMIN_SESSION_STORAGE_KEY,
+        });
+      } else {
+        clearStoreWebSession(PLATFORM_ADMIN_SESSION_STORAGE_KEY);
+      }
+      resetSessionState();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to start session');
+      setErrorMessage(resolveSessionFailureMessage(error, 'Unable to sign out'));
     } finally {
       setIsBusy(false);
     }
@@ -278,6 +506,7 @@ export function usePlatformAdminWorkspace() {
     activeTenantLifecycle,
     activeTenantId,
     billingPlans,
+    beginSignIn,
     environmentContract,
     errorMessage,
     isBusy,
@@ -314,6 +543,8 @@ export function usePlatformAdminWorkspace() {
     setTenantSlug,
     createTenant,
     sendOwnerInvite,
+    sessionState,
+    signOut,
     startSession,
     suspendActiveTenantAccess,
   };

@@ -179,6 +179,13 @@ describe('platform admin control tower flow', () => {
     vi.restoreAllMocks();
   });
 
+  test('shows the platform sign-in surface instead of a production token gate', () => {
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Platform sign-in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in with Korsenex' })).toBeInTheDocument();
+  });
+
   test('auto-starts a session from local bootstrap URL parameters into the control tower', async () => {
     mockResponses([
       jsonResponse({ access_token: 'session-platform', token_type: 'Bearer' }),
