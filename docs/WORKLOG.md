@@ -2,6 +2,24 @@
 
 ## 2026-04-19
 
+- Completed the cross-app auth and session foundation for the public app suite:
+  - added shared browser session helpers in `packages/auth` for callback parsing, persistence, refresh, and sign-out instead of treating web auth as token-paste bootstrap
+  - replaced production token-entry posture in `owner-web` and `platform-admin` with real signed-out, restoring, expired, and revoked entry surfaces backed by the shared session lifecycle
+  - tightened `store-desktop` runtime session recovery so activation, unlock, expiry, revocation, and sign-out are explicit product states in the entry shell and status strip
+  - replaced `store-mobile` in-memory pairing/session posture with durable local persistence, plus explicit sign-out, unpair, and expired-session recovery behavior
+- Verified:
+  - `npm run test --workspace @store/auth`
+  - `npm run test --workspace @store/owner-web`
+  - `npm run typecheck --workspace @store/owner-web`
+  - `npm run build --workspace @store/owner-web`
+  - `npm run test --workspace @store/platform-admin`
+  - `npm run typecheck --workspace @store/platform-admin`
+  - `npm run build --workspace @store/platform-admin`
+  - `npm run test --workspace @store/store-desktop`
+  - `npm run typecheck --workspace @store/store-desktop`
+  - `npm run build --workspace @store/store-desktop`
+  - `npm run ci:store-mobile`
+
 - Closed `V2-004` end-to-end on current `main`:
   - verified the full store-operations depth track now exists across control-plane authority, owner-web, store-desktop, and the shared Android mobile/tablet runtime: reviewed receiving, reviewed stock counts, reviewed expiry disposition, replenishment policy, shelf/backroom restock tasks, assisted restock, and replenishment-board-driven execution
   - fixed stale backend expiry-flow coverage so it now opens a branch cashier session before posting the sale that drains batch lots, matching the `V2-006` cashier-session governance contract already required by billing

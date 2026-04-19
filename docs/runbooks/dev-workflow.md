@@ -103,6 +103,7 @@ npm run dev:platform-admin
 ```
 
 - URL: [http://127.0.0.1:15174](http://127.0.0.1:15174)
+- Production-style sign-in requires `VITE_KORSENEX_AUTHORIZE_URL` in the app environment
 - Seeded local bootstrap:
   [http://127.0.0.1:15174/#stub_sub=platform-1&stub_email=admin@store.local&stub_name=Platform%20Admin](http://127.0.0.1:15174/#stub_sub=platform-1&stub_email=admin@store.local&stub_name=Platform%20Admin)
 
@@ -113,6 +114,7 @@ npm run dev:owner-web
 ```
 
 - URL: [http://127.0.0.1:15173](http://127.0.0.1:15173)
+- Production-style sign-in requires `VITE_KORSENEX_AUTHORIZE_URL` in the app environment
 - Seeded local bootstrap:
   [http://127.0.0.1:15173/#stub_sub=owner-1&stub_email=owner@acme.local&stub_name=Acme%20Owner](http://127.0.0.1:15173/#stub_sub=owner-1&stub_email=owner@acme.local&stub_name=Acme%20Owner)
 
@@ -125,6 +127,7 @@ npm run dev:store-desktop
 - URL: [http://127.0.0.1:15172](http://127.0.0.1:15172)
 - Seeded local bootstrap:
   [http://127.0.0.1:15172/#stub_sub=cashier-1&stub_email=cashier@acme.local&stub_name=Counter%20Cashier](http://127.0.0.1:15172/#stub_sub=cashier-1&stub_email=cashier@acme.local&stub_name=Counter%20Cashier)
+- Browser shell is for local UI verification only; production operator access belongs to the packaged desktop activation flow
 
 Store Desktop native Tauri shell:
 
@@ -144,11 +147,35 @@ cd apps/store-mobile
 - a running Android emulator, or
 - a connected physical Android device with USB debugging enabled
 
+## Auth And Session Notes
+
+Web control surfaces:
+
+- `owner-web` and `platform-admin` now expect Korsenex redirect-style sign-in in normal environments
+- set `VITE_KORSENEX_AUTHORIZE_URL` to the web sign-in entry URL for the environment you are testing
+- the `#stub_*` bootstrap links above remain development-only helpers; production entry should not rely on pasted tokens or hash bootstrap
+
+Store Desktop:
+
+- packaged desktop remains device-bound
+- first-run operator access is `Activate this terminal`
+- subsequent launches are `Unlock this terminal` when local PIN posture is present
+- explicit runtime sign-out clears the live session but keeps approved-device posture so the terminal can be unlocked again instead of fully reactivated
+- revoked or expired runtime sessions now surface explicit recovery posture instead of generic bootstrap errors
+
+Store Mobile:
+
+- pairing and runtime session state now persist locally on device restart
+- `Sign out` clears the live runtime session while keeping the paired device record
+- `Unpair` clears both pairing and runtime session state
+- expired sessions fall back to a recovery posture that requires a fresh activation or explicit unpair
+
 ## Notes
 
 - The web and browser-shell dev servers proxy `/v1/*` to `http://127.0.0.1:18000` by default.
 - The `#stub_*` bootstrap values are consumed by the app on load and then removed from the browser URL.
 - For `store-desktop`, the seeded bootstrap signs in the cashier identity. Attendance and cashier opening still follow the real runtime workflow inside the app.
+- For `store-mobile`, runtime session persistence is stored locally on device for development/runtime resume. Treat emulator/device state as persistent until you explicitly sign out or uninstall the app.
 
 Production and shared development should use Korsenex `jwks` mode.
 
