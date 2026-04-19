@@ -75,6 +75,6 @@ describe('store runtime browser production posture', () => {
     expect(await screen.findByRole('heading', { name: 'Store access' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Korsenex token')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start runtime session' })).not.toBeInTheDocument();
-    expect(screen.getByText(/Browser preview does not support production sign-in/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Browser preview does not support production sign-in/i).length).toBeGreaterThan(0);
   });
 });

@@ -32,6 +32,77 @@ function resolveEntryCtaState(workspace: StoreRuntimeWorkspaceState) {
   };
 }
 
+function resolveEntrySurfaceCopy(workspace: StoreRuntimeWorkspaceState) {
+  if (workspace.requiresPinEnrollment) {
+    return {
+      eyebrow: 'Runtime security',
+      body: 'Create a 4-digit PIN so this approved terminal can resume securely after the initial activation.',
+      title: 'Protect this terminal',
+    };
+  }
+  if (workspace.requiresLocalUnlock) {
+    if (workspace.runtimeSessionStatus === 'expired') {
+      return {
+        eyebrow: 'Session recovery',
+        body: 'The previous runtime session expired. Unlock this device to fetch a fresh session or recover cached runtime access.',
+        title: 'Runtime session expired',
+      };
+    }
+    if (workspace.runtimeSessionStatus === 'revoked') {
+      return {
+        eyebrow: 'Session recovery',
+        body: 'This device session was revoked. Unlock will not recover access; a fresh owner-issued activation is required.',
+        title: 'Runtime access revoked',
+      };
+    }
+    if (workspace.runtimeSessionStatus === 'signed_out_on_device') {
+      return {
+        eyebrow: 'Signed out',
+        body: 'The live session ended on this approved terminal. Unlock with the device PIN to resume operator access.',
+        title: 'Unlock this terminal',
+      };
+    }
+    return {
+      eyebrow: 'Device unlock',
+      body: 'This packaged terminal is approved for store use. Unlock it locally before resuming branch operations.',
+      title: 'Unlock this terminal',
+    };
+  }
+  if (workspace.runtimeShellKind === 'packaged_desktop') {
+    if (workspace.runtimeSessionStatus === 'revoked') {
+      return {
+        eyebrow: 'Activation required',
+        body: 'The previous runtime grant is no longer valid on this machine. Ask the owner to issue a fresh activation code.',
+        title: 'Runtime access revoked',
+      };
+    }
+    if (workspace.runtimeSessionStatus === 'commercial_hold') {
+      return {
+        eyebrow: 'Commercial hold',
+        body: 'This tenant cannot activate new runtime sessions until billing access is restored.',
+        title: 'Activation blocked',
+      };
+    }
+    return {
+      eyebrow: 'Device activation',
+      body: 'Activate this packaged desktop once, then continue with PIN unlock and cashier session controls on future launches.',
+      title: 'Activate this terminal',
+    };
+  }
+  if (workspace.supportsDeveloperSessionBootstrap) {
+    return {
+      eyebrow: 'Developer bootstrap',
+      body: 'Local browser preview can still bootstrap a runtime session for development and UI verification.',
+      title: 'Sign in to this runtime',
+    };
+  }
+  return {
+    eyebrow: 'Browser preview',
+    body: 'Browser preview does not support production sign-in. Use the packaged desktop activation flow for operator access.',
+    title: 'Preview-only runtime',
+  };
+}
+
 export function StoreRuntimeEntrySurface(
   props: { workspace: StoreRuntimeWorkspaceState; onResumeSelling: () => void },
 ) {
@@ -45,6 +116,7 @@ export function StoreRuntimeEntrySurface(
     && !workspace.requiresLocalUnlock
     && workspace.hasLoadedLocalAuth;
   const ctaState = resolveEntryCtaState(workspace);
+  const copy = resolveEntrySurfaceCopy(workspace);
 
   return (
     <div
@@ -56,9 +128,11 @@ export function StoreRuntimeEntrySurface(
     >
       <div style={{ display: 'grid', gap: '24px' }}>
         <SectionCard eyebrow="Entry" title="Store access">
-          <p style={{ marginTop: 0, color: '#4e5871' }}>
-            Start the runtime, clock in, open the register, and resume the active counter.
+          <p style={{ marginTop: 0, marginBottom: '10px', fontSize: '12px', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#75809b' }}>
+            {copy.eyebrow}
           </p>
+          <h3 style={{ marginTop: 0, marginBottom: '10px', fontSize: '24px', color: '#172033' }}>{copy.title}</h3>
+          <p style={{ marginTop: 0, color: '#4e5871' }}>{copy.body}</p>
               <DetailList
             items={[
               { label: 'Runtime', value: workspace.runtimeShellLabel ?? 'Resolving runtime shell...' },
@@ -150,9 +224,7 @@ export function StoreRuntimeEntrySurface(
                 </ActionButton>
               </div>
             ) : (
-              <p style={{ color: '#4e5871', marginBottom: 0 }}>
-                Browser preview does not support production sign-in. Use the packaged desktop activation flow for operator access.
-              </p>
+              <p style={{ color: '#4e5871', marginBottom: 0 }}>{copy.body}</p>
             )}
           </div>
 

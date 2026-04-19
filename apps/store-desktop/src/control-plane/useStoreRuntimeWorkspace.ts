@@ -139,6 +139,48 @@ import { useStoreRuntimeCheckoutPayment } from './useStoreRuntimeCheckoutPayment
 import { useStoreRuntimeHardwareIntegration } from './useStoreRuntimeHardwareIntegration';
 import { useStoreRuntimeOfflineContinuity } from './useStoreRuntimeOfflineContinuity';
 type CacheStatus = 'EMPTY' | 'HYDRATED' | 'SYNCED';
+type StoreRuntimeSessionStatus =
+  | 'signed_out'
+  | 'restoring'
+  | 'activation_required'
+  | 'unlock_required'
+  | 'expired'
+  | 'revoked'
+  | 'commercial_hold'
+  | 'signed_out_on_device'
+  | 'ready';
+
+function resolveRuntimeSessionFailureState(error: unknown): {
+  clearLocalAuth: boolean;
+  message: string;
+  status: StoreRuntimeSessionStatus;
+} | null {
+  if (!(error instanceof ControlPlaneRequestError)) {
+    return null;
+  }
+  if (error.status === 401) {
+    return {
+      clearLocalAuth: false,
+      message: 'Runtime session expired. Sign in again.',
+      status: 'expired',
+    };
+  }
+  if (error.status === 402) {
+    return {
+      clearLocalAuth: false,
+      message: error.detail ?? 'Commercial access is suspended for this tenant. Ask the owner to update billing.',
+      status: 'commercial_hold',
+    };
+  }
+  if (error.status === 403 || error.status === 409) {
+    return {
+      clearLocalAuth: true,
+      message: 'Runtime access is no longer valid on this device. Ask the owner to issue a new activation.',
+      status: 'revoked',
+    };
+  }
+  return null;
+}
 
 export function useStoreRuntimeWorkspace() {
   const {
@@ -153,6 +195,7 @@ export function useStoreRuntimeWorkspace() {
   const [korsenexToken, setKorsenexToken] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  const [runtimeSessionStatus, setRuntimeSessionStatus] = useState<StoreRuntimeSessionStatus>('restoring');
   const [hasLoadedLocalAuth, setHasLoadedLocalAuth] = useState(false);
   const [localAuthRecord, setLocalAuthRecord] = useState<StoreRuntimeLocalAuthRecord | null>(null);
   const [hubIdentityRecord, setHubIdentityRecord] = useState<StoreRuntimeHubIdentityRecord | null>(null);
@@ -558,6 +601,7 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
       setIsLocalUnlocked(false);
       setAccessToken('');
       setSessionExpiresAt(null);
+      setRuntimeSessionStatus('signed_out');
       setActor(null);
       setTenant(null);
       setBranches([]);
@@ -1149,6 +1193,7 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
     applyStateTransition(() => {
       setAccessToken(nextSession.access_token);
       setSessionExpiresAt(nextSession.expires_at);
+      setRuntimeSessionStatus('ready');
       setActor(nextActor);
       setTenant(tenantSummary);
       setBranches(branchList.records);
@@ -1325,25 +1370,37 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
       }
       if (restorePolicy === 'CLEAR_STALE_PACKAGED_SESSION') {
         await clearStoreRuntimeSession();
+        if (!isCancelled) {
+          setRuntimeSessionStatus('revoked');
+          setErrorMessage('Stored runtime session is no longer valid on this packaged desktop. Activate this device again.');
+        }
         return;
       }
       if (isStoreRuntimeSessionExpired(persistedSession)) {
         await clearStoreRuntimeSession();
         if (!isCancelled) {
           resetRuntimeWorkspaceState();
+          setRuntimeSessionStatus('expired');
           setErrorMessage('Stored runtime session expired. Sign in again.');
         }
         return;
       }
       setIsBusy(true);
       setErrorMessage('');
+      setRuntimeSessionStatus('restoring');
       try {
         await bootstrapRuntimeSession(persistedSession);
       } catch (error) {
         await clearStoreRuntimeSession();
         if (!isCancelled) {
           resetRuntimeWorkspaceState();
-          setErrorMessage(error instanceof Error ? error.message : 'Stored runtime session could not be restored');
+          const failure = resolveRuntimeSessionFailureState(error);
+          if (failure?.clearLocalAuth) {
+            await clearStoreRuntimeLocalAuth();
+            setLocalAuthRecord(null);
+          }
+          setRuntimeSessionStatus(failure?.status ?? 'signed_out');
+          setErrorMessage(failure?.message ?? (error instanceof Error ? error.message : 'Stored runtime session could not be restored'));
         }
       } finally {
         if (!isCancelled) {
@@ -1356,6 +1413,56 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
       isCancelled = true;
     };
   }, [hasLoadedLocalAuth, localAuthRecord, runtimeShellStatus?.runtime_kind]);
+
+  useEffect(() => {
+    if (isSessionLive) {
+      if (runtimeSessionStatus !== 'ready') {
+        setRuntimeSessionStatus('ready');
+      }
+      return;
+    }
+    if (!hasLoadedLocalAuth) {
+      if (runtimeSessionStatus !== 'restoring') {
+        setRuntimeSessionStatus('restoring');
+      }
+      return;
+    }
+    if (requiresPinEnrollment || requiresLocalUnlock) {
+      if (!['expired', 'revoked', 'commercial_hold', 'signed_out_on_device'].includes(runtimeSessionStatus)) {
+        setRuntimeSessionStatus('unlock_required');
+      }
+      return;
+    }
+    if (runtimeShellStatus?.runtime_kind === 'packaged_desktop') {
+      if (!['expired', 'revoked', 'commercial_hold'].includes(runtimeSessionStatus)) {
+        setRuntimeSessionStatus('activation_required');
+      }
+      return;
+    }
+    if (runtimeSessionStatus === 'restoring' || runtimeSessionStatus === 'ready') {
+      setRuntimeSessionStatus('signed_out');
+    }
+  }, [
+    hasLoadedLocalAuth,
+    isSessionLive,
+    requiresLocalUnlock,
+    requiresPinEnrollment,
+    runtimeSessionStatus,
+    runtimeShellStatus?.runtime_kind,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isSessionLive || !sessionExpiresAt) {
+      return;
+    }
+    const refreshDelayMs = Math.max(Date.parse(sessionExpiresAt) - Date.now() - 120_000, 1_000);
+    const timer = window.setTimeout(() => {
+      void refreshRuntimeSession();
+    }, refreshDelayMs);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isSessionLive, sessionExpiresAt]);
 
   useEffect(() => {
     const hasRuntimeState =
@@ -1455,16 +1562,19 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
 
   async function startSession() {
     if (!supportsDeveloperSessionBootstrap) {
+      setRuntimeSessionStatus('signed_out');
       setErrorMessage('Browser preview does not support manual session bootstrap. Use the approved packaged desktop activation flow.');
       return;
     }
     setIsBusy(true);
     setErrorMessage('');
+    setRuntimeSessionStatus('restoring');
     try {
       const session = await storeControlPlaneClient.exchangeSession(korsenexToken);
       await bootstrapRuntimeSession(session);
       await saveStoreRuntimeSession({ access_token: session.access_token, expires_at: session.expires_at });
     } catch (error) {
+      setRuntimeSessionStatus('signed_out');
       setErrorMessage(error instanceof Error ? error.message : 'Unable to start runtime session');
     } finally {
       setIsBusy(false);
@@ -1490,6 +1600,7 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
       });
     } catch (error) {
       if (error instanceof ControlPlaneRequestError && error.status === 402) {
+        setRuntimeSessionStatus('commercial_hold');
         setErrorMessage(error.detail ?? 'Commercial access is suspended for this tenant. Ask the owner to update billing.');
       } else {
         setErrorMessage(error instanceof Error ? error.message : 'Unable to activate desktop access');
@@ -1515,6 +1626,7 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
     }
     setIsBusy(true);
     setErrorMessage('');
+    setRuntimeSessionStatus('restoring');
     try {
       const pinSalt = createStoreRuntimePinSalt();
       const pinHash = await hashStoreRuntimePin(normalizedNewPin, pinSalt);
@@ -1547,6 +1659,7 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
       setConfirmPin('');
       await bootstrapRuntimeSession(pendingPinEnrollmentSession);
     } catch (error) {
+      setRuntimeSessionStatus('activation_required');
       setErrorMessage(error instanceof Error ? error.message : 'Unable to save runtime PIN');
       return;
     } finally {
@@ -1568,12 +1681,14 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
     }
     setIsBusy(true);
     setErrorMessage('');
+    setRuntimeSessionStatus('restoring');
     try {
       const pinMatches = await verifyStoreRuntimePin(unlockPin, localAuthRecord);
       if (!pinMatches) {
         const failedLocalAuth = recordFailedStoreRuntimePinAttempt(localAuthRecord);
         await saveStoreRuntimeLocalAuth(failedLocalAuth);
         setLocalAuthRecord(failedLocalAuth);
+        setRuntimeSessionStatus('unlock_required');
         setErrorMessage(
           failedLocalAuth.locked_until
             ? 'Runtime PIN is temporarily locked due to repeated failures.'
@@ -1625,6 +1740,7 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
         if (error instanceof ControlPlaneRequestError && error.status === 402) {
           await clearStoreRuntimeSession();
           resetRuntimeWorkspaceState();
+          setRuntimeSessionStatus('commercial_hold');
           setErrorMessage(error.detail ?? 'Commercial access is suspended for this tenant. Ask the owner to update billing.');
           return;
         }
@@ -1633,6 +1749,7 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
           await clearStoreRuntimeLocalAuth();
           setLocalAuthRecord(null);
           resetRuntimeWorkspaceState();
+          setRuntimeSessionStatus('revoked');
           setErrorMessage('Runtime unlock is no longer valid. Ask the owner to issue a new activation.');
           return;
         }
@@ -1647,13 +1764,16 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
           if (cachedSnapshot) {
             applyCachedRuntimeSnapshot(cachedSnapshot);
           }
+          setRuntimeSessionStatus('ready');
           setErrorMessage('Control plane unavailable. Cached runtime unlocked locally.');
           return;
         }
+        setRuntimeSessionStatus('expired');
         setErrorMessage('Offline runtime unlock expired. Reconnect to the control plane to continue.');
         return;
       }
     } catch (error) {
+      setRuntimeSessionStatus('unlock_required');
       setErrorMessage(error instanceof Error ? error.message : 'Unable to unlock runtime');
     } finally {
       setIsBusy(false);
@@ -1667,20 +1787,24 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
     }
     setIsBusy(true);
     setErrorMessage('');
+    setRuntimeSessionStatus('restoring');
     try {
       const session = await storeControlPlaneClient.refreshSession(currentAccessToken);
       await bootstrapRuntimeSession(session);
       await saveStoreRuntimeSession({ access_token: session.access_token, expires_at: session.expires_at });
     } catch (error) {
-      if (error instanceof ControlPlaneRequestError && error.status === 401) {
+      const failure = resolveRuntimeSessionFailureState(error);
+      if (failure) {
         await clearStoreRuntimeSession();
+        if (failure.clearLocalAuth) {
+          await clearStoreRuntimeLocalAuth();
+          setLocalAuthRecord(null);
+        }
         resetRuntimeWorkspaceState();
-        setErrorMessage('Runtime session expired. Sign in again.');
-      } else if (error instanceof ControlPlaneRequestError && error.status === 402) {
-        await clearStoreRuntimeSession();
-        resetRuntimeWorkspaceState();
-        setErrorMessage(error.detail ?? 'Commercial access is suspended for this tenant. Ask the owner to update billing.');
+        setRuntimeSessionStatus(failure.status);
+        setErrorMessage(failure.message);
       } else {
+        setRuntimeSessionStatus('signed_out');
         setErrorMessage(error instanceof Error ? error.message : 'Unable to refresh runtime session');
       }
     } finally {
@@ -1699,7 +1823,10 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
       await clearStoreRuntimeSession();
       resetRuntimeWorkspaceState();
       if (localAuthRecord) {
+        setRuntimeSessionStatus('signed_out_on_device');
         setErrorMessage('Runtime session signed out. Unlock with PIN to continue on this device.');
+      } else {
+        setRuntimeSessionStatus('signed_out');
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to sign out of the runtime session');
@@ -2927,6 +3054,7 @@ const runtimeHardware = useStoreRuntimeHardwareIntegration({
     saleSerialNumbers,
     sales,
     sessionExpiresAt,
+    runtimeSessionStatus,
     promotionCode,
     selectedRuntimeDeviceId,
     selectedStockCountProductId,

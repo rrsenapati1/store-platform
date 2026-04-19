@@ -83,6 +83,7 @@ function buildWorkspace(overrides: Partial<StoreRuntimeWorkspaceState> = {}): St
     runtimeShellKind: 'browser_web',
     runtimeHostname: 'localhost',
     sessionExpiresAt: null,
+    runtimeSessionStatus: 'signed_out',
     hasLoadedLocalAuth: true,
     requiresPinEnrollment: false,
     requiresLocalUnlock: false,
@@ -160,6 +161,44 @@ describe('StoreRuntimeEntrySurface', () => {
     expect(screen.getByRole('heading', { name: 'Store access' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start runtime session' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Resume selling' })).toBeDisabled();
+  });
+
+  test('renders expired packaged-desktop recovery copy when a stored session has lapsed', () => {
+    render(
+      <StoreRuntimeEntrySurface
+        workspace={buildWorkspace({
+          runtimeShellKind: 'packaged_desktop',
+          supportsDeveloperSessionBootstrap: false,
+          runtimeSessionStatus: 'expired',
+          requiresLocalUnlock: true,
+          errorMessage: 'Stored runtime session expired. Sign in again.',
+        })}
+        onResumeSelling={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Runtime session expired' })).toBeInTheDocument();
+    expect(screen.getByText(/Unlock this device to fetch a fresh session/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unlock runtime' })).toBeInTheDocument();
+  });
+
+  test('renders revoked packaged-desktop activation copy after device access is invalidated', () => {
+    render(
+      <StoreRuntimeEntrySurface
+        workspace={buildWorkspace({
+          runtimeShellKind: 'packaged_desktop',
+          supportsDeveloperSessionBootstrap: false,
+          runtimeSessionStatus: 'revoked',
+          requiresLocalUnlock: false,
+          hasLoadedLocalAuth: true,
+        })}
+        onResumeSelling={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Runtime access revoked' })).toBeInTheDocument();
+    expect(screen.getByText(/Ask the owner to issue a fresh activation code/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Activate desktop access' })).toBeInTheDocument();
   });
 
   test('requires attendance before register open when the branch runtime policy enforces it', () => {

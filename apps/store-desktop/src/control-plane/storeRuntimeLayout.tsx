@@ -19,6 +19,30 @@ function resolveSessionTone(isReady: boolean): 'success' | 'warning' {
   return isReady ? 'success' : 'warning';
 }
 
+function resolveSessionLabel(workspace: StoreRuntimeWorkspaceState, runtimeReady: boolean) {
+  if (runtimeReady) {
+    return 'Live';
+  }
+  switch (workspace.runtimeSessionStatus) {
+    case 'unlock_required':
+      return 'Unlock required';
+    case 'activation_required':
+      return 'Activation required';
+    case 'expired':
+      return 'Expired';
+    case 'revoked':
+      return 'Revoked';
+    case 'commercial_hold':
+      return 'Commercial hold';
+    case 'signed_out_on_device':
+      return 'Signed out';
+    case 'restoring':
+      return 'Restoring';
+    default:
+      return 'Idle';
+  }
+}
+
 export function StoreRuntimeLayout(props: {
   workspace: StoreRuntimeWorkspaceState;
   activeScreen: StoreRuntimeScreenId;
@@ -92,11 +116,19 @@ export function StoreRuntimeLayout(props: {
           detail={`${actorName} :: ${branchName}`}
           actions={(
             <>
-              <StatusBadge label={props.runtimeReady ? 'Live' : 'Idle'} tone={resolveSessionTone(props.runtimeReady)} />
+              <StatusBadge
+                label={resolveSessionLabel(props.workspace, props.runtimeReady)}
+                tone={resolveSessionTone(props.runtimeReady)}
+              />
               <StoreThemeModeToggle />
               {props.workspace.isSessionLive ? (
                 <ActionButton onClick={() => void props.workspace.refreshRuntimeSession()} disabled={props.workspace.isBusy}>
                   Refresh
+                </ActionButton>
+              ) : null}
+              {props.workspace.isSessionLive ? (
+                <ActionButton onClick={() => void props.workspace.signOut()} disabled={props.workspace.isBusy}>
+                  Sign out
                 </ActionButton>
               ) : null}
             </>
