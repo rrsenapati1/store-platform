@@ -6,14 +6,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.store.mobile.ui.operations.MobileOperationsContent
-import com.store.mobile.ui.operations.MobileOperationsSection
 import com.store.mobile.ui.operations.ExpiryScreenActions
 import com.store.mobile.ui.operations.ExpiryUiState
 import com.store.mobile.ui.operations.ReceivingScreenActions
@@ -28,8 +27,9 @@ import com.store.mobile.ui.scan.ScanLookupUiState
 
 @Composable
 fun InventoryTabletShell(
-    activeSection: MobileOperationsSection,
-    onSelectSection: (MobileOperationsSection) -> Unit,
+    activeDestination: InventoryTabletDestination,
+    onSelectDestination: (InventoryTabletDestination) -> Unit,
+    overviewModel: InventoryTabletOverviewModel,
     scanLookupState: ScanLookupUiState,
     onDraftBarcodeChange: (String) -> Unit,
     onLookupBarcode: () -> Unit,
@@ -55,55 +55,63 @@ fun InventoryTabletShell(
             .padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Column(
-            modifier = Modifier.weight(0.32f),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(text = "Inventory tablet", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                text = "Backroom-first runtime for receiving, stock counts, expiry review, and branch posture.",
-                style = MaterialTheme.typography.bodyMedium,
+        Column(modifier = Modifier.weight(0.29f)) {
+            InventoryTabletSectionRail(
+                activeDestination = activeDestination,
+                onSelectDestination = onSelectDestination,
             )
-            listOf(
-                MobileOperationsSection.RECEIVING,
-                MobileOperationsSection.STOCK_COUNT,
-                MobileOperationsSection.EXPIRY,
-                MobileOperationsSection.SCAN,
-                MobileOperationsSection.RESTOCK,
-                MobileOperationsSection.RUNTIME,
-            ).forEach { section ->
-                Button(
-                    onClick = { onSelectSection(section) },
-                    enabled = section != activeSection,
-                    modifier = Modifier.fillMaxWidth(),
+        }
+        Column(
+            modifier = Modifier.weight(0.71f),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                tonalElevation = 2.dp,
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Text(text = mobileOperationsSectionLabel(section))
+                    Text(text = "Backroom operations", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        text = overviewModel.runtimeBanner,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
-        }
-        Column(modifier = Modifier.weight(0.68f)) {
-            MobileOperationsContent(
-                activeSection = activeSection,
-                scanLookupState = scanLookupState,
-                isTabletLayout = true,
-                onDraftBarcodeChange = onDraftBarcodeChange,
-                onLookupBarcode = onLookupBarcode,
-                onConfigureZebraDataWedge = onConfigureZebraDataWedge,
-                onCameraPermissionResolved = onCameraPermissionResolved,
-                onCameraPreviewFailure = onCameraPreviewFailure,
-                onCameraBarcodeDetected = onCameraBarcodeDetected,
-                receivingState = receivingState,
-                receivingActions = receivingActions,
-                stockCountState = stockCountState,
-                stockCountActions = stockCountActions,
-                restockState = restockState,
-                restockActions = restockActions,
-                expiryState = expiryState,
-                expiryActions = expiryActions,
-                runtimeStatusState = runtimeStatusState,
-                onSignOut = onSignOut,
-                onUnpair = onUnpair,
-            )
+            if (activeDestination == InventoryTabletDestination.OVERVIEW) {
+                InventoryTabletOverviewScreen(
+                    model = overviewModel,
+                    onSelectDestination = onSelectDestination,
+                )
+            } else {
+                MobileOperationsContent(
+                    activeSection = requireNotNull(activeDestination.operationsSection),
+                    scanLookupState = scanLookupState,
+                    isTabletLayout = true,
+                    onDraftBarcodeChange = onDraftBarcodeChange,
+                    onLookupBarcode = onLookupBarcode,
+                    onConfigureZebraDataWedge = onConfigureZebraDataWedge,
+                    onCameraPermissionResolved = onCameraPermissionResolved,
+                    onCameraPreviewFailure = onCameraPreviewFailure,
+                    onCameraBarcodeDetected = onCameraBarcodeDetected,
+                    receivingState = receivingState,
+                    receivingActions = receivingActions,
+                    stockCountState = stockCountState,
+                    stockCountActions = stockCountActions,
+                    restockState = restockState,
+                    restockActions = restockActions,
+                    expiryState = expiryState,
+                    expiryActions = expiryActions,
+                    runtimeStatusState = runtimeStatusState,
+                    onSignOut = onSignOut,
+                    onUnpair = onUnpair,
+                )
+            }
         }
     }
 }

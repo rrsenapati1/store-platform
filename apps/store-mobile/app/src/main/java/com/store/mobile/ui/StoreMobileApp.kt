@@ -62,7 +62,10 @@ import com.store.mobile.ui.pairing.PairingSessionStatus
 import com.store.mobile.ui.pairing.PairingViewModel
 import com.store.mobile.ui.runtime.buildRuntimeStatusState
 import com.store.mobile.ui.scan.ScanLookupViewModel
+import com.store.mobile.ui.tablet.InventoryTabletDestination
 import com.store.mobile.ui.tablet.InventoryTabletShell
+import com.store.mobile.ui.tablet.buildInventoryTabletOverviewModel
+import com.store.mobile.ui.tablet.defaultInventoryTabletDestination
 import com.store.mobile.ui.theme.StoreMobileTheme
 
 private const val STORE_MOBILE_RUNTIME_PREFERENCES = "store.mobile.runtime"
@@ -248,7 +251,7 @@ fun StoreMobileApp() {
     var restockState by remember { mutableStateOf(restockViewModel.state) }
     var expiryState by remember { mutableStateOf(expiryViewModel.state) }
     var handheldSection by remember { mutableStateOf(MobileOperationsSection.SCAN) }
-    var tabletSection by remember { mutableStateOf(MobileOperationsSection.RECEIVING) }
+    var tabletDestination by remember { mutableStateOf(defaultInventoryTabletDestination()) }
     val receivingActions = remember(receivingViewModel) {
         ReceivingScreenActions(
             onLineReceivedQuantityChange = { productId, value ->
@@ -386,18 +389,18 @@ fun StoreMobileApp() {
         )
     }
 
-    DisposableEffect(application, pairingState.pairedDevice?.deviceId, handheldSection, tabletSection) {
+    DisposableEffect(application, pairingState.pairedDevice?.deviceId, handheldSection, tabletDestination) {
         val mobileApp = application
         if (mobileApp == null || pairingState.pairedDevice == null) {
             onDispose { }
         } else {
             val removeListener = mobileApp.addExternalBarcodeListener { barcode ->
                 val shellMode = resolveStoreMobileShellMode(pairingState.pairedDevice?.runtimeProfile)
-                val isScanSectionActive = if (shellMode == StoreMobileShellMode.TABLET) {
-                    tabletSection == MobileOperationsSection.SCAN
-                } else {
-                    handheldSection == MobileOperationsSection.SCAN
-                }
+                val isScanSectionActive = isStoreMobileScanSectionActive(
+                    shellMode = shellMode,
+                    handheldSection = handheldSection,
+                    tabletDestination = tabletDestination,
+                )
                 when (barcode) {
                     is ExternalScannerEvent.BarcodeDetected -> {
                         if (!isScanSectionActive) {
@@ -553,11 +556,19 @@ fun StoreMobileApp() {
                         zebraDataWedgeStatus = scanLookupState.zebraDataWedgeStatus,
                         zebraDataWedgeMessage = scanLookupState.zebraDataWedgeMessage,
                     )
+                    val tabletOverviewModel = buildInventoryTabletOverviewModel(
+                        receivingState = receivingState,
+                        stockCountState = stockCountState,
+                        restockState = restockState,
+                        expiryState = expiryState,
+                        runtimeStatusState = runtimeStatusState,
+                    )
 
                     if (shellMode == StoreMobileShellMode.TABLET) {
                         InventoryTabletShell(
-                            activeSection = tabletSection,
-                            onSelectSection = { section -> tabletSection = section },
+                            activeDestination = tabletDestination,
+                            onSelectDestination = { destination -> tabletDestination = destination },
+                            overviewModel = tabletOverviewModel,
                             scanLookupState = scanLookupState,
                             onDraftBarcodeChange = { barcode ->
                                 scanLookupViewModel.updateDraftBarcode(barcode)

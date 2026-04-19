@@ -1397,3 +1397,9 @@
   - `npm run test`
   - `npm run typecheck`
   - `npm run build`
+- Completed inventory tablet productization on top of the new mobile runtime foundation:
+  - replaced the old tablet section-button shell with an overview-first backroom workspace
+  - added pure tablet destination and overview models so receiving/count/restock/expiry/runtime posture derives from existing state instead of hard-coded tiles
+  - moved the tablet runtime onto a modern branch-operations shell with explicit overview, drill-down navigation, and scan/runtime utility sections
+  - kept handheld scan-first behavior intact while giving tablet its own product identity
+  - reduced the deferred public-release productization backlog to secure-storage hardening, final mobile state polish, and the final cross-app visual parity pass
