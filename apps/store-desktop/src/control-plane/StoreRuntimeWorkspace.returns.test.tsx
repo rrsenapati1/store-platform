@@ -296,9 +296,7 @@ describe('store runtime sale return flow', () => {
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Entry' })).toHaveAttribute('aria-current', 'page');
-    });
+    await screen.findByRole('heading', { name: 'Store access' });
     fireEvent.click(await screen.findByRole('button', { name: 'Clock in' }));
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
     await waitFor(() => {
@@ -318,7 +316,7 @@ describe('store runtime sale return flow', () => {
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
-    await screen.findByRole('heading', { name: 'Returns and exchanges' });
+    await screen.findByLabelText('Return quantity');
 
     fireEvent.change(screen.getByLabelText('Return quantity'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '97.12' } });
@@ -652,9 +650,7 @@ describe('store runtime sale return flow', () => {
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Entry' }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Entry' })).toHaveAttribute('aria-current', 'page');
-    });
+    await screen.findByRole('heading', { name: 'Store access' });
     fireEvent.click(await screen.findByRole('button', { name: 'Clock in' }));
     fireEvent.change(screen.getByLabelText('Opening float amount'), { target: { value: '150' } });
     await waitFor(() => {
@@ -676,7 +672,6 @@ describe('store runtime sale return flow', () => {
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0003')).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
-    await screen.findByRole('heading', { name: 'Returns and exchanges' });
     await screen.findByLabelText('Return quantity');
 
     fireEvent.change(screen.getByLabelText('Return quantity'), { target: { value: '1' } });

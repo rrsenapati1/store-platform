@@ -149,8 +149,9 @@ describe('store runtime barcode lookup flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
+    await screen.findByLabelText('Customer name');
     fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
-    await screen.findByRole('heading', { name: 'Operations desk' });
+    await screen.findByLabelText('Scanned barcode');
 
     fireEvent.change(screen.getByLabelText('Scanned barcode'), {
       target: { value: '  ACMETEACLASSIC  ' },

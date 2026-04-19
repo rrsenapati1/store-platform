@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { consumeLocalDevBootstrapFromWindow } from '@store/auth';
-import { ActionButton, AppShell, DetailList, FormField, MetricGrid, SectionCard, StatusBadge } from '@store/ui';
+import { ActionButton, AppShell, DetailList, FormField, MetricGrid, SectionCard, StatusBadge, StoreThemeModeToggle } from '@store/ui';
 import type { WorkspaceMetric } from '@store/types';
 import { usePlatformAdminWorkspace } from './usePlatformAdminWorkspace';
 
@@ -47,6 +47,7 @@ export function PlatformAdminWorkspace() {
       kicker="Platform super admin"
       title="Platform Onboarding Control Plane"
       subtitle="Tenant creation, owner binding, and Milestone 1 onboarding state for the enterprise control-plane reset."
+      actions={<StoreThemeModeToggle />}
     >
       <MetricGrid metrics={metrics} />
 

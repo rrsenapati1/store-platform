@@ -264,9 +264,10 @@ describe('store runtime outbox continuity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    await screen.findByLabelText('Customer name');
     fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
-    await screen.findByRole('heading', { name: 'Operations desk' });
-    expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Send device heartbeat' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('device-1')).toBeInTheDocument();
 
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     fireEvent.click(screen.getByRole('button', { name: 'Send device heartbeat' }));
@@ -507,8 +508,8 @@ describe('store runtime outbox continuity', () => {
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
-    await screen.findByRole('heading', { name: 'Operations desk' });
-    expect(await screen.findByDisplayValue('device-1')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Queue latest invoice print' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('device-1')).toBeInTheDocument();
 
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     fireEvent.click(screen.getByRole('button', { name: 'Queue latest invoice print' }));

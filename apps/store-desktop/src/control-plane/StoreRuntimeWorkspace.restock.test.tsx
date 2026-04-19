@@ -273,7 +273,7 @@ describe('store runtime assisted restock flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start runtime session' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Operations' }));
-    await screen.findByRole('heading', { name: 'Operations desk' });
+    await screen.findByRole('button', { name: 'Refresh restock board' });
 
     fireEvent.change(screen.getByLabelText('Scanned barcode'), {
       target: { value: 'ACMETEACLASSIC' },
@@ -328,7 +328,7 @@ describe('store runtime assisted restock flow', () => {
 
     expect(await screen.findByText('Counter Cashier')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
-    await screen.findByRole('heading', { name: 'Operations desk' });
+    await screen.findByRole('button', { name: 'Refresh restock board' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh restock board' }));
 

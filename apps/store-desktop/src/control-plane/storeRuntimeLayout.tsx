@@ -4,6 +4,7 @@ import {
   RuntimeShellNavRail,
   RuntimeShellStatusStrip,
   StatusBadge,
+  StoreThemeModeToggle,
 } from '@store/ui';
 import type { ReactNode } from 'react';
 import { StoreRuntimeEntrySurface } from './storeRuntimeEntrySurface';
@@ -92,6 +93,7 @@ export function StoreRuntimeLayout(props: {
           actions={(
             <>
               <StatusBadge label={props.runtimeReady ? 'Live' : 'Idle'} tone={resolveSessionTone(props.runtimeReady)} />
+              <StoreThemeModeToggle />
               {props.workspace.isSessionLive ? (
                 <ActionButton onClick={() => void props.workspace.refreshRuntimeSession()} disabled={props.workspace.isBusy}>
                   Refresh

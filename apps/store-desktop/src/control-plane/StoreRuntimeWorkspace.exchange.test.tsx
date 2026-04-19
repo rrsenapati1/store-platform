@@ -367,7 +367,6 @@ describe('store runtime exchange flow', () => {
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
-    await screen.findByRole('heading', { name: 'Returns and exchanges' });
     await screen.findByLabelText('Exchange return quantity');
 
     fireEvent.change(screen.getByLabelText('Exchange return quantity'), { target: { value: '1' } });

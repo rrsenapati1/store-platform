@@ -650,8 +650,8 @@ describe('store runtime offline continuity flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Unlock runtime' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    await screen.findByLabelText('Customer name');
     fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
-    await screen.findByText('Returns and exchanges');
     const replayButton = await screen.findByRole('button', { name: 'Replay offline sales' });
 
     fireEvent.click(replayButton);
@@ -693,8 +693,8 @@ describe('store runtime offline continuity flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Unlock runtime' }));
 
     expect((await screen.findAllByText('Counter Cashier')).length).toBeGreaterThan(0);
+    await screen.findByLabelText('Customer name');
     fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
-    await screen.findByText('Returns and exchanges');
-    expect(await screen.findByText('Offline sales are disabled by branch policy. Replay remains available for any already-recorded pending offline sales.')).toBeInTheDocument();
+    expect(await screen.findByText(/Offline sales are disabled by branch policy/i)).toBeInTheDocument();
   });
 });

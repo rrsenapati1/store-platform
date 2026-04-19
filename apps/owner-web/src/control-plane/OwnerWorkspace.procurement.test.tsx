@@ -300,7 +300,7 @@ describe('owner procurement foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
     expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
-    expect(await screen.findByText('Classic Tea (tea-classic-250g) :: MRP 120 :: TEA :: STANDARD')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
 
     fireEvent.change(screen.getByLabelText('Supplier name'), { target: { value: 'Acme Tea Traders' } });
     fireEvent.change(screen.getByLabelText('Supplier GSTIN'), { target: { value: '29AAEPM0111C1Z3' } });

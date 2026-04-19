@@ -340,6 +340,7 @@ describe('owner batch expiry flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
     expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
 
     fireEvent.change(screen.getByLabelText('Lot A batch number'), { target: { value: 'BATCH-A' } });
     fireEvent.change(screen.getByLabelText('Lot A quantity'), { target: { value: '6' } });

@@ -335,6 +335,7 @@ describe('owner restock workflow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
     expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Catalog' }));
 
     fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Classic Tea' } });
     fireEvent.change(screen.getByLabelText('SKU code'), { target: { value: 'tea-classic-250g' } });
@@ -352,6 +353,8 @@ describe('owner restock workflow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Assign first product to branch' }));
 
     await screen.findByText('Latest branch catalog item');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
 
     fireEvent.change(screen.getByLabelText('Reorder point'), { target: { value: '10' } });
     fireEvent.change(screen.getByLabelText('Target stock'), { target: { value: '24' } });

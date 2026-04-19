@@ -192,11 +192,12 @@ export function useOwnerWorkspace() {
   const [latestTenantMembership, setLatestTenantMembership] = useState<ControlPlaneMembership | null>(null);
   const [latestBranchMembership, setLatestBranchMembership] = useState<ControlPlaneMembership | null>(null);
   const [latestDevice, setLatestDevice] = useState<ControlPlaneDeviceRegistration | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
 
   const tenantId = actor?.tenant_memberships[0]?.tenant_id ?? '';
-  const branchId = branches[0]?.branch_id ?? '';
+  const branchId = (selectedBranchId || branches[0]?.branch_id) ?? '';
 
   useEffect(() => {
     if (!latestPurchaseOrder) {
@@ -207,6 +208,19 @@ export function useOwnerWorkspace() {
     setGoodsReceiptNote('');
     setReceivingLineDrafts(buildReceivingLineDrafts(latestPurchaseOrder));
   }, [latestPurchaseOrder?.id]);
+
+  useEffect(() => {
+    if (branches.length === 0) {
+      if (selectedBranchId) {
+        setSelectedBranchId('');
+      }
+      return;
+    }
+    const branchStillAvailable = branches.some((branch) => branch.branch_id === selectedBranchId);
+    if (!selectedBranchId || !branchStillAvailable) {
+      setSelectedBranchId(branches[0]?.branch_id ?? '');
+    }
+  }, [branches, selectedBranchId]);
 
   function setReceivingLineQuantity(productId: string, value: string) {
     setReceivingLineDrafts((current) =>
@@ -1157,6 +1171,7 @@ export function useOwnerWorkspace() {
     branchGstin,
     branchId,
     branchName,
+    selectedBranchId,
     catalogProducts,
     decisionNote,
     deviceCode,
@@ -1242,6 +1257,7 @@ export function useOwnerWorkspace() {
     setDeviceName,
     setBranchCatalogPriceOverride,
     setBranchPriceTierSellingPrice,
+    setSelectedBranchId,
     setDecisionNote,
     setCountedQuantity,
     setCountNote,

@@ -330,7 +330,7 @@ describe('store runtime print queue flow', () => {
 
     expect((await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
-    await screen.findByRole('heading', { name: 'Operations desk' });
+    await screen.findByRole('button', { name: 'Queue latest invoice print' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Queue latest invoice print' }));
 

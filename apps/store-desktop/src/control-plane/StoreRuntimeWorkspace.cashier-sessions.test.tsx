@@ -440,7 +440,6 @@ describe('store runtime cashier session governance', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create sales invoice' }));
     expect(await screen.findAllByText('SINV-BLRFLAGSHIP-0001')).not.toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Returns' }));
-    await screen.findByRole('heading', { name: 'Returns and exchanges' });
     await screen.findByLabelText('Return quantity');
 
     fireEvent.change(screen.getByLabelText('Return quantity'), { target: { value: '1' } });

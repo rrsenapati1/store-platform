@@ -287,13 +287,19 @@ describe('owner onboarding flow', () => {
     expect((await screen.findAllByText('Acme Retail')).length).toBeGreaterThan(0);
     expect(await screen.findByText('owner_invite.accepted')).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await screen.findByLabelText('Branch name');
+
     fireEvent.change(screen.getByLabelText('Branch name'), { target: { value: 'Bengaluru Flagship' } });
     fireEvent.change(screen.getByLabelText('Branch code'), { target: { value: 'blr-flagship' } });
     fireEvent.change(screen.getByLabelText('Branch GSTIN'), { target: { value: '29ABCDE1234F1Z5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create first branch' }));
 
-    expect(await screen.findByText('Bengaluru Flagship')).toBeInTheDocument();
+    expect((await screen.findAllByText('Bengaluru Flagship')).length).toBeGreaterThan(0);
     expect((await screen.findAllByText('BRANCH_READY')).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Workforce' }));
+    await screen.findByLabelText('Staff profile email');
 
     fireEvent.change(screen.getByLabelText('Staff profile email'), { target: { value: 'cashier@acme.local' } });
     fireEvent.change(screen.getByLabelText('Staff profile full name'), { target: { value: 'Cash Counter One' } });
@@ -328,9 +334,14 @@ describe('owner onboarding flow', () => {
       expect(screen.getByText('Counter Desktop 1 -> Cash Counter One')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Catalog barcode operations')).toBeInTheDocument();
-    expect(screen.getByText('Batch expiry and lot control')).toBeInTheDocument();
-    expect(screen.getByText('IRP submission queue')).toBeInTheDocument();
-    expect(screen.getByText('Customer insights')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Catalog' }));
+    expect(await screen.findByText('Catalog barcode operations')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    expect(await screen.findByText('Batch expiry and lot control')).toBeInTheDocument();
+    expect(await screen.findByText('IRP submission queue')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commercial' }));
+    expect(await screen.findByText('Customer insights')).toBeInTheDocument();
   });
 });

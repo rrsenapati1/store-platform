@@ -5,6 +5,12 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   ActionButton,
   AppShell,
+  OwnerCommandHeader,
+  OwnerCommandShell,
+  OwnerExceptionBoard,
+  OwnerNavRail,
+  OwnerPanel,
+  OwnerSignalRow,
   CommerceLineItem,
   CommerceSheet,
   CommerceSummaryRow,
@@ -12,6 +18,8 @@ import {
   DetailList,
   FormField,
   MetricGrid,
+  StoreThemeModeToggle,
+  StoreThemeProvider,
   RuntimeShell,
   RuntimeShellNavRail,
   RuntimeShellStatusStrip,
@@ -86,5 +94,44 @@ describe('shared ui primitives', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close checkout' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('renders theme and owner shell primitives from the package barrel', () => {
+    render(
+      <StoreThemeProvider storageKey="ui.index.test.theme">
+        <OwnerCommandShell
+          navRail={
+            <OwnerNavRail
+              title="Acme Retail"
+              items={[
+                { id: 'overview', label: 'Overview' },
+                { id: 'commercial', label: 'Commercial' },
+              ]}
+              activeItemId="overview"
+              onSelect={() => undefined}
+            />
+          }
+          commandHeader={
+            <OwnerCommandHeader
+              title="Overview"
+              branchOptions={[{ value: 'all', label: 'All branches' }]}
+              selectedBranch="all"
+              onBranchChange={() => undefined}
+              actions={<StoreThemeModeToggle />}
+            />
+          }
+        >
+          <OwnerSignalRow items={[{ label: 'Branches', value: '1' }]} />
+          <OwnerPanel title="Exceptions">
+            <OwnerExceptionBoard items={[{ id: '1', title: 'Low stock', detail: 'Classic Tea' }]} />
+          </OwnerPanel>
+        </OwnerCommandShell>
+      </StoreThemeProvider>,
+    );
+
+    expect(screen.getAllByText('Acme Retail')).toHaveLength(2);
+    expect(screen.getByText('Branches')).toBeInTheDocument();
+    expect(screen.getByText('Low stock')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Light theme' })).toBeInTheDocument();
   });
 });

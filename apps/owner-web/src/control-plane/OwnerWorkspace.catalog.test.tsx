@@ -176,6 +176,7 @@ describe('owner catalog foundation flow', () => {
 
     expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
     expect(await screen.findByText('Bengaluru Flagship')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Catalog' }));
 
     fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Classic Tea' } });
     fireEvent.change(screen.getByLabelText('SKU code'), { target: { value: 'tea-classic-250g' } });
@@ -221,6 +222,7 @@ describe('owner catalog foundation flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start owner session' }));
 
     expect(await screen.findByText('Acme Owner', {}, { timeout: 10_000 })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Catalog' }));
 
     fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Reserve Beverage' } });
     fireEvent.change(screen.getByLabelText('SKU code'), { target: { value: 'bev-reserve-750' } });
