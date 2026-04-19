@@ -163,8 +163,17 @@ Contains:
 - pairing posture
 - scanner availability
 - sync/runtime status
+- runtime lifecycle actions:
+  - `Sign out`
+  - `Unpair`
 
 This keeps device diagnostics accessible without crowding the primary work loop.
+
+Important boundary:
+
+- `sign out` and `unpair` must remain available while the runtime is live
+- they should be reachable from the `Runtime` area or equivalent runtime-affordance sheet
+- they must not require the user to first fall out of the live runtime and back into the pre-runtime `Entry` surface
 
 ## Scan Screen Composition
 
