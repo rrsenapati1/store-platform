@@ -12,7 +12,10 @@ import com.store.mobile.runtime.StoreMobilePairedDevice
 import com.store.mobile.runtime.StoreMobileRuntimeSession
 import com.store.mobile.scan.InMemoryScanLookupRepository
 import com.store.mobile.scan.RemoteScanLookupRepository
+import com.store.mobile.ui.operations.MobileOperationsSection
+import com.store.mobile.ui.tablet.InventoryTabletDestination
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -245,5 +248,24 @@ class StoreMobileRuntimeContextTest {
         )
 
         assertTrue(repository is InMemoryScanLookupRepository)
+    }
+
+    @Test
+    fun treatsTabletScanAsActiveOnlyOnScanDestination() {
+        assertFalse(
+            isStoreMobileScanSectionActive(
+                shellMode = StoreMobileShellMode.TABLET,
+                handheldSection = MobileOperationsSection.SCAN,
+                tabletDestination = InventoryTabletDestination.OVERVIEW,
+            ),
+        )
+
+        assertTrue(
+            isStoreMobileScanSectionActive(
+                shellMode = StoreMobileShellMode.TABLET,
+                handheldSection = MobileOperationsSection.RECEIVING,
+                tabletDestination = InventoryTabletDestination.SCAN,
+            ),
+        )
     }
 }
