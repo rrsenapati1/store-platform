@@ -138,8 +138,26 @@ fun RuntimeStatusScreen(
                     .padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Text(
+                    text = "Runtime posture",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Text(text = state.title, style = MaterialTheme.typography.headlineSmall)
                 Text(text = state.detail, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = if (state.connected) {
+                        "Healthy spoke connection. Session, branch, and diagnostics are ready for live handheld or tablet work."
+                    } else {
+                        "Recovery required. Reconnect to the approved branch hub before resuming live spoke operations."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.connected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
                 Text(text = state.pendingSyncLabel, style = MaterialTheme.typography.bodyMedium)
                 Text(text = state.deviceLabel, style = MaterialTheme.typography.bodyMedium)
                 Text(text = state.hubLabel, style = MaterialTheme.typography.bodyMedium)
@@ -153,6 +171,11 @@ fun RuntimeStatusScreen(
                     .padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Text(
+                    text = "Diagnostics",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Text(text = state.externalScannerTitle, style = MaterialTheme.typography.titleMedium)
                 Text(text = state.externalScannerDetail, style = MaterialTheme.typography.bodyMedium)
                 Text(text = state.externalScannerLastScanLabel, style = MaterialTheme.typography.bodySmall)

@@ -27,6 +27,11 @@ fun HandheldScanHomeScreen(
     onConfigureZebraDataWedge: () -> Unit,
     onSelectTaskSection: (MobileOperationsSection) -> Unit,
 ) {
+    val heroModel = buildHandheldScanHeroModel(
+        state = state,
+        actionModel = actionModel,
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -41,21 +46,23 @@ fun HandheldScanHomeScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "Scan",
+                    text = heroModel.eyebrow,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = "Point the camera or scanner at an item and move directly into the next task.",
+                    text = heroModel.title,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = when {
-                        state.productName.isNotBlank() -> "Last scanned: ${state.productName}"
-                        else -> "No item scanned yet."
-                    },
+                    text = heroModel.detail,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Primary route: ${heroModel.primaryActionLabel}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -157,6 +164,25 @@ fun HandheldScanHomeScreen(
                             Text("${queue.label} · ${queue.count}")
                         }
                     }
+                }
+            }
+        } else {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Task queues clear",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "No queued restock, count, receiving, or expiry work is blocking the handheld right now. Scan the next item to route straight into the right task.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

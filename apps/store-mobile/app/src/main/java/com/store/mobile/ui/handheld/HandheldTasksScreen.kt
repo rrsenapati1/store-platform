@@ -53,6 +53,13 @@ fun HandheldTasksScreen(
     expiryActions: ExpiryScreenActions,
     runtimeStatusState: RuntimeStatusUiState,
 ) {
+    val postureModel = buildHandheldTaskPostureModel(
+        receivingState = receivingState,
+        stockCountState = stockCountState,
+        restockState = restockState,
+        expiryState = expiryState,
+    )
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -65,11 +72,35 @@ fun HandheldTasksScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Tasks",
+                    text = postureModel.eyebrow,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = postureModel.title,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = "Receiving, count, restock, and expiry work stay here so scan remains the primary home.",
+                    text = postureModel.detail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Task sections",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = "Receiving, count, restock, and expiry work stay here so scan remains the primary home for new item-driven actions.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

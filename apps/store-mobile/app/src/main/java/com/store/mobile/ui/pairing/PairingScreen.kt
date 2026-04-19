@@ -108,12 +108,5 @@ fun PairingScreen(
         ) {
             Text(redeemLabel)
         }
-        state.errorMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
     }
 }

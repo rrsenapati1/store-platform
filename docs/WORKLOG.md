@@ -2,6 +2,16 @@
 
 ## 2026-04-20
 
+- Closed the final store-mobile state-polish pass for public release:
+  - added explicit entry posture modeling so unpaired, paired-signed-out, expired-session, and live-session states now read like deliberate operator checkpoints instead of generic cards
+  - upgraded the handheld scan home with state-aware hero messaging, clearer empty/error item focus cards, and a task-queue-clear posture when nothing is blocking the associate
+  - upgraded the handheld tasks surface with resumable-work and queue-summary posture so empty boards no longer feel like blank admin screens
+  - tightened the runtime surface so healthy vs degraded spoke posture is explicit and diagnostics read as operator recovery guidance instead of raw status text
+- Verified:
+  - `./gradlew.bat testDebugUnitTest --tests com.store.mobile.ui.entry.StoreMobileEntrySurfaceModelTest --tests com.store.mobile.ui.handheld.HandheldRuntimePostureModelTest`
+  - `npm run ci:store-mobile`
+  - `git -c core.safecrlf=false diff --check`
+
 - Productized the first `store-mobile` handheld runtime pass:
   - added a dedicated mobile light/dark theme foundation and runtime destination model
   - split the root mobile app flow so pre-runtime pairing/session recovery now lives in a dedicated entry surface instead of a raw inline shell branch

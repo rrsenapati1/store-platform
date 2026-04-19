@@ -235,40 +235,54 @@ internal fun ScanLookupDetailsPanel(
         ) {
             Text("Lookup barcode")
         }
+        when {
+            state.productName.isNotBlank() -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(text = state.productName, style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            text = scanSourceLabel(state.lastScanSource),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(text = "Barcode: ${state.barcode}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "SKU: ${state.skuCode}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Price: ${state.priceLabel}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Stock: ${state.stockLabel}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Status: ${state.availabilityStatus}", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+
+            state.errorMessage != null -> {
+                ScanCameraMessageCard(
+                    title = "Lookup needs attention",
+                    message = buildString {
+                        append(state.errorMessage)
+                        if (state.draftBarcode.isNotBlank()) {
+                            append(" Last barcode: ${state.draftBarcode}.")
+                        }
+                    },
+                )
+            }
+
+            else -> {
+                ScanCameraMessageCard(
+                    title = "No item in focus yet",
+                    message = "Scan with camera, rugged scanner, or manual lookup to pull an item into this handheld and route into the next task.",
+                )
+            }
+        }
         ExternalScannerStatusCard(state = state)
         ZebraDataWedgeStatusCard(
             state = state,
             onConfigureZebraDataWedge = onConfigureZebraDataWedge,
         )
-        if (state.productName.isNotBlank()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(text = state.productName, style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        text = scanSourceLabel(state.lastScanSource),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(text = "Barcode: ${state.barcode}", style = MaterialTheme.typography.bodyMedium)
-                    Text(text = "SKU: ${state.skuCode}", style = MaterialTheme.typography.bodyMedium)
-                    Text(text = "Price: ${state.priceLabel}", style = MaterialTheme.typography.bodyMedium)
-                    Text(text = "Stock: ${state.stockLabel}", style = MaterialTheme.typography.bodyMedium)
-                    Text(text = "Status: ${state.availabilityStatus}", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-        state.errorMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
         if (state.cameraStatus == ScanCameraStatus.READY) {
             Text(
                 text = "Point the camera at a barcode, or use a DataWedge/HID/USB external scanner. Repeated detections are throttled to keep lookup stable.",

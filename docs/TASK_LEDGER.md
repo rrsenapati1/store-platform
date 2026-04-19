@@ -69,7 +69,6 @@ Updated: 2026-04-19
 
 These follow-ups remain release-critical productization work even though the first-pass shell rewrites are landing incrementally:
 
-- Final mobile empty/error/loading-state polish across entry, scan, tasks, and runtime flows
 - Final cross-app visual parity audit across `store-desktop`, `owner-web`, `platform-admin`, and `store-mobile`
 
 ## Future Work After V2
