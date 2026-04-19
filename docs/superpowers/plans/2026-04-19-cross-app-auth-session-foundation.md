@@ -161,6 +161,13 @@ Wire these shared helpers to explicit app client methods:
 
 Keep this foundation generic enough for both web apps so `owner-web` and `platform-admin` do not re-implement redirect entry, refresh timing, exchange, or sign-out behavior separately.
 
+For this first implementation pass, assume:
+
+- `authorizeBaseUrl` comes from app-level env wiring such as `import.meta.env.VITE_KORSENEX_AUTHORIZE_URL`
+- the callback `returnTo` URL is derived from the current app origin/path and fed into the shared helper by each app
+
+Do not block this task on introducing a backend-hosted web callback endpoint unless implementation proves it is strictly required.
+
 - [ ] **Step 4: Re-export the new helpers without breaking the existing dev bootstrap API**
 
 Modify `packages/auth/src/index.ts` so:
@@ -191,8 +198,6 @@ Run:
 
 ```bash
 npm run test --workspace @store/auth
-npm run test --workspace @store/owner-web -- src/App.test.tsx
-npm run test --workspace @store/platform-admin -- src/App.test.tsx
 ```
 
 Expected: PASS.
