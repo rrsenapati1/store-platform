@@ -91,7 +91,7 @@ export function OwnerAuthEntrySurface(props: OwnerAuthEntrySurfaceProps) {
       <MetricGrid metrics={metrics} />
 
       <SectionCard eyebrow="Secure entry" title={authCopy.title}>
-        <p style={{ color: 'var(--store-ink-muted, #5f6f85)', lineHeight: 1.6, marginTop: 0 }}>{authCopy.body}</p>
+        <p style={{ color: 'var(--store-text-muted, #5a6477)', lineHeight: 1.6, marginTop: 0 }}>{authCopy.body}</p>
         <ActionButton onClick={() => void props.onSignIn()} disabled={props.isBusy || props.sessionState === 'restoring'}>
           {authCopy.actionLabel}
         </ActionButton>

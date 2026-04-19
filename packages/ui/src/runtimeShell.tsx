@@ -2,9 +2,9 @@ import React, { type PropsWithChildren, type ReactNode, useId } from 'react';
 
 const shellStyle: React.CSSProperties = {
   minHeight: '100vh',
-  background: 'linear-gradient(180deg, #f6f8fc 0%, #eef2f7 100%)',
-  color: '#172033',
-  fontFamily: '"Segoe UI", sans-serif',
+  background: 'var(--store-surface-app, linear-gradient(180deg, #f7f3eb 0%, #ffffff 44%, #eef3fb 100%))',
+  color: 'var(--store-text-default, #25314f)',
+  fontFamily: '"Segoe UI", "Inter", sans-serif',
 };
 
 const navRailStyle: React.CSSProperties = {
@@ -12,8 +12,8 @@ const navRailStyle: React.CSSProperties = {
   top: 0,
   alignSelf: 'start',
   minHeight: '100vh',
-  borderRight: '1px solid rgba(23,32,51,0.08)',
-  background: 'rgba(247,249,252,0.96)',
+  borderRight: '1px solid var(--store-border-soft, rgba(23,32,51,0.10))',
+  background: 'var(--store-surface-raised, rgba(255,255,255,0.92))',
   padding: '24px 20px',
   boxSizing: 'border-box',
 };
@@ -32,8 +32,8 @@ const statusStripStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: '16px',
-  borderBottom: '1px solid rgba(23,32,51,0.08)',
-  background: 'rgba(255,255,255,0.94)',
+  borderBottom: '1px solid var(--store-border-soft, rgba(23,32,51,0.10))',
+  background: 'var(--store-surface-raised, rgba(255,255,255,0.92))',
   backdropFilter: 'blur(14px)',
   padding: '14px 24px',
   boxSizing: 'border-box',
@@ -53,8 +53,8 @@ const footerStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: '16px',
-  borderTop: '1px solid rgba(23,32,51,0.08)',
-  background: 'rgba(255,255,255,0.96)',
+  borderTop: '1px solid var(--store-border-soft, rgba(23,32,51,0.10))',
+  background: 'var(--store-surface-raised, rgba(255,255,255,0.92))',
   backdropFilter: 'blur(14px)',
   padding: '16px 24px',
   boxSizing: 'border-box',
@@ -71,7 +71,7 @@ const labelStyle: React.CSSProperties = {
   fontSize: '11px',
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  color: '#6b7487',
+  color: 'var(--store-text-subtle, #778195)',
 };
 
 const headingStyle: React.CSSProperties = {
@@ -79,14 +79,14 @@ const headingStyle: React.CSSProperties = {
   fontSize: '18px',
   lineHeight: 1.2,
   fontWeight: 700,
-  color: '#172033',
+  color: 'var(--store-text-strong, #172033)',
 };
 
 const subheadingStyle: React.CSSProperties = {
   margin: 0,
   fontSize: '13px',
   lineHeight: 1.5,
-  color: '#4e5871',
+  color: 'var(--store-text-muted, #5a6477)',
 };
 
 export function RuntimeShell(props: PropsWithChildren<{ navRail?: ReactNode; statusStrip?: ReactNode; footer?: ReactNode }>) {
@@ -130,10 +130,15 @@ export function RuntimeShellStatusStrip(
     <header style={statusStripStyle} aria-labelledby={titleId}>
       <div style={{ display: 'grid', gap: '4px' }}>
         {props.label ? <p style={labelStyle}>{props.label}</p> : null}
-        <h1 id={titleId} style={{ margin: 0, fontSize: '16px', lineHeight: 1.3, fontWeight: 700 }}>
+        <h1
+          id={titleId}
+          style={{ margin: 0, fontSize: '16px', lineHeight: 1.3, fontWeight: 700, color: 'var(--store-text-strong, #172033)' }}
+        >
           {props.title}
         </h1>
-        {props.detail ? <p style={{ margin: 0, fontSize: '13px', color: '#4e5871' }}>{props.detail}</p> : null}
+        {props.detail ? (
+          <p style={{ margin: 0, fontSize: '13px', color: 'var(--store-text-muted, #5a6477)' }}>{props.detail}</p>
+        ) : null}
         {props.children}
       </div>
       {props.actions ? <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>{props.actions}</div> : null}

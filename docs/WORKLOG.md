@@ -2,6 +2,15 @@
 
 ## 2026-04-20
 
+- Closed the final deferred cross-app visual parity pass for public release:
+  - moved the shared `store-desktop` runtime shell onto the same tokenized light/dark surface system already used by owner-web and platform-admin instead of leaving the desktop shell on hard-coded light-only colors
+  - aligned the desktop navigation rail, status strip, and footer posture with the shared product shell language so desktop now reads as part of the same modern suite rather than a separate legacy surface
+  - removed the last stale owner-web auth copy token mismatch and explicitly closed the deferred public-release productization backlog in `docs/TASK_LEDGER.md`
+- Verified:
+  - `npm run test --workspace @store/ui -- src/index.test.tsx`
+  - `npm run test --workspace @store/owner-web -- src/control-plane/OwnerAuthEntrySurface.test.tsx`
+  - `npm run test --workspace @store/store-desktop -- src/App.test.tsx src/control-plane/StoreRuntimeEntrySurface.test.tsx`
+
 - Closed the final store-mobile state-polish pass for public release:
   - added explicit entry posture modeling so unpaired, paired-signed-out, expired-session, and live-session states now read like deliberate operator checkpoints instead of generic cards
   - upgraded the handheld scan home with state-aware hero messaging, clearer empty/error item focus cards, and a task-queue-clear posture when nothing is blocking the associate

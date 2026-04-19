@@ -6,7 +6,7 @@ import {
   StatusBadge,
   StoreThemeModeToggle,
 } from '@store/ui';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { StoreRuntimeEntrySurface } from './storeRuntimeEntrySurface';
 import { StoreRuntimeManagerSurface } from './storeRuntimeManagerSurface';
 import { StoreRuntimeOperationsSurface } from './storeRuntimeOperationsSurface';
@@ -41,6 +41,22 @@ function resolveSessionLabel(workspace: StoreRuntimeWorkspaceState, runtimeReady
     default:
       return 'Idle';
   }
+}
+
+function navButtonStyle(active: boolean): CSSProperties {
+  return {
+    border: '1px solid',
+    borderColor: active ? 'var(--store-accent, #1f4fbf)' : 'var(--store-border-soft, rgba(23,32,51,0.10))',
+    borderRadius: 'var(--store-radius-control, 14px)',
+    background: active ? 'var(--store-accent-soft, rgba(31,79,191,0.12))' : 'transparent',
+    color: active ? 'var(--store-text-strong, #172033)' : 'var(--store-text-default, #25314f)',
+    textAlign: 'left',
+    padding: '14px 16px',
+    display: 'grid',
+    gap: '4px',
+    cursor: 'pointer',
+    transition: 'background var(--store-transition-fast, 160ms ease), border-color var(--store-transition-fast, 160ms ease)',
+  };
 }
 
 export function StoreRuntimeLayout(props: {
@@ -88,20 +104,13 @@ export function StoreRuntimeLayout(props: {
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={definition.label}
                 onClick={() => props.onSelectScreen(screenId)}
-                style={{
-                  border: isActive ? '1px solid rgba(15, 58, 140, 0.28)' : '1px solid rgba(23,32,51,0.08)',
-                  borderRadius: '16px',
-                  background: isActive ? '#eaf1ff' : '#ffffff',
-                  color: '#172033',
-                  textAlign: 'left',
-                  padding: '14px 16px',
-                  display: 'grid',
-                  gap: '4px',
-                  cursor: 'pointer',
-                }}
+                style={navButtonStyle(isActive)}
               >
                 <strong>{definition.label}</strong>
-                <span aria-hidden="true" style={{ fontSize: '12px', color: '#5a6477', lineHeight: 1.45 }}>
+                <span
+                  aria-hidden="true"
+                  style={{ fontSize: '12px', color: 'var(--store-text-muted, #5a6477)', lineHeight: 1.45 }}
+                >
                   {definition.description}
                 </span>
               </button>
@@ -139,11 +148,11 @@ export function StoreRuntimeLayout(props: {
         <>
           <div style={{ display: 'grid', gap: '4px' }}>
             <strong>{props.workspace.activeCashierSession?.session_number ?? 'Register not open'}</strong>
-            <span style={{ fontSize: '12px', color: '#5a6477' }}>
+            <span style={{ fontSize: '12px', color: 'var(--store-text-muted, #5a6477)' }}>
               {props.workspace.runtimeShellLabel ?? 'Runtime shell'} :: {props.workspace.runtimeHostname ?? 'Browser-managed'}
             </span>
           </div>
-          <div style={{ fontSize: '12px', color: '#5a6477' }}>
+          <div style={{ fontSize: '12px', color: 'var(--store-text-muted, #5a6477)' }}>
             {props.workspace.checkoutPaymentSession
               ? `Payment session ${props.workspace.checkoutPaymentSession.lifecycle_status}`
               : 'One active cart at a time'}

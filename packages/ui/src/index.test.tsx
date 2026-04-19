@@ -57,19 +57,21 @@ describe('shared ui primitives', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
   });
 
-  test('renders runtime shell primitives with the expected slots', () => {
+  test('renders runtime shell primitives with tokenized shell surfaces', () => {
     render(
-      <RuntimeShell
-        navRail={(
-          <RuntimeShellNavRail label="Navigation" title="Store Desktop" subtitle="Operator controls">
-            <button type="button">Transactions</button>
-          </RuntimeShellNavRail>
-        )}
-        statusStrip={<RuntimeShellStatusStrip label="Session" title="Register 04" detail="Connected to local queue" />}
-        footer={<ActionButton>Settle</ActionButton>}
-      >
-        <section>Main workspace</section>
-      </RuntimeShell>,
+      <StoreThemeProvider storageKey="ui.index.runtime-shell.theme" defaultMode="dark">
+        <RuntimeShell
+          navRail={(
+            <RuntimeShellNavRail label="Navigation" title="Store Desktop" subtitle="Operator controls">
+              <button type="button">Transactions</button>
+            </RuntimeShellNavRail>
+          )}
+          statusStrip={<RuntimeShellStatusStrip label="Session" title="Register 04" detail="Connected to local queue" />}
+          footer={<ActionButton>Settle</ActionButton>}
+        >
+          <section>Main workspace</section>
+        </RuntimeShell>
+      </StoreThemeProvider>,
     );
 
     expect(screen.getByText('Store Desktop')).toBeInTheDocument();
@@ -77,6 +79,15 @@ describe('shared ui primitives', () => {
     expect(screen.getByText('Main workspace')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settle' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Transactions' })).toBeInTheDocument();
+
+    const navigation = screen.getByLabelText('Store Desktop');
+    expect(navigation.getAttribute('style')).toContain('var(--store-surface-raised');
+    expect(navigation.getAttribute('style')).toContain('var(--store-border-soft');
+
+    const sessionHeading = screen.getByRole('heading', { name: 'Register 04' });
+    const sessionStrip = sessionHeading.closest('header');
+    expect(sessionStrip?.getAttribute('style')).toContain('var(--store-surface-raised');
+    expect(sessionStrip?.getAttribute('style')).toContain('var(--store-border-soft');
   });
 
   test('renders commerce primitives and closes the sheet', () => {

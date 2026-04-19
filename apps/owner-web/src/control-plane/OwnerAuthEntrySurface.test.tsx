@@ -55,6 +55,17 @@ describe('OwnerAuthEntrySurface', () => {
     expect(screen.getByRole('button', { name: 'Sign in again' })).toBeEnabled();
   });
 
+  test('uses shared muted-text tokens for the entry copy', () => {
+    renderWithTheme(createProps());
+
+    const copies = screen.getAllByText(/Use your Korsenex identity to open the owner command center/i);
+    expect(copies.length).toBeGreaterThan(0);
+    for (const copy of copies) {
+      expect(copy.getAttribute('style')).toContain('var(--store-text-muted');
+      expect(copy.getAttribute('style')).not.toContain('store-ink-muted');
+    }
+  });
+
   test('can expose local developer bootstrap controls without replacing the real sign-in CTA', () => {
     const props = createProps({
       korsenexToken: 'stub:sub=owner-1;email=owner@acme.local;name=Acme Owner',

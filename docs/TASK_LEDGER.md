@@ -1,6 +1,6 @@
 # Store Task Ledger
 
-Updated: 2026-04-19
+Updated: 2026-04-20
 
 | ID | Pri | Status | Track | Surface | Task | Exit Criteria |
 |---|---|---|---|---|---|---|
@@ -67,9 +67,7 @@ Updated: 2026-04-19
 
 ## Public Release Deferred Productization
 
-These follow-ups remain release-critical productization work even though the first-pass shell rewrites are landing incrementally:
-
-- Final cross-app visual parity audit across `store-desktop`, `owner-web`, `platform-admin`, and `store-mobile`
+All previously deferred public-release productization tasks are now complete.
 
 ## Future Work After V2
 
