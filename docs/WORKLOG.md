@@ -1,5 +1,23 @@
 # Store Worklog
 
+## 2026-04-20
+
+- Productized the first `store-mobile` handheld runtime pass:
+  - added a dedicated mobile light/dark theme foundation and runtime destination model
+  - split the root mobile app flow so pre-runtime pairing/session recovery now lives in a dedicated entry surface instead of a raw inline shell branch
+  - rebuilt the handheld default home around scan-first lookup with contextual actions, resumable task context, and queue preview instead of equal-weight top-level operations tabs
+  - replaced the handheld section switcher with a runtime shell organized around `Scan`, `Tasks`, and `Runtime`
+  - moved live `Sign out` and `Unpair` actions into the runtime area so session lifecycle controls no longer depend on the app root header
+- Tracked remaining public-release mobile/system work explicitly in `docs/TASK_LEDGER.md` under `Public Release Deferred Productization`:
+  - inventory tablet productization
+  - secure-storage hardening review
+  - final mobile empty/error/loading polish
+  - final cross-app visual parity audit
+- Verified:
+  - `npm run ci:store-mobile`
+  - `cd apps/store-mobile; .\gradlew.bat testDebugUnitTest --tests com.store.mobile.ui.pairing.PairingViewModelTest --tests com.store.mobile.runtime.StoreMobilePairingRepositoryTest --tests com.store.mobile.runtime.StoreMobileSessionRepositoryTest --tests com.store.mobile.ui.StoreMobileRuntimeContextTest`
+  - `git -c core.safecrlf=false diff --check`
+
 ## 2026-04-19
 
 - Completed the cross-app auth and session foundation for the public app suite:

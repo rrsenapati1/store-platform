@@ -147,6 +147,14 @@ cd apps/store-mobile
 - a running Android emulator, or
 - a connected physical Android device with USB debugging enabled
 
+Current product posture:
+
+- handheld associate runtime is the primary mobile experience
+- default live destination is `Scan`
+- `Tasks` groups receiving, count, restock, and expiry work
+- `Runtime` exposes device/session posture plus `Sign out` and `Unpair`
+- inventory tablet remains functional, but full tablet productization is still tracked in the public-release deferred backlog
+
 ## Auth And Session Notes
 
 Web control surfaces:

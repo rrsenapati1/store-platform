@@ -65,6 +65,15 @@ Updated: 2026-04-19
 | V2-009 | P0 | Done | V2 launch program | Hardening + scale | Add deeper security, recovery, performance/load validation, operational maturity, and launch-grade hardening across the expanded suite. | The broadened V2 suite meets stronger security, scale, backup/restore, observability, and performance expectations than the smaller release target. |
 | V2-010 | P0 | Done | V2 launch program | V2 launch readiness + cutover | Run the V2 beta program, certification, cutover reviews, and final launch sign-off for the full enterprise physical-retail suite. | V2 beta evidence exists, parallel required lanes are complete, launch checklists are signed off, and the V2 release candidate is operationally approved. |
 
+## Public Release Deferred Productization
+
+These follow-ups remain release-critical productization work even though the first-pass shell rewrites are landing incrementally:
+
+- Inventory tablet productization on top of the new `store-mobile` theme and runtime foundation
+- Secure-storage hardening review for persisted mobile pairing/session state before public release
+- Final mobile empty/error/loading-state polish across entry, scan, tasks, and runtime flows
+- Final cross-app visual parity audit across `store-desktop`, `owner-web`, `platform-admin`, and `store-mobile`
+
 ## Future Work After V2
 
 - Omnichannel storefronts, online ordering, and marketplace sync
