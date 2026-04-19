@@ -25,6 +25,8 @@
 
 ### Owner web
 
+- Modify: `apps/owner-web/src/control-plane/client.ts`
+  - Add explicit `exchangeSession()`, `refreshSession()`, and `signOut()` usage points for the shared browser session lifecycle.
 - Modify: `apps/owner-web/src/control-plane/useOwnerWorkspace.ts`
   - Stop treating session start as a token-entry action only; add restore, refresh, and sign-out orchestration.
 - Modify: `apps/owner-web/src/control-plane/OwnerWorkspace.tsx`
@@ -33,11 +35,15 @@
   - Signed-out, loading, expired-session, and sign-in-required owner entry UI.
 - Create: `apps/owner-web/src/control-plane/OwnerAuthEntrySurface.test.tsx`
   - Entry-surface behavior coverage.
+- Create: `apps/owner-web/src/control-plane/testOwnerSessionHarness.ts`
+  - Reusable session bootstrap helper for owner-web tests after the token gate is removed.
 - Modify: `apps/owner-web/src/App.test.tsx`
   - Update app-level bootstrap expectations away from manual token entry.
 
 ### Platform admin
 
+- Modify: `apps/platform-admin/src/control-plane/client.ts`
+  - Add explicit `exchangeSession()`, `refreshSession()`, and `signOut()` usage points for the shared browser session lifecycle.
 - Modify: `apps/platform-admin/src/control-plane/usePlatformAdminWorkspace.ts`
   - Add browser session restore, refresh, sign-out, and callback flow support.
 - Modify: `apps/platform-admin/src/control-plane/PlatformAdminWorkspace.tsx`
@@ -103,6 +109,8 @@
 - Create: `packages/auth/src/webSession.test.ts`
 - Modify: `packages/auth/src/index.ts`
 - Modify: `packages/auth/src/index.test.ts`
+- Modify: `apps/owner-web/src/control-plane/client.ts`
+- Modify: `apps/platform-admin/src/control-plane/client.ts`
 
 - [ ] **Step 1: Write the failing shared-web-session tests**
 
@@ -111,6 +119,7 @@ Create `packages/auth/src/webSession.test.ts` to cover:
 - browser callback parsing into a stable auth result
 - session persistence and restore
 - expiry detection
+- refresh-threshold detection
 - session clear on sign-out
 - local-dev bootstrap helpers staying separate from production session helpers
 
@@ -130,6 +139,8 @@ Create `packages/auth/src/webSession.ts` with focused functions and types such a
 
 ```ts
 export type StoreWebSessionRecord = { accessToken: string; expiresAt: string };
+export type StoreWebSessionExchange = (token: string) => Promise<StoreWebSessionRecord>;
+export type StoreWebSessionRefresh = (accessToken: string) => Promise<StoreWebSessionRecord>;
 export function loadStoreWebSession(storageKey: string): StoreWebSessionRecord | null;
 export function saveStoreWebSession(storageKey: string, record: StoreWebSessionRecord): void;
 export function clearStoreWebSession(storageKey: string): void;
@@ -137,10 +148,18 @@ export function isStoreWebSessionExpired(record: StoreWebSessionRecord, now?: nu
 export function readKorsenexCallback(windowLike: Pick<Window, 'location' | 'history'>): { token: string | null };
 export function buildKorsenexSignInUrl(args: { authorizeBaseUrl: string; returnTo: string; state?: string }): string;
 export function shouldRefreshStoreWebSession(record: StoreWebSessionRecord, now?: number, leadSeconds?: number): boolean;
+export async function exchangeStoreWebSession(args: { token: string; exchange: StoreWebSessionExchange; storageKey: string }): Promise<StoreWebSessionRecord>;
+export async function refreshStoreWebSession(args: { record: StoreWebSessionRecord; refresh: StoreWebSessionRefresh; storageKey: string }): Promise<StoreWebSessionRecord>;
 export async function signOutStoreWebSession(args: { storageKey: string; accessToken: string; signOut: (accessToken: string) => Promise<void> }): Promise<void>;
 ```
 
-Keep this foundation generic enough for both web apps so `owner-web` and `platform-admin` do not re-implement redirect entry, refresh timing, or sign-out behavior separately.
+Wire these shared helpers to explicit app client methods:
+
+- `exchangeSession()` -> `POST /v1/auth/oidc/exchange`
+- `refreshSession()` -> `POST /v1/auth/refresh`
+- `signOut()` -> `POST /v1/auth/sign-out`
+
+Keep this foundation generic enough for both web apps so `owner-web` and `platform-admin` do not re-implement redirect entry, refresh timing, exchange, or sign-out behavior separately.
 
 - [ ] **Step 4: Re-export the new helpers without breaking the existing dev bootstrap API**
 
@@ -149,30 +168,51 @@ Modify `packages/auth/src/index.ts` so:
 - local-dev bootstrap helpers stay available
 - new web-session helpers become the primary shared browser auth surface
 
-- [ ] **Step 5: Re-run the auth package tests**
+- [ ] **Step 5: Add explicit web-session client methods in both web apps**
+
+Modify:
+
+- `apps/owner-web/src/control-plane/client.ts`
+- `apps/platform-admin/src/control-plane/client.ts`
+
+to expose:
+
+```ts
+exchangeSession(token: string)
+refreshSession(accessToken: string)
+signOut(accessToken: string)
+```
+
+backed by the named control-plane auth routes above.
+
+- [ ] **Step 6: Re-run the shared auth and client-adjacent tests**
 
 Run:
 
 ```bash
 npm run test --workspace @store/auth
+npm run test --workspace @store/owner-web -- src/App.test.tsx
+npm run test --workspace @store/platform-admin -- src/App.test.tsx
 ```
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add packages/auth/src/index.ts packages/auth/src/index.test.ts packages/auth/src/webSession.ts packages/auth/src/webSession.test.ts
+git add packages/auth/src/index.ts packages/auth/src/index.test.ts packages/auth/src/webSession.ts packages/auth/src/webSession.test.ts apps/owner-web/src/control-plane/client.ts apps/platform-admin/src/control-plane/client.ts
 git commit -m "feat: add shared web auth session foundation"
 ```
 
 ## Task 2: Replace owner-web token bootstrap with real web auth lifecycle
 
 **Files:**
+- Modify: `apps/owner-web/src/control-plane/client.ts`
 - Modify: `apps/owner-web/src/control-plane/useOwnerWorkspace.ts`
 - Modify: `apps/owner-web/src/control-plane/OwnerWorkspace.tsx`
 - Create: `apps/owner-web/src/control-plane/OwnerAuthEntrySurface.tsx`
 - Create: `apps/owner-web/src/control-plane/OwnerAuthEntrySurface.test.tsx`
+- Create: `apps/owner-web/src/control-plane/testOwnerSessionHarness.ts`
 - Modify: `apps/owner-web/src/App.test.tsx`
 
 - [ ] **Step 1: Add failing owner auth-entry tests**
@@ -185,7 +225,13 @@ Create `OwnerAuthEntrySurface.test.tsx` to cover:
 
 Also update `apps/owner-web/src/App.test.tsx` so production entry no longer expects manual token input.
 
-- [ ] **Step 2: Run the owner-web tests to verify they fail**
+- [ ] **Step 2: Add a reusable owner test session harness**
+
+Create `testOwnerSessionHarness.ts` so existing owner-web tests can bootstrap a live owner session without depending on visible token-entry UI.
+
+Update auth-sensitive tests that currently drive the old token gate to use this harness rather than reproducing token-entry steps ad hoc.
+
+- [ ] **Step 3: Run the owner-web tests to verify they fail**
 
 Run:
 
@@ -195,7 +241,7 @@ npm run test --workspace @store/owner-web -- src/App.test.tsx src/control-plane/
 
 Expected: FAIL because owner-web still gates on `Korsenex token` input.
 
-- [ ] **Step 3: Implement the owner auth entry surface**
+- [ ] **Step 4: Implement the owner auth entry surface**
 
 Create `OwnerAuthEntrySurface.tsx` with product states for:
 
@@ -206,18 +252,21 @@ Create `OwnerAuthEntrySurface.tsx` with product states for:
 
 Do not leak dev token-entry UI into production entry posture.
 
-- [ ] **Step 4: Extend the owner workspace hook with web-session lifecycle**
+- [ ] **Step 5: Extend the owner workspace hook with web-session lifecycle**
 
 Modify `useOwnerWorkspace.ts` to:
 
 - restore persisted browser session on app load
 - refresh before expiry when possible
 - sign out cleanly
-- start session from callback-exchange or explicit sign-in initiation rather than token paste
+- start session from callback-exchange or explicit sign-in initiation rather than token paste, using:
+  - `ownerControlPlaneClient.exchangeSession()`
+  - `ownerControlPlaneClient.refreshSession()`
+  - `ownerControlPlaneClient.signOut()`
 
 If the real redirect initiation is only a URL handoff in this slice, keep it explicit and env-driven.
 
-- [ ] **Step 5: Refactor `OwnerWorkspace.tsx`**
+- [ ] **Step 6: Refactor `OwnerWorkspace.tsx`**
 
 Make `OwnerWorkspace.tsx`:
 
@@ -225,26 +274,27 @@ Make `OwnerWorkspace.tsx`:
 - otherwise render `OwnerAuthEntrySurface`
 - keep local-dev bootstrap support only behind development-only behavior
 
-- [ ] **Step 6: Re-run the owner-web tests**
+- [ ] **Step 7: Re-run the owner-web tests**
 
 Run:
 
 ```bash
-npm run test --workspace @store/owner-web -- src/App.test.tsx src/control-plane/OwnerAuthEntrySurface.test.tsx
+npm run test --workspace @store/owner-web
 ```
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add apps/owner-web/src/control-plane/useOwnerWorkspace.ts apps/owner-web/src/control-plane/OwnerWorkspace.tsx apps/owner-web/src/control-plane/OwnerAuthEntrySurface.tsx apps/owner-web/src/control-plane/OwnerAuthEntrySurface.test.tsx apps/owner-web/src/App.test.tsx
+git add apps/owner-web/src/control-plane/client.ts apps/owner-web/src/control-plane/useOwnerWorkspace.ts apps/owner-web/src/control-plane/OwnerWorkspace.tsx apps/owner-web/src/control-plane/OwnerAuthEntrySurface.tsx apps/owner-web/src/control-plane/OwnerAuthEntrySurface.test.tsx apps/owner-web/src/control-plane/testOwnerSessionHarness.ts apps/owner-web/src/App.test.tsx
 git commit -m "feat: add owner web auth entry lifecycle"
 ```
 
 ## Task 3: Replace platform-admin token bootstrap with real web auth lifecycle
 
 **Files:**
+- Modify: `apps/platform-admin/src/control-plane/client.ts`
 - Modify: `apps/platform-admin/src/control-plane/usePlatformAdminWorkspace.ts`
 - Modify: `apps/platform-admin/src/control-plane/PlatformAdminWorkspace.tsx`
 - Create: `apps/platform-admin/src/control-plane/PlatformAdminAuthEntrySurface.tsx`
@@ -286,7 +336,10 @@ Modify `usePlatformAdminWorkspace.ts` to:
 - restore browser session
 - refresh before expiry
 - support explicit sign-out
-- bootstrap from callback/sign-in initiation rather than token-entry
+- bootstrap from callback/sign-in initiation rather than token-entry, using:
+  - `platformAdminClient.exchangeSession()`
+  - `platformAdminClient.refreshSession()`
+  - `platformAdminClient.signOut()`
 
 - [ ] **Step 5: Refactor `PlatformAdminWorkspace.tsx`**
 
@@ -309,7 +362,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/platform-admin/src/control-plane/usePlatformAdminWorkspace.ts apps/platform-admin/src/control-plane/PlatformAdminWorkspace.tsx apps/platform-admin/src/control-plane/PlatformAdminAuthEntrySurface.tsx apps/platform-admin/src/control-plane/PlatformAdminAuthEntrySurface.test.tsx apps/platform-admin/src/App.test.tsx
+git add apps/platform-admin/src/control-plane/client.ts apps/platform-admin/src/control-plane/usePlatformAdminWorkspace.ts apps/platform-admin/src/control-plane/PlatformAdminWorkspace.tsx apps/platform-admin/src/control-plane/PlatformAdminAuthEntrySurface.tsx apps/platform-admin/src/control-plane/PlatformAdminAuthEntrySurface.test.tsx apps/platform-admin/src/App.test.tsx
 git commit -m "feat: add platform admin auth entry lifecycle"
 ```
 
